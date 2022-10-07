@@ -10,8 +10,8 @@ use crate::encoding::{BinaryMarshaler, BinaryUnmarshaller};
 
 use crate::group::integer_field::integer_field::ByteOrder::{BigEndian, LittleEndian};
 
-const ONE: u8 = 1;
-const TWO: u8 = 2;
+// const ONE: u8 = 1;
+// const TWO: u8 = 2;
 
 // var marshalScalarID = [8]byte{'m', 'o', 'd', '.', 'i', 'n', 't', ' '}
 
@@ -226,7 +226,7 @@ impl Int {
 
     /// mul sets the target to a * b mod m.
     /// Target receives a's modulus.
-    fn mul(mut self, a: &Self, b: &Self) -> Self {
+    pub fn mul(mut self, a: &Self, b: &Self) -> Self {
         self.m = a.m.clone();
         self.v = a.v.clone() * b.v.clone();
         self.v = self.v % self.m.clone();
@@ -235,7 +235,7 @@ impl Int {
 
 
     /// add sets the target to a + b mod m, where m is a's modulus..
-    pub(crate) fn add(mut self, a: &Self, b: &Self) -> Self {
+    pub fn add(mut self, a: &Self, b: &Self) -> Self {
         self.m = a.m.clone();
         self.v = (a.v.clone() + b.v.clone()) % self.m.clone();
         self

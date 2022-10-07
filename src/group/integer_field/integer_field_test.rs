@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod test {
-    use std::ops::Shl;
     use num_bigint::BigInt;
     use num_bigint::Sign::Plus;
     use crate::encoding::{BinaryMarshaler, BinaryUnmarshaller};

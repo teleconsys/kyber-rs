@@ -1,3 +1,3 @@
 mod group;
-mod edwards25519;
-mod integer_field;
+pub mod edwards25519;
+pub mod integer_field;
