@@ -1,7 +1,9 @@
 use std::cmp::Ordering::{Equal, Greater};
-use num_bigint::{BigInt};
+
 use anyhow::{bail, Result};
 use num_bigint::Sign::Plus;
+use num_traits::Num;
+use num_bigint::{BigInt};
 
 use serde::{Serialize, Deserialize};
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaller};
@@ -61,9 +63,9 @@ impl From<bool> for ByteOrder {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Int {
     // Integer value from 0 through m-1
-    v: BigInt,
+    pub(crate) v: BigInt,
     // Modulus for finite field arithmetic
-    m: BigInt,
+    pub(crate) m: BigInt,
     // Endianness which will be used on input and output
     pub bo: ByteOrder,
 }
@@ -89,6 +91,16 @@ impl Int {
     }
 
 
+    /// init a Int with a given big.Int value and modulus pointer.
+    /// Note that the value is copied; the modulus is not.
+    fn init(mut self, v: BigInt, m: BigInt) -> Self {
+        self.m = m.clone();
+        self.bo = BigEndian;
+        self.v = v % m;
+        self
+    }
+
+
     /// little_endian encodes the value of this Int into a little-endian byte-slice
     /// at least min bytes but no more than max bytes long.
     /// Panics if max != 0 and the Int cannot be represented in max bytes.
@@ -108,7 +120,8 @@ impl Int {
         }
 
         let buf = vec![0; pad as usize];
-        reverse(&mut buf[0..act as usize].to_vec(), &v_bytes).clone()
+        let buf2 = &buf[0..act as usize];
+        reverse(&buf2.to_vec(), &v_bytes)
     }
 
     /// marshal_size returns the length in bytes of encoded integers with modulus m.
@@ -119,10 +132,30 @@ impl Int {
         (self.m.bits() + 7) / 8
     }
 
-    // new_int64 creates a new Int with a given int64 value and big.Int modulus.
+
+    /// new_int creates a new Int with a given big.Int and a big.Int modulus.
+    pub fn new_int(v: BigInt, m: BigInt) -> Int {
+        return Int::default().init(v, m);
+    }
+
+    /// new_int64 creates a new Int with a given int64 value and big.Int modulus.
     pub fn new_int64(v: i64, m: BigInt) -> Int {
         Int::default().init64(v, m)
     }
+
+
+    /// new_int_bytes creates a new Int with a given slice of bytes and a big.Int
+    /// modulus.
+    pub fn new_int_bytes(a: &[u8], m: BigInt, byte_order: ByteOrder) -> Int {
+        return Int::default().init_bytes(a, m, byte_order);
+    }
+
+    /// new_int_string creates a new Int with a given string and a big.Int modulus.
+    /// The value is set to a rational fraction n/d in a given base.
+    pub fn new_int_string(n: String, d: String, base: i32, m: &BigInt) -> Int {
+        return Int::default().init_string(n, d, base, m);
+    }
+
 
     // Equal returns true if the TWO Ints are equal
     pub fn equal(&self, s2: &Self) -> bool {
@@ -133,6 +166,86 @@ impl Int {
     // fn  Cmp(&self, s2 kyber.Scalar) -> i32 {
     //     return i.V.Cmp(&s2.(*Int).V)
     // }
+
+    // init_bytes init the Int to a number represented in a big-endian byte string.
+    pub fn init_bytes(self, a: &[u8], m: BigInt, byte_order: ByteOrder) -> Self {
+        Int {
+            m,
+            bo: byte_order,
+            v: self.v,
+        }.set_bytes(a)
+    }
+
+    /// set_bytes set the value value to a number represented
+    /// by a byte string.
+    /// Endianness depends on the endianess set in i.
+    pub fn set_bytes(self, a: &[u8]) -> Self {
+        let mut buff = a.clone().to_vec();
+        if self.bo ==
+            LittleEndian {
+            buff = reverse(vec![0; buff.len()].as_ref(), &a.to_vec());
+        }
+        Int {
+            m: self.m.clone(),
+            v: BigInt::from_bytes_be(Plus, buff.as_ref()) % &self.m,
+            bo: self.bo,
+        }
+    }
+
+    /// init_string inits the Int to a rational fraction n/d
+    /// specified with a pair of strings in a given base.
+    fn init_string(mut self, n: String, d: String, base: i32, m: &BigInt) -> Int {
+        self.m = m.clone();
+        self.bo = BigEndian;
+        self.set_string(n, d, base).expect("init_string: invalid fraction representation")
+    }
+
+
+    /// set_string sets the Int to a rational fraction n/d represented by a pair of strings.
+    /// If d == "", then the denominator is taken to be 1.
+    /// Returns (i,true) on success, or
+    /// (nil,false) if either string fails to parse.
+    pub fn set_string(mut self, n: String, d: String, base: i32) -> Result<Self> {
+        self.v = BigInt::from_str_radix(n.as_str(), base as u32)?;
+        if d != "" {
+            let mut di = Int::default();
+            di.m = self.m.clone();
+            di = di.set_string(d, "".to_string(), base)?;
+            return Ok(self.clone().div(&self, &di));
+        }
+        Ok(self)
+    }
+
+    /// div sets the target to a * b^-1 mod m, where b^-1 is the modular inverse of b.
+    pub fn div(mut self, a: &Self, b: &Self) -> Self {
+        let _t = BigInt::default();
+        self.v = a.v.clone() * b.v.clone();
+        self.v = self.v.clone() % self.m.clone();
+        self
+    }
+
+    /// mul sets the target to a * b mod m.
+    /// Target receives a's modulus.
+    fn mul(mut self, a: &Self, b: &Self) -> Self {
+        self.m = a.m.clone();
+        self.v = a.v.clone() * b.v.clone();
+        self.v = self.v % self.m.clone();
+        self
+    }
+
+
+    /// add sets the target to a + b mod m, where m is a's modulus..
+    pub(crate) fn add(mut self, a: &Self, b: &Self) -> Self {
+        self.m = a.m.clone();
+        self.v = (a.v.clone() + b.v.clone()) % self.m.clone();
+        self
+    }
+
+
+    // Return the Int's integer value in hexadecimal string representation.
+    pub fn string(&self) -> String {
+        hex::encode(self.v.to_bytes_be().1)
+    }
 }
 
 impl PartialEq for Int {
@@ -185,74 +298,20 @@ impl BinaryUnmarshaller for Int {
     }
 }
 
-// // NewInt creaters a new Int with a given big.Int and a big.Int modulus.
-// func NewInt(v *big.Int, m *big.Int) *Int {
-// return new(Int).Init(v, m)
-// }
 
-
-// // NewIntBytes creates a new Int with a given slice of bytes and a big.Int
+// // new_int_bytes creates a new Int with a given slice of bytes and a big.Int
 // // modulus.
-// func NewIntBytes(a []byte, m *big.Int, byteOrder ByteOrder) *Int {
-// return new(Int).InitBytes(a, m, byteOrder)
+// func new_int_bytes(a []byte, m *big.Int, byteOrder ByteOrder) *Int {
+// return new(Int).init_bytes(a, m, byteOrder)
 // }
-//
-// // NewIntString creates a new Int with a given string and a big.Int modulus.
-// // The value is set to a rational fraction n/d in a given base.
-// func NewIntString(n, d string, base int, m *big.Int) *Int {
-// return new(Int).InitString(n, d, base, m)
-// }
-//
-// // Init a Int with a given big.Int value and modulus pointer.
+
+// // init a Int with a given big.Int value and modulus pointer.
 // // Note that the value is copied; the modulus is not.
-// func (i *Int) Init(V *big.Int, m *big.Int) *Int {
+// func (i *Int) init(V *big.Int, m *big.Int) *Int {
 // i.M = m
 // i.BO = BigEndian
 // i.V.Set(V).Mod(&i.V, m)
 // return i
-// }
-
-// // InitBytes init the Int to a number represented in a big-endian byte string.
-// func (i *Int) InitBytes(a []byte, m *big.Int, byteOrder ByteOrder) *Int {
-// i.M = m
-// i.BO = byteOrder
-// i.SetBytes(a)
-// return i
-// }
-//
-// // InitString inits the Int to a rational fraction n/d
-// // specified with a pair of strings in a given base.
-// func (i *Int) InitString(n, d string, base int, m *big.Int) *Int {
-// i.M = m
-// i.BO = BigEndian
-// if _, succ := i.SetString(n, d, base); !succ {
-// panic("InitString: invalid fraction representation")
-// }
-// return i
-// }
-//
-// // Return the Int's integer value in hexadecimal string representation.
-// func (i *Int) String() string {
-// return hex.EncodeToString(i.V.Bytes())
-// }
-//
-// // SetString sets the Int to a rational fraction n/d represented by a pair of strings.
-// // If d == "", then the denominator is taken to be 1.
-// // Returns (i,true) on success, or
-// // (nil,false) if either string fails to parse.
-// func (i *Int) SetString(n, d string, base int) (*Int, bool) {
-// if _, succ := i.V.SetString(n, base); !succ {
-// return nil, false
-// }
-// if d != "" {
-// var di Int
-// di.M = i.M
-// if _, succ := di.SetString(d, "", base); !succ {
-// return nil, false
-// }
-// i.Div(i, &di)
-// }
-// return i, true
 // }
 
 // // Nonzero returns true if the integer value is nonzero.
@@ -262,7 +321,7 @@ impl BinaryUnmarshaller for Int {
 //
 // // Set both value and modulus to be equal to another Int.
 // // Since this method copies the modulus as well,
-// // it may be used as an alternative to Init().
+// // it may be used as an alternative to init().
 // func (i *Int) Set(a kyber.Scalar) kyber.Scalar {
 // ai := a.(*Int)
 // i.V.Set(&ai.V)
@@ -272,7 +331,7 @@ impl BinaryUnmarshaller for Int {
 //
 // // Clone returns a separate duplicate of this Int.
 // func (i *Int) Clone() kyber.Scalar {
-// ni := new(Int).Init(&i.V, i.M)
+// ni := new(Int).init(&i.V, i.M)
 // ni.BO = i.BO
 // return ni
 // }
@@ -308,16 +367,7 @@ impl BinaryUnmarshaller for Int {
 // func (i *Int) Uint64() uint64 {
 // return i.V.Uint64()
 // }
-//
-// // Add sets the target to a + b mod m, where m is a's modulus..
-// func (i *Int) Add(a, b kyber.Scalar) kyber.Scalar {
-// ai := a.(*Int)
-// bi := b.(*Int)
-// i.M = ai.M
-// i.V.Add(&ai.V, &bi.V).Mod(&i.V, i.M)
-// return i
-// }
-//
+
 // // Sub sets the target to a - b mod m.
 // // Target receives a's modulus.
 // func (i *Int) Sub(a, b kyber.Scalar) kyber.Scalar {
@@ -339,28 +389,7 @@ impl BinaryUnmarshaller for Int {
 // }
 // return i
 // }
-//
-// // Mul sets the target to a * b mod m.
-// // Target receives a's modulus.
-// func (i *Int) Mul(a, b kyber.Scalar) kyber.Scalar {
-// ai := a.(*Int)
-// bi := b.(*Int)
-// i.M = ai.M
-// i.V.Mul(&ai.V, &bi.V).Mod(&i.V, i.M)
-// return i
-// }
-//
-// // Div sets the target to a * b^-1 mod m, where b^-1 is the modular inverse of b.
-// func (i *Int) Div(a, b kyber.Scalar) kyber.Scalar {
-// ai := a.(*Int)
-// bi := b.(*Int)
-// var t big.Int
-// i.M = ai.M
-// i.V.Mul(&ai.V, t.ModInverse(&bi.V, i.M))
-// i.V.Mod(&i.V, i.M)
-// return i
-// }
-//
+
 // // Inv sets the target to the modular inverse of a with respect to modulus m.
 // func (i *Int) Inv(a kyber.Scalar) kyber.Scalar {
 // ai := a.(*Int)
@@ -458,27 +487,17 @@ impl BinaryUnmarshaller for Int {
 // copy(buf[ofs:], i.V.Bytes())
 // return buf
 // }
-//
-// // SetBytes set the value value to a number represented
-// // by a byte string.
-// // Endianness depends on the endianess set in i.
-// func (i *Int) SetBytes(a []byte) kyber.Scalar {
-// var buff = a
-// if i.BO == little_endian {
-// buff = reverse(nil, a)
-// }
-// i.V.SetBytes(buff).Mod(&i.V, i.M)
-// return i
-// }
 
 /// reverse copies src into dst in byte-reversed order and returns dst,
 /// such that src[0] goes into dst[len-1] and vice versa.
 /// dst and src may be the same slice but otherwise must not overlap.
-fn reverse<'a>(dst: &'a mut Vec<u8>, src: &Vec<u8>) -> &'a mut Vec<u8> {
+fn reverse(dst: &Vec<u8>, src: &Vec<u8>) -> Vec<u8> {
+    let mut dst = dst.clone();
+    let src = src.clone();
     let l = dst.len();
     for i in 0..(l + 1) / 2 {
         let j = l - 1 - i;
         (dst[i], dst[j]) = (src[j], src[i]);
     }
-    return dst;
+    dst.clone()
 }

@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod test {
+    use std::ops::Shl;
     use num_bigint::BigInt;
+    use num_bigint::Sign::Plus;
     use crate::encoding::{BinaryMarshaler, BinaryUnmarshaller};
 
     use crate::group::integer_field::integer_field::ByteOrder::{BigEndian, LittleEndian};
@@ -51,49 +53,48 @@ mod test {
         assert_ne!(i, i2);
     }
 
-// func TestIntEndianBytes(t *testing.T) {
-// modulo, err := hex.DecodeString("1000")
-// moduloI := new(big.Int).SetBytes(modulo)
-// assert.Nil(t, err)
-// v, err := hex.DecodeString("10")
-// assert.Nil(t, err)
-//
-// i := new(Int).InitBytes(v, moduloI, BigEndian)
-//
-// assert.Equal(t, 2, i.MarshalSize())
-// assert.NotPanics(t, func() { i.little_endian(2, 2) })
-// }
-//
-// func TestInits(t *testing.T) {
-// i1 := NewInt64(int64(65500), big.NewInt(65535))
-// i2 := NewInt(&i1.V, i1.M)
-// assert.True(t, i1.Equal(i2))
-// b, _ := i1.marshal_binary()
-// i3 := NewIntBytes(b, i1.M, BigEndian)
-// assert.True(t, i1.Equal(i3))
-// i4 := NewIntString(i1.String(), "", 16, i1.M)
-// assert.True(t, i1.Equal(i4))
-// }
-//
-// func TestInit128bits(t *testing.T) {
-// m := new(big.Int).Lsh(big.NewInt(1), 128)
-// m = m.Sub(m, big.NewInt(1))
-//
-// i1 := NewInt(big.NewInt(1), m)
-// // size in bytes
-// require.Equal(t, 16, i1.MarshalSize())
-// }
-//
-// func TestIntClone(t *testing.T) {
-// moduloI := new(big.Int).SetBytes([]byte{0x10, 0})
-// base := new(Int).InitBytes([]byte{0x10}, moduloI, BigEndian)
-//
-// clone := base.Clone()
-// clone.Add(clone, clone)
-// b1, _ := clone.marshal_binary()
-// b2, _ := base.marshal_binary()
-// if bytes.Equal(b1, b2) {
-// t.Error("Should not be equal")
-// }
-// }
+    #[test]
+    fn test_int_endian_bytes() {
+        let modulo = hex::decode("1000").unwrap();
+        let modulo_i = BigInt::from_bytes_be(Plus, modulo.as_ref());
+        let v = hex::decode("10").unwrap();
+        let i = Int::default().init_bytes(v.as_ref(), modulo_i, BigEndian);
+
+        assert_eq!(2, i.marshal_size());
+        i.little_endian(2, 2);
+    }
+
+    #[test]
+    fn test_inits() {
+        let i1 = Int::new_int64(65500, BigInt::from(65535 as i64));
+        let i2 = Int::new_int(i1.v.clone(), i1.m.clone());
+        assert_eq!(i1, i2);
+        let b = i1.marshal_binary().unwrap();
+        let i3 = Int::new_int_bytes(b.as_slice(), i1.m.clone(), BigEndian);
+        assert_eq!(i1, i3);
+        let i4 = Int::new_int_string(i1.string(), "".to_string(), 16, &i1.m);
+        assert_eq!(i1, i4);
+    }
+
+    #[test]
+    fn test_init128bits() {
+        let mut m = BigInt::from(1 as i32) << 128 as i32;
+        m = m - BigInt::from(1 as i32);
+
+        let i1 = Int::new_int(BigInt::from(1 as i32), m);
+        // size in bytes
+        assert_eq!(16, i1.marshal_size());
+    }
+
+    #[test]
+    fn test_int_clone() {
+        let modulo_i = BigInt::from_bytes_be(Plus, &[0x10, 0].as_slice());
+        let base = Int::default().init_bytes(&[0x10], modulo_i, BigEndian);
+        let mut clone = base.clone();
+        let tmp = clone.clone();
+        clone = clone.add(&tmp, &tmp);
+        let b1 = clone.marshal_binary().unwrap();
+        let b2 = base.marshal_binary().unwrap();
+        assert_ne!(b1, b2, "Should not be equal");
+    }
 }
