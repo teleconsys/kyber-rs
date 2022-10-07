@@ -5,4 +5,6 @@ pub use encoding::{
     BinaryUnmarshaller,
     Marshaling,
     MarshallingError,
+    unmarshal_binary,
+    marshal_binary,
 };

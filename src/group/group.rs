@@ -5,15 +5,9 @@ use crate::encoding::Marshaling;
 /// This is an exponent in DSA-style groups,
 /// in which security is based on the Discrete Logarithm assumption,
 /// and a scalar multiplier in elliptic curve groups.
-pub trait Scalar: Marshaling + Clone {
-    /// Equality test for two Scalars derived from the same Group.
-    fn equal(&self, other: &Self) -> bool;
-
+pub trait Scalar: Marshaling + Clone + PartialEq {
     /// Set sets the receiver equal to another Scalar a.
     fn set(&mut self, a: &Self) -> &mut Self;
-
-// // Clone creates a new Scalar with the same value.
-// Clone() Scalar
 
     // set_int64 sets the receiver to a small integer value.
     fn set_int64(&mut self, v: i64) -> &mut Self;

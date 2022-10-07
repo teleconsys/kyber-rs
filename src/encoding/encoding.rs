@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 use std::fmt::{Debug};
-use serde::{Serialize};
+use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 use thiserror::Error;
 
 /// Marshaling is a basic interface representing fixed-length (or known-length)
@@ -8,9 +9,7 @@ use thiserror::Error;
 /// Implementors must ensure that calls to these methods do not modify
 /// the underlying object so that other users of the object can access
 /// it concurrently.
-pub trait Marshaling {
-// encoding.BinaryMarshaler
-// encoding.BinaryUnmarshaler
+pub trait Marshaling: BinaryMarshaler + BinaryUnmarshaller {
 
 // String returns the human readable string representation of the object.
 // String() string
@@ -58,20 +57,14 @@ pub trait BinaryUnmarshaller {
     fn unmarshal_binary(&mut self, data: &[u8]) -> Result<()>;
 }
 
-pub trait DefaultBinaryMarshalling {}
-
-impl<T> BinaryMarshaler for T where T: Serialize + DefaultBinaryMarshalling {
-    fn marshal_binary(&self) -> Result<Vec<u8>> {
-        return match bincode::serialize(self) {
-            Ok(v) => { Ok(v) }
-            Err(e) => { bail!(MarshallingError::Serialization(e)) }
-        };
-    }
+pub fn marshal_binary<T: Serialize>(x: &T) -> Result<Vec<u8>> {
+    return match bincode::serialize(x) {
+        Ok(v) => { Ok(v) }
+        Err(e) => { bail!(MarshallingError::Serialization(e)) }
+    };
 }
 
-// impl<T> BinaryUnmarshaller for T where T: Deserialize {
-//     fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), Error> {
-//         self = bincode::deserialize(data)?;
-//         Ok(())
-//     }
-// }
+pub fn unmarshal_binary<'de, T: Deserialize<'de>>(x: &mut T, data: &'de [u8]) -> Result<()> {
+    *x = bincode::deserialize(data)?;
+    Ok(())
+}

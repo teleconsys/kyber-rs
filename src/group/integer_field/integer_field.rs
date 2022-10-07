@@ -6,7 +6,8 @@ use num_traits::Num;
 use num_bigint::{BigInt};
 
 use serde::{Serialize, Deserialize};
-use crate::encoding::{BinaryMarshaler, BinaryUnmarshaller};
+use crate::encoding::{BinaryMarshaler, BinaryUnmarshaller, Marshaling};
+use crate::group::group::Scalar;
 
 use crate::group::integer_field::integer_field::ByteOrder::{BigEndian, LittleEndian};
 
@@ -295,6 +296,22 @@ impl BinaryUnmarshaller for Int {
             bail!("unmarshal_binary: value out of range");
         }
         Ok(())
+    }
+}
+
+impl Marshaling for Int {}
+
+impl Scalar for Int {
+    fn set(&mut self, a: &Self) -> &mut Self {
+        todo!()
+    }
+
+    /// set_int64 sets the Int to an arbitrary 64-bit "small integer" value.
+    /// The modulus must already be initialized.
+    fn set_int64(&mut self, v: i64) -> &mut Int {
+        // i.V.SetInt64(v).Mod(&i.V, i.M)
+        // return i
+        todo!()
     }
 }
 
