@@ -57,7 +57,7 @@ mod test {
         let modulo = hex::decode("1000").unwrap();
         let modulo_i = BigInt::from_bytes_be(Plus, modulo.as_ref());
         let v = hex::decode("10").unwrap();
-        let i = Int::default().init_bytes(v.as_ref(), modulo_i, BigEndian);
+        let i = Int::default().init_bytes(v.as_ref(), &modulo_i, BigEndian);
 
         assert_eq!(2, i.marshal_size());
         i.little_endian(2, 2);
@@ -69,7 +69,7 @@ mod test {
         let i2 = Int::new_int(i1.v.clone(), i1.m.clone());
         assert_eq!(i1, i2);
         let b = i1.marshal_binary().unwrap();
-        let i3 = Int::new_int_bytes(b.as_slice(), i1.m.clone(), BigEndian);
+        let i3 = Int::new_int_bytes(b.as_slice(), &i1.m, BigEndian);
         assert_eq!(i1, i3);
         let i4 = Int::new_int_string(i1.string(), "".to_string(), 16, &i1.m);
         assert_eq!(i1, i4);
@@ -88,7 +88,7 @@ mod test {
     #[test]
     fn test_int_clone() {
         let modulo_i = BigInt::from_bytes_be(Plus, &[0x10, 0].as_slice());
-        let base = Int::default().init_bytes(&[0x10], modulo_i, BigEndian);
+        let base = Int::default().init_bytes(&[0x10], &modulo_i, BigEndian);
         let mut clone = base.clone();
         let tmp = clone.clone();
         clone = clone.add(&tmp, &tmp);

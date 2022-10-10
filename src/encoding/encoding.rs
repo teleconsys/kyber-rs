@@ -1,7 +1,6 @@
 use anyhow::{bail, Result};
 use std::fmt::{Debug};
 use serde::{Deserialize, Serialize};
-use serde::de::DeserializeOwned;
 use thiserror::Error;
 
 /// Marshaling is a basic interface representing fixed-length (or known-length)

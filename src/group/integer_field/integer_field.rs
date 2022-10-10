@@ -147,7 +147,7 @@ impl Int {
 
     /// new_int_bytes creates a new Int with a given slice of bytes and a big.Int
     /// modulus.
-    pub fn new_int_bytes(a: &[u8], m: BigInt, byte_order: ByteOrder) -> Int {
+    pub fn new_int_bytes(a: &[u8], m: &BigInt, byte_order: ByteOrder) -> Int {
         return Int::default().init_bytes(a, m, byte_order);
     }
 
@@ -169,28 +169,12 @@ impl Int {
     // }
 
     // init_bytes init the Int to a number represented in a big-endian byte string.
-    pub fn init_bytes(self, a: &[u8], m: BigInt, byte_order: ByteOrder) -> Self {
+    pub fn init_bytes(self, a: &[u8], m: &BigInt, byte_order: ByteOrder) -> Self {
         Int {
-            m,
+            m: m.clone(),
             bo: byte_order,
             v: self.v,
         }.set_bytes(a)
-    }
-
-    /// set_bytes set the value value to a number represented
-    /// by a byte string.
-    /// Endianness depends on the endianess set in i.
-    pub fn set_bytes(self, a: &[u8]) -> Self {
-        let mut buff = a.clone().to_vec();
-        if self.bo ==
-            LittleEndian {
-            buff = reverse(vec![0; buff.len()].as_ref(), &a.to_vec());
-        }
-        Int {
-            m: self.m.clone(),
-            v: BigInt::from_bytes_be(Plus, buff.as_ref()) % &self.m,
-            bo: self.bo,
-        }
     }
 
     /// init_string inits the Int to a rational fraction n/d
@@ -302,16 +286,44 @@ impl BinaryUnmarshaller for Int {
 impl Marshaling for Int {}
 
 impl Scalar for Int {
-    fn set(&mut self, a: &Self) -> &mut Self {
+    fn set(&mut self, _a: &Self) -> &mut Self {
         todo!()
     }
 
     /// set_int64 sets the Int to an arbitrary 64-bit "small integer" value.
     /// The modulus must already be initialized.
-    fn set_int64(&mut self, v: i64) -> &mut Int {
+    fn set_int64(&mut self, _v: i64) -> &mut Int {
         // i.V.SetInt64(v).Mod(&i.V, i.M)
         // return i
         todo!()
+    }
+
+    fn zero(&mut self) -> &mut Self {
+        todo!()
+    }
+
+    fn add(&mut self, _a: &Self, _b: &Self) -> &mut Self {
+        todo!()
+    }
+
+    fn mul(&mut self, _a: Self, _b: Self) -> &mut Self {
+        todo!()
+    }
+
+    /// set_bytes set the value value to a number represented
+    /// by a byte string.
+    /// Endianness depends on the endianess set in i.
+    fn set_bytes(&mut self, a: &[u8]) -> Self {
+        let mut buff = a.clone().to_vec();
+        if self.bo ==
+            LittleEndian {
+            buff = reverse(vec![0; buff.len()].as_ref(), &a.to_vec());
+        }
+        Int {
+            m: self.m.clone(),
+            v: BigInt::from_bytes_be(Plus, buff.as_ref()) % &self.m,
+            bo: self.bo,
+        }
     }
 }
 

@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use crate::encoding::Marshaling;
 
 /// Scalar represents a scalar value by which
@@ -5,19 +6,19 @@ use crate::encoding::Marshaling;
 /// This is an exponent in DSA-style groups,
 /// in which security is based on the Discrete Logarithm assumption,
 /// and a scalar multiplier in elliptic curve groups.
-pub trait Scalar: Marshaling + Clone + PartialEq {
-    /// Set sets the receiver equal to another Scalar a.
+pub trait Scalar: Marshaling + Clone + PartialEq + Debug {
+    //// Set sets the receiver equal to another Scalar a.
     fn set(&mut self, a: &Self) -> &mut Self;
 
-    // set_int64 sets the receiver to a small integer value.
+    /// set_int64 sets the receiver to a small integer value.
     fn set_int64(&mut self, v: i64) -> &mut Self;
 
-// // Set to the additive identity (0).
-// Zero() Scalar
-//
-// // Set to the modular sum of scalars a and b.
-// Add(a, b Scalar) Scalar
-//
+    /// Set to the additive identity (0).
+    fn zero(&mut self) -> &mut Self;
+
+    /// Set to the modular sum of scalars a and b.
+    fn add(&mut self, a: &Self, b: &Self) -> &mut Self;
+
 // // Set to the modular difference a - b.
 // Sub(a, b Scalar) Scalar
 //
@@ -26,10 +27,10 @@ pub trait Scalar: Marshaling + Clone + PartialEq {
 //
 // // Set to the multiplicative identity (1).
 // One() Scalar
-//
-// // Set to the modular product of scalars a and b.
-// Mul(a, b Scalar) Scalar
-//
+
+    /// Set to the modular product of scalars a and b.
+    fn mul(&mut self, a: Self, b: Self) -> &mut Self;
+
 // // Set to the modular division of scalar a by scalar b.
 // Div(a, b Scalar) Scalar
 //
@@ -38,12 +39,12 @@ pub trait Scalar: Marshaling + Clone + PartialEq {
 //
 // // Set to a fresh random or pseudo-random scalar.
 // Pick(rand cipher.Stream) Scalar
-//
-// // SetBytes sets the scalar from a byte-slice,
-// // reducing if necessary to the appropriate modulus.
-// // The endianess of the byte-slice is determined by the
-// // implementation.
-// SetBytes([]byte) Scalar
+
+    /// set_bytes sets the scalar from a byte-slice,
+    /// reducing if necessary to the appropriate modulus.
+    /// The endianess of the byte-slice is determined by the
+    /// implementation.
+    fn set_bytes(&mut self, bytes: &[u8]) -> Self;
 }
 
 /// Point represents an element of a public-key cryptographic Group.
