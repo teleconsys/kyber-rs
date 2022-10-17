@@ -6,6 +6,7 @@ use num_traits::Num;
 use num_bigint::{BigInt};
 
 use serde::{Serialize, Deserialize};
+use crate::cipher::cipher::Stream;
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaller, Marshaling};
 use crate::group::group::Scalar;
 
@@ -46,8 +47,8 @@ impl From<bool> for ByteOrder {
 /// Int is a generic implementation of finite field arithmetic
 /// on integer finite fields with a given constant modulus,
 /// built using Go's built-in big.Int package.
-/// Int satisfies the kyber.Scalar interface,
-/// and hence serves as a basic implementation of kyber.Scalar,
+/// Int satisfies the kyber.scalar interface,
+/// and hence serves as a basic implementation of kyber.scalar,
 /// e.g., representing discrete-log exponents of Schnorr groups
 /// or scalar multipliers for elliptic curves.
 ///
@@ -164,7 +165,7 @@ impl Int {
     }
 
     // // Cmp compares TWO Ints for equality or inequality
-    // fn  Cmp(&self, s2 kyber.Scalar) -> i32 {
+    // fn  Cmp(&self, s2 kyber.scalar) -> i32 {
     //     return i.V.Cmp(&s2.(*Int).V)
     // }
 
@@ -310,6 +311,10 @@ impl Scalar for Int {
         todo!()
     }
 
+    fn pick<T: Stream>(&mut self, _rand: &T) -> &mut Self {
+        todo!()
+    }
+
     /// set_bytes set the value value to a number represented
     /// by a byte string.
     /// Endianness depends on the endianess set in i.
@@ -351,7 +356,7 @@ impl Scalar for Int {
 // // Set both value and modulus to be equal to another Int.
 // // Since this method copies the modulus as well,
 // // it may be used as an alternative to init().
-// func (i *Int) Set(a kyber.Scalar) kyber.Scalar {
+// func (i *Int) Set(a kyber.scalar) kyber.scalar {
 // ai := a.(*Int)
 // i.V.Set(&ai.V)
 // i.M = ai.M
@@ -359,20 +364,20 @@ impl Scalar for Int {
 // }
 //
 // // Clone returns a separate duplicate of this Int.
-// func (i *Int) Clone() kyber.Scalar {
+// func (i *Int) Clone() kyber.scalar {
 // ni := new(Int).init(&i.V, i.M)
 // ni.BO = i.BO
 // return ni
 // }
 //
 // // Zero set the Int to the value 0.  The modulus must already be initialized.
-// func (i *Int) Zero() kyber.Scalar {
+// func (i *Int) Zero() kyber.scalar {
 // i.V.SetInt64(0)
 // return i
 // }
 //
 // // One sets the Int to the value 1.  The modulus must already be initialized.
-// func (i *Int) One() kyber.Scalar {
+// func (i *Int) One() kyber.scalar {
 // i.V.SetInt64(1)
 // return i
 // }
@@ -386,7 +391,7 @@ impl Scalar for Int {
 //
 // // SetUint64 sets the Int to an arbitrary uint64 value.
 // // The modulus must already be initialized.
-// func (i *Int) SetUint64(v uint64) kyber.Scalar {
+// func (i *Int) SetUint64(v uint64) kyber.scalar {
 // i.V.SetUint64(v).Mod(&i.V, i.M)
 // return i
 // }
@@ -399,7 +404,7 @@ impl Scalar for Int {
 
 // // Sub sets the target to a - b mod m.
 // // Target receives a's modulus.
-// func (i *Int) Sub(a, b kyber.Scalar) kyber.Scalar {
+// func (i *Int) Sub(a, b kyber.scalar) kyber.scalar {
 // ai := a.(*Int)
 // bi := b.(*Int)
 // i.M = ai.M
@@ -408,7 +413,7 @@ impl Scalar for Int {
 // }
 //
 // // Neg sets the target to -a mod m.
-// func (i *Int) Neg(a kyber.Scalar) kyber.Scalar {
+// func (i *Int) Neg(a kyber.scalar) kyber.scalar {
 // ai := a.(*Int)
 // i.M = ai.M
 // if ai.V.Sign() > 0 {
@@ -420,7 +425,7 @@ impl Scalar for Int {
 // }
 
 // // Inv sets the target to the modular inverse of a with respect to modulus m.
-// func (i *Int) Inv(a kyber.Scalar) kyber.Scalar {
+// func (i *Int) Inv(a kyber.scalar) kyber.scalar {
 // ai := a.(*Int)
 // i.M = ai.M
 // i.V.ModInverse(&a.(*Int).V, i.M)
@@ -429,7 +434,7 @@ impl Scalar for Int {
 //
 // // Exp sets the target to a^e mod m,
 // // where e is an arbitrary big.Int exponent (not necessarily 0 <= e < m).
-// func (i *Int) Exp(a kyber.Scalar, e *big.Int) kyber.Scalar {
+// func (i *Int) Exp(a kyber.scalar, e *big.Int) kyber.scalar {
 // ai := a.(*Int)
 // i.M = ai.M
 // // to protect against golang/go#22830
@@ -441,7 +446,7 @@ impl Scalar for Int {
 //
 // // Jacobi computes the Jacobi symbol of (a/m), which indicates whether a is
 // // zero (0), a positive square in m (1), or a non-square in m (-1).
-// func (i *Int) Jacobi(as kyber.Scalar) kyber.Scalar {
+// func (i *Int) Jacobi(as kyber.scalar) kyber.scalar {
 // ai := as.(*Int)
 // i.M = ai.M
 // i.V.SetInt64(int64(big.Jacobi(&ai.V, i.M)))
@@ -451,7 +456,7 @@ impl Scalar for Int {
 // // Sqrt computes some square root of a mod m of ONE exists.
 // // Assumes the modulus m is an odd prime.
 // // Returns true on success, false if input a is not a square.
-// func (i *Int) Sqrt(as kyber.Scalar) bool {
+// func (i *Int) Sqrt(as kyber.scalar) bool {
 // ai := as.(*Int)
 // out := i.V.ModSqrt(&ai.V, ai.M)
 // i.M = ai.M
@@ -460,7 +465,7 @@ impl Scalar for Int {
 //
 // // Pick a [pseudo-]random integer modulo m
 // // using bits from the given stream cipher.
-// func (i *Int) Pick(rand cipher.Stream) kyber.Scalar {
+// func (i *Int) Pick(rand cipher.Stream) kyber.scalar {
 // i.V.Set(random.Int(i.M, rand))
 // return i
 // }

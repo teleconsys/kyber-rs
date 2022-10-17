@@ -1,13 +1,14 @@
 use std::fmt::Debug;
+use crate::cipher::cipher::Stream;
 use crate::encoding::Marshaling;
 
-/// Scalar represents a scalar value by which
+/// scalar represents a scalar value by which
 /// a Point (group element) may be encrypted to produce another Point.
 /// This is an exponent in DSA-style groups,
 /// in which security is based on the Discrete Logarithm assumption,
 /// and a scalar multiplier in elliptic curve groups.
 pub trait Scalar: Marshaling + Clone + PartialEq + Debug {
-    //// Set sets the receiver equal to another Scalar a.
+    //// Set sets the receiver equal to another scalar a.
     fn set(&mut self, a: &Self) -> &mut Self;
 
     /// set_int64 sets the receiver to a small integer value.
@@ -20,25 +21,25 @@ pub trait Scalar: Marshaling + Clone + PartialEq + Debug {
     fn add(&mut self, a: &Self, b: &Self) -> &mut Self;
 
 // // Set to the modular difference a - b.
-// Sub(a, b Scalar) Scalar
+// Sub(a, b scalar) scalar
 //
 // // Set to the modular negation of scalar a.
-// Neg(a Scalar) Scalar
+// Neg(a scalar) scalar
 //
 // // Set to the multiplicative identity (1).
-// One() Scalar
+// One() scalar
 
     /// Set to the modular product of scalars a and b.
     fn mul(&mut self, a: Self, b: Self) -> &mut Self;
 
 // // Set to the modular division of scalar a by scalar b.
-// Div(a, b Scalar) Scalar
+// Div(a, b scalar) scalar
 //
 // // Set to the modular inverse of scalar a.
-// Inv(a Scalar) Scalar
-//
-// // Set to a fresh random or pseudo-random scalar.
-// Pick(rand cipher.Stream) Scalar
+// Inv(a scalar) scalar
+
+    // Set to a fresh random or pseudo-random scalar.
+    fn pick<T: Stream>(&mut self, rand: &T) -> &mut Self;
 
     /// set_bytes sets the scalar from a byte-slice,
     /// reducing if necessary to the appropriate modulus.
@@ -97,10 +98,10 @@ pub trait Point: Marshaling {
 //
 // // Multiply point p by the scalar s.
 // // If p == nil, multiply with the standard base point Base().
-// Mul(s Scalar, p Point) Point
+// Mul(s scalar, p Point) Point
 }
 
-/// AllowsVarTime allows callers to determine if a given kyber.Scalar
+/// AllowsVarTime allows callers to determine if a given kyber.scalar
 /// or kyber.Point supports opting-in to variable time operations. If
 /// an object implements AllowsVarTime, then the caller can use
 /// AllowVarTime(true) in order to allow variable time operations on
@@ -127,9 +128,9 @@ pub trait AllowsVarTime {
 /// enabling the caller to generate the two particular types of objects
 /// relevant to DSA-style public-key cryptography;
 /// we call these objects Points and Scalars.
-/// The caller must explicitly initialize or set a new Point or Scalar object
+/// The caller must explicitly initialize or set a new Point or scalar object
 /// to some value before using it as an input to some other operation
-/// involving Point and/or Scalar objects.
+/// involving Point and/or scalar objects.
 /// For example, to compare a point P against the neutral (identity) element,
 /// you might use P.Equal(suite.Point().Null()),
 /// but not just P.Equal(suite.Point()).
@@ -138,17 +139,17 @@ pub trait AllowsVarTime {
 /// should satisfy suitable hardness assumptions for the applicable group:
 /// e.g., that it is cryptographically hard for an adversary to
 /// take an encrypted Point and the known generator it was based on,
-/// and derive the Scalar with which the Point was encrypted.
+/// and derive the scalar with which the Point was encrypted.
 /// Any implementation is also expected to satisfy
 /// the standard homomorphism properties that Diffie-Hellman
 /// and the associated body of public-key cryptography are based on.
-pub trait Group {
-    // String() -> string;
+pub trait Group<T: Scalar> {
+    fn string(&self) -> String;
 
-    // Max length of scalars in bytes
-    // ScalarLen() int
-    // Create new scalar
-    // Scalar() Scalar
+    // /// Max length of scalars in bytes
+    // fn scalar_len(&self) -> i32;
+    /// Create new scalar
+    fn scalar(&self) -> T;
     // Max length of point in bytes
     // PointLen() int
     // Create new point

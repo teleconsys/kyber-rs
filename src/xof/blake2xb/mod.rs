@@ -1,1 +1,2 @@
-pub mod blake;
+mod blake;
+pub use blake::XOF;

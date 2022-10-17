@@ -3,6 +3,7 @@ use crate::group::group;
 use serde::{Deserialize, Serialize};
 
 use subtle::ConstantTimeEq;
+use crate::cipher::cipher::Stream;
 use crate::group::edwards25519::constants;
 use crate::group::edwards25519::constants::PRIME_ORDER;
 use crate::group::edwards25519::fe::{load3, load4};
@@ -79,7 +80,7 @@ impl BinaryUnmarshaller for Scalar {
 }
 
 impl group::Scalar for Scalar {
-    // Set equal to another Scalar a
+    // Set equal to another scalar a
     fn set(&mut self, a: &Self) -> &mut Self {
         self.v = a.v.clone();
         self
@@ -103,6 +104,10 @@ impl group::Scalar for Scalar {
     fn mul(&mut self, a: Self, b: Self) -> &mut Self {
         sc_mul(&mut self.v, &a.v, &b.v);
         self
+    }
+
+    fn pick<T: Stream>(&mut self, _rand: &T) -> &mut Self {
+        todo!()
     }
 
     fn set_bytes(&mut self, bytes: &[u8]) -> Self {

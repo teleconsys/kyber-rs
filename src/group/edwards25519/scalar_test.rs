@@ -3,6 +3,7 @@ use crate::encoding::{BinaryMarshaler, BinaryUnmarshaller, Marshaling};
 use crate::group::edwards25519::scalar::Scalar as EdScalar;
 use crate::group::group::Scalar;
 use serde::{Deserialize, Serialize};
+use crate::cipher::cipher::Stream;
 
 /// SimpleCTScalar implements the scalar operations only using `ScMulAdd` by
 /// playing with the parameters.
@@ -62,6 +63,10 @@ impl Scalar for SimpleCTScalar {
     fn mul(&mut self, a: Self, b: Self) -> &mut Self {
         self.s.mul(a.s, b.s);
         self
+    }
+
+    fn pick<T: Stream>(&mut self, _rand: &T) -> &mut Self {
+        todo!()
     }
 
     fn set_bytes(&mut self, _bytes: &[u8]) -> Self {
@@ -133,65 +138,3 @@ fn test_factored_scalar() {
 fn test_simple_ct_scalar() {
     test_simple(SimpleCTScalar::new)
 }
-
-fn benchScalarAdd<T: Scalar> (new: fn() -> T) {
-// let seed = tSuite.XOF([]byte("hello world"))
-// s1 := new()
-// s2 := new()
-// s3 := new()
-// s1.Pick(seed)
-// s2.Pick(seed)
-//
-// for i := 0; i < b.N; i++ {
-// s3.Add(s1, s2)
-}
-
-// func benchScalarMul(b *testing.B, new func() kyber.Scalar) {
-// var seed = tSuite.XOF([]byte("hello world"))
-// s1 := new()
-// s2 := new()
-// s3 := new()
-// s1.Pick(seed)
-// s2.Pick(seed)
-//
-// for i := 0; i < b.N; i++ {
-// s3.Mul(s1, s2)
-// }
-// }
-//
-// func benchScalarSub(b *testing.B, new func() kyber.Scalar) {
-// var seed = tSuite.XOF([]byte("hello world"))
-// s1 := new()
-// s2 := new()
-// s3 := new()
-// s1.Pick(seed)
-// s2.Pick(seed)
-//
-// for i := 0; i < b.N; i++ {
-// s3.Sub(s1, s2)
-// }
-// }
-//
-// // addition
-//
-// func BenchmarkCTScalarAdd(b *testing.B) { benchScalarAdd(b, tSuite.Scalar) }
-//
-// func BenchmarkCTScalarSimpleAdd(b *testing.B) { benchScalarAdd(b, newSimpleCTScalar) }
-//
-// func BenchmarkCTScalarFactoredAdd(b *testing.B) { benchScalarAdd(b, newFactoredScalar) }
-//
-// // multiplication
-//
-// func BenchmarkCTScalarMul(b *testing.B) { benchScalarMul(b, tSuite.Scalar) }
-//
-// func BenchmarkCTScalarSimpleMul(b *testing.B) { benchScalarMul(b, newSimpleCTScalar) }
-//
-// func BenchmarkCTScalarFactoredMul(b *testing.B) { benchScalarMul(b, newFactoredScalar) }
-//
-// // substraction
-//
-// func BenchmarkCTScalarSub(b *testing.B) { benchScalarSub(b, tSuite.Scalar) }
-//
-// func BenchmarkCTScalarSimpleSub(b *testing.B) { benchScalarSub(b, newSimpleCTScalar) }
-//
-// func BenchmarkCTScalarFactoredSub(b *testing.B) { benchScalarSub(b, newFactoredScalar) }

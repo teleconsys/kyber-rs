@@ -1,11 +1,15 @@
+use crate::group::edwards25519::curve::Curve;
+use crate::group::edwards25519::scalar::Scalar;
+use crate::group::group::Group;
 use crate::xof;
-use crate::xof::blake2xb;
 
 /// SuiteEd25519 implements some basic functionalities such as Group, HashFactory,
 /// and XOFFactory.
-struct SuiteEd25519 {
+pub struct SuiteEd25519 {
     // Curve
     // r cipher.Stream
+
+    curve: Curve,
 }
 
 impl SuiteEd25519 {
@@ -16,9 +20,8 @@ impl SuiteEd25519 {
     // }
 
     /// xof returns an XOF which is implemented via the Blake2b hash.
-    fn xof(&self, key: &[u8]) -> xof::blake2xb::blake::xof {
-        todo!()
-        // return blake2xb.New(key);
+    pub fn xof(&self, key: &[u8]) -> xof::blake2xb::XOF {
+        xof::blake2xb::XOF::new(key)
     }
 
 //     func (s *SuiteEd25519) Read(r io.Reader, objs ...interface{}) error {
@@ -42,15 +45,16 @@ impl SuiteEd25519 {
 // }
 // return random.New()
 // }
-//
-// /// NewBlakeSHA256Ed25519 returns a cipher suite based on package
-// /// go.dedis.ch/kyber/v3/xof/blake2xb, SHA-256, and the Ed25519 curve.
-// /// It produces cryptographically random numbers via package crypto/rand.
-// func NewBlakeSHA256Ed25519() *SuiteEd25519 {
+
+    /// new_blake_sha256ed25519 returns a cipher suite based on package
+    /// go.dedis.ch/kyber/v3/xof/blake2xb, SHA-256, and the Ed25519 curve.
+    /// It produces cryptographically random numbers via package crypto/rand.
+    pub fn new_blake_sha256ed25519() -> SuiteEd25519 {
+        SuiteEd25519::default()
 // suite := new(SuiteEd25519)
 // return suite
-// }
-//
+    }
+
 // /// NewBlakeSHA256Ed25519WithRand returns a cipher suite based on package
 // /// go.dedis.ch/kyber/v3/xof/blake2xb, SHA-256, and the Ed25519 curve.
 // /// It produces cryptographically random numbers via the provided stream r.
@@ -59,4 +63,20 @@ impl SuiteEd25519 {
 // suite.r = r
 // return suite
 // }
+}
+
+impl Group<Scalar> for SuiteEd25519 {
+    fn string(&self) -> String {
+        self.curve.string()
+    }
+
+    fn scalar(&self) -> Scalar {
+        self.curve.scalar()
+    }
+}
+
+impl Default for SuiteEd25519 {
+    fn default() -> Self {
+        SuiteEd25519 { curve: Curve::default() }
+    }
 }
