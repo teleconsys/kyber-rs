@@ -1,6 +1,8 @@
+use anyhow::Error;
+
 // A Stream represents a stream cipher.
 pub trait Stream {
-    // XORKeyStream XORs each byte in the given slice with a byte from the
+    // xor_key_stream XORs each byte in the given slice with a byte from the
     // cipher's key stream. Dst and src must overlap entirely or not at all.
     //
     // If len(dst) < len(src), XORKeyStream should panic. It is acceptable
@@ -10,5 +12,5 @@ pub trait Stream {
     // Multiple calls to XORKeyStream behave as if the concatenation of
     // the src buffers was passed in a single run. That is, Stream
     // maintains state and does not reset at each XORKeyStream call.
-    fn XORKeyStream(&mut self, dst: &mut [u8], src: &[u8]);
+    fn xor_key_stream(&mut self, dst: &mut [u8], src: &[u8]) -> Result<(), Error>;
 }
