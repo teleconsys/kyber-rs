@@ -1,14 +1,14 @@
 use std::cmp::Ordering::{Equal, Greater};
 
 use anyhow::{bail, Result};
+use num_bigint::BigInt;
 use num_bigint::Sign::Plus;
 use num_traits::Num;
-use num_bigint::{BigInt};
 
-use serde::{Serialize, Deserialize};
 use crate::cipher::cipher::Stream;
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaller, Marshaling};
 use crate::group::group::Scalar;
+use serde::{Deserialize, Serialize};
 
 use crate::group::integer_field::integer_field::ByteOrder::{BigEndian, LittleEndian};
 
@@ -30,7 +30,7 @@ impl Into<bool> for ByteOrder {
     fn into(self) -> bool {
         match self {
             LittleEndian => true,
-            BigEndian => false
+            BigEndian => false,
         }
     }
 }
@@ -39,7 +39,7 @@ impl From<bool> for ByteOrder {
     fn from(b: bool) -> Self {
         match b {
             true => LittleEndian,
-            false => BigEndian
+            false => BigEndian,
         }
     }
 }
@@ -92,7 +92,6 @@ impl Int {
         self
     }
 
-
     /// init a Int with a given big.Int value and modulus pointer.
     /// Note that the value is copied; the modulus is not.
     fn init(mut self, v: BigInt, m: BigInt) -> Self {
@@ -101,7 +100,6 @@ impl Int {
         self.v = v % m;
         self
     }
-
 
     /// little_endian encodes the value of this Int into a little-endian byte-slice
     /// at least min bytes but no more than max bytes long.
@@ -134,7 +132,6 @@ impl Int {
         (self.m.bits() + 7) / 8
     }
 
-
     /// new_int creates a new Int with a given big.Int and a big.Int modulus.
     pub fn new_int(v: BigInt, m: BigInt) -> Int {
         return Int::default().init(v, m);
@@ -144,7 +141,6 @@ impl Int {
     pub fn new_int64(v: i64, m: BigInt) -> Int {
         Int::default().init64(v, m)
     }
-
 
     /// new_int_bytes creates a new Int with a given slice of bytes and a big.Int
     /// modulus.
@@ -157,7 +153,6 @@ impl Int {
     pub fn new_int_string(n: String, d: String, base: i32, m: &BigInt) -> Int {
         return Int::default().init_string(n, d, base, m);
     }
-
 
     // Equal returns true if the TWO Ints are equal
     pub fn equal(&self, s2: &Self) -> bool {
@@ -175,7 +170,8 @@ impl Int {
             m: m.clone(),
             bo: byte_order,
             v: self.v,
-        }.set_bytes(a)
+        }
+        .set_bytes(a)
     }
 
     /// init_string inits the Int to a rational fraction n/d
@@ -183,9 +179,9 @@ impl Int {
     fn init_string(mut self, n: String, d: String, base: i32, m: &BigInt) -> Int {
         self.m = m.clone();
         self.bo = BigEndian;
-        self.set_string(n, d, base).expect("init_string: invalid fraction representation")
+        self.set_string(n, d, base)
+            .expect("init_string: invalid fraction representation")
     }
-
 
     /// set_string sets the Int to a rational fraction n/d represented by a pair of strings.
     /// If d == "", then the denominator is taken to be 1.
@@ -219,14 +215,12 @@ impl Int {
         self
     }
 
-
     /// add sets the target to a + b mod m, where m is a's modulus..
     pub fn add(mut self, a: &Self, b: &Self) -> Self {
         self.m = a.m.clone();
         self.v = (a.v.clone() + b.v.clone()) % self.m.clone();
         self
     }
-
 
     // Return the Int's integer value in hexadecimal string representation.
     pub fn string(&self) -> String {
@@ -273,11 +267,10 @@ impl BinaryUnmarshaller for Int {
         }
         // Still needed here because of the comparison with the modulo
         if self.bo == LittleEndian {
-            buf = reverse(&mut vec![0 as u8; buf.len()], &buf.to_vec())
-                .to_owned();
+            buf = reverse(&mut vec![0 as u8; buf.len()], &buf.to_vec()).to_owned();
         }
         self.v = BigInt::from_bytes_be(Plus, buf.as_slice());
-        if matches!(self.v.cmp(&self.m), Greater | Equal ) {
+        if matches!(self.v.cmp(&self.m), Greater | Equal) {
             bail!("unmarshal_binary: value out of range");
         }
         Ok(())
@@ -311,7 +304,7 @@ impl Scalar for Int {
         todo!()
     }
 
-    fn pick<T: Stream>(&mut self, _rand: &T) -> &mut Self {
+    fn pick(&mut self, _rand: &mut impl Stream) -> &mut Self {
         todo!()
     }
 
@@ -320,8 +313,7 @@ impl Scalar for Int {
     /// Endianness depends on the endianess set in i.
     fn set_bytes(&mut self, a: &[u8]) -> Self {
         let mut buff = a.clone().to_vec();
-        if self.bo ==
-            LittleEndian {
+        if self.bo == LittleEndian {
             buff = reverse(vec![0; buff.len()].as_ref(), &a.to_vec());
         }
         Int {
@@ -331,7 +323,6 @@ impl Scalar for Int {
         }
     }
 }
-
 
 // // new_int_bytes creates a new Int with a given slice of bytes and a big.Int
 // // modulus.
@@ -381,7 +372,6 @@ impl Scalar for Int {
 // i.V.SetInt64(1)
 // return i
 // }
-
 
 // // Int64 returns the int64 representation of the value.
 // // If the value is not representable in an int64 the result is undefined.
@@ -469,7 +459,6 @@ impl Scalar for Int {
 // i.V.Set(random.Int(i.M, rand))
 // return i
 // }
-
 
 // // marshal_binary encodes the value of this Int into a byte-slice exactly Len() bytes long.
 // // It uses i's ByteOrder to determine which byte order to output.

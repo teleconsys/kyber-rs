@@ -1,9 +1,10 @@
+use crate::cipher::cipher::Stream;
 use crate::encoding;
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaller, Marshaling};
 use crate::group::edwards25519::scalar::Scalar as EdScalar;
 use crate::group::group::Scalar;
+use crate::util::random;
 use serde::{Deserialize, Serialize};
-use crate::cipher::cipher::Stream;
 
 /// SimpleCTScalar implements the scalar operations only using `ScMulAdd` by
 /// playing with the parameters.
@@ -65,8 +66,9 @@ impl Scalar for SimpleCTScalar {
         self
     }
 
-    fn pick<T: Stream>(&mut self, _rand: &T) -> &mut Self {
-        todo!()
+    fn pick(&mut self, rand: &mut impl Stream) -> &mut Self {
+        self.s.pick(rand);
+        self
     }
 
     fn set_bytes(&mut self, _bytes: &[u8]) -> Self {
@@ -118,10 +120,11 @@ fn test_set_bytes_le() {
 
 fn test_simple<T: Scalar>(new: fn() -> T) {
     let mut s1 = new();
-    let s2 = new();
+    let mut s2 = new();
     let mut s3 = new();
     s1.set_int64(2);
-    // s2.Pick(random.New());
+    let mut r = random::New(vec![]);
+    // s2.pick(&mut r);
 
     let mut tmp = new();
     let s22 = tmp.add(&s2, &s2);

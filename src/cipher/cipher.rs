@@ -1,4 +1,4 @@
-use anyhow::Error;
+use anyhow::Result;
 
 // A Stream represents a stream cipher.
 pub trait Stream {
@@ -12,5 +12,5 @@ pub trait Stream {
     // Multiple calls to XORKeyStream behave as if the concatenation of
     // the src buffers was passed in a single run. That is, Stream
     // maintains state and does not reset at each XORKeyStream call.
-    fn xor_key_stream(&mut self, dst: &mut [u8], src: &[u8]) -> Result<(), Error>;
+    fn xor_key_stream(&mut self, dst: &mut [u8], src: &[u8]) -> Result<()>;
 }

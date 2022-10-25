@@ -1,6 +1,6 @@
-use std::fmt::Debug;
 use crate::cipher::cipher::Stream;
 use crate::encoding::Marshaling;
+use std::fmt::Debug;
 
 /// scalar represents a scalar value by which
 /// a Point (group element) may be encrypted to produce another Point.
@@ -20,26 +20,26 @@ pub trait Scalar: Marshaling + Clone + PartialEq + Debug {
     /// Set to the modular sum of scalars a and b.
     fn add(&mut self, a: &Self, b: &Self) -> &mut Self;
 
-// // Set to the modular difference a - b.
-// Sub(a, b scalar) scalar
-//
-// // Set to the modular negation of scalar a.
-// Neg(a scalar) scalar
-//
-// // Set to the multiplicative identity (1).
-// One() scalar
+    // // Set to the modular difference a - b.
+    // Sub(a, b scalar) scalar
+    //
+    // // Set to the modular negation of scalar a.
+    // Neg(a scalar) scalar
+    //
+    // // Set to the multiplicative identity (1).
+    // One() scalar
 
     /// Set to the modular product of scalars a and b.
     fn mul(&mut self, a: Self, b: Self) -> &mut Self;
 
-// // Set to the modular division of scalar a by scalar b.
-// Div(a, b scalar) scalar
-//
-// // Set to the modular inverse of scalar a.
-// Inv(a scalar) scalar
+    // // Set to the modular division of scalar a by scalar b.
+    // Div(a, b scalar) scalar
+    //
+    // // Set to the modular inverse of scalar a.
+    // Inv(a scalar) scalar
 
     // Set to a fresh random or pseudo-random scalar.
-    fn pick<T: Stream>(&mut self, rand: &T) -> &mut Self;
+    fn pick(&mut self, rand: &mut impl Stream) -> &mut Self;
 
     /// set_bytes sets the scalar from a byte-slice,
     /// reducing if necessary to the appropriate modulus.
@@ -54,51 +54,51 @@ pub trait Scalar: Marshaling + Clone + PartialEq + Debug {
 /// or an (x, y) point on an elliptic curve.
 /// A Point can contain a Diffie-Hellman public key, an ElGamal ciphertext, etc.
 pub trait Point: Marshaling {
-//
-// // Equality test for two Points derived from the same Group.
-// Equal(s2 Point) bool
-//
-// // Null sets the receiver to the neutral identity element.
-// Null() Point
-//
-// // Base sets the receiver to this group's standard base point.
-// Base() Point
-//
-// // Pick sets the receiver to a fresh random or pseudo-random Point.
-// Pick(rand cipher.Stream) Point
-//
-// // Set sets the receiver equal to another Point p.
-// Set(p Point) Point
-//
-// // Clone clones the underlying point.
-// Clone() Point
-//
-// // Maximum number of bytes that can be embedded in a single
-// // group element via Pick().
-// EmbedLen() int
-//
-// // Embed encodes a limited amount of specified data in the
-// // Point, using r as a source of cryptographically secure
-// // random data.  Implementations only embed the first EmbedLen
-// // bytes of the given data.
-// Embed(data []byte, r cipher.Stream) Point
-//
-// // Extract data embedded in a point chosen via Embed().
-// // Returns an error if doesn't represent valid embedded data.
-// Data() ([]byte, error)
-//
-// // Add points so that their scalars add homomorphically.
-// Add(a, b Point) Point
-//
-// // Subtract points so that their scalars subtract homomorphically.
-// Sub(a, b Point) Point
-//
-// // Set to the negation of point a.
-// Neg(a Point) Point
-//
-// // Multiply point p by the scalar s.
-// // If p == nil, multiply with the standard base point Base().
-// Mul(s scalar, p Point) Point
+    //
+    // // Equality test for two Points derived from the same Group.
+    // Equal(s2 Point) bool
+    //
+    // // Null sets the receiver to the neutral identity element.
+    // Null() Point
+    //
+    // // Base sets the receiver to this group's standard base point.
+    // Base() Point
+    //
+    // // Pick sets the receiver to a fresh random or pseudo-random Point.
+    // Pick(rand cipher.Stream) Point
+    //
+    // // Set sets the receiver equal to another Point p.
+    // Set(p Point) Point
+    //
+    // // Clone clones the underlying point.
+    // Clone() Point
+    //
+    // // Maximum number of bytes that can be embedded in a single
+    // // group element via Pick().
+    // EmbedLen() int
+    //
+    // // Embed encodes a limited amount of specified data in the
+    // // Point, using r as a source of cryptographically secure
+    // // random data.  Implementations only embed the first EmbedLen
+    // // bytes of the given data.
+    // Embed(data []byte, r cipher.Stream) Point
+    //
+    // // Extract data embedded in a point chosen via Embed().
+    // // Returns an error if doesn't represent valid embedded data.
+    // Data() ([]byte, error)
+    //
+    // // Add points so that their scalars add homomorphically.
+    // Add(a, b Point) Point
+    //
+    // // Subtract points so that their scalars subtract homomorphically.
+    // Sub(a, b Point) Point
+    //
+    // // Set to the negation of point a.
+    // Neg(a Point) Point
+    //
+    // // Multiply point p by the scalar s.
+    // // If p == nil, multiply with the standard base point Base().
+    // Mul(s scalar, p Point) Point
 }
 
 /// AllowsVarTime allows callers to determine if a given kyber.scalar

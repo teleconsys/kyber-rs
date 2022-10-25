@@ -11,23 +11,22 @@ lazy_static! {
 }
 
 fn benchScalarAdd<T: Scalar>(n: usize, new: fn() -> T) {
-    let seed = T_SUITE.xof("hello world".as_ref());
+    let mut seed = T_SUITE.xof("hello world".as_ref());
     let mut s1 = new();
     let mut s2 = new();
-    let s3 = new();
-    s1.pick(&seed);
-    s2.pick(&seed);
+    let mut s3 = new();
+    // s1.pick(&mut seed);
+    // s2.pick(&mut seed);
 
-    // for i in 0..b.N {
-    //     s3.Add(&s1, &s2);
-    // }
+    for _ in 0..n {
+        s3.add(&s1, &s2);
+    }
 }
 
 fn benchScalarAddG(b: &mut Bencher) {
-    const N: usize = 1024;
-    b.iter(|| {
-        benchScalarAdd(N, || { T_SUITE.scalar() })
-    })
+    // const N: usize = 1024;
+    const N: usize = 1;
+    b.iter(|| benchScalarAdd(N, || T_SUITE.scalar()))
 }
 
 benchmark_group!(benches, benchScalarAddG);
