@@ -1,12 +1,11 @@
 #[cfg(test)]
 mod test {
+    use crate::encoding::{BinaryMarshaler, BinaryUnmarshaller};
     use num_bigint::BigInt;
     use num_bigint::Sign::Plus;
-    use crate::encoding::{BinaryMarshaler, BinaryUnmarshaller};
 
     use crate::group::integer_field::integer_field::ByteOrder::{BigEndian, LittleEndian};
     use crate::group::integer_field::integer_field::Int;
-
 
     #[test]
     fn test_int_endianness() {

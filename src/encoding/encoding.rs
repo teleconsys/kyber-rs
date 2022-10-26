@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
-use std::fmt::{Debug};
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use thiserror::Error;
 
 /// Marshaling is a basic interface representing fixed-length (or known-length)
@@ -9,20 +9,19 @@ use thiserror::Error;
 /// the underlying object so that other users of the object can access
 /// it concurrently.
 pub trait Marshaling: BinaryMarshaler + BinaryUnmarshaller {
+    // String returns the human readable string representation of the object.
+    // String() string
 
-// String returns the human readable string representation of the object.
-// String() string
+    // Encoded length of this object in bytes.
+    // MarshalSize() int
 
-// Encoded length of this object in bytes.
-// MarshalSize() int
+    // Encode the contents of this object and write it to an io.Writer.
+    // MarshalTo(w io.Writer) (int, error)
 
-// Encode the contents of this object and write it to an io.Writer.
-// MarshalTo(w io.Writer) (int, error)
-
-// Decode the content of this object by reading from an io.Reader.
-// If r is an XOF, it uses r to pick a valid object pseudo-randomly,
-// which may entail reading more than Len bytes due to retries.
-// UnmarshalFrom(r io.Reader) (int, error)
+    // Decode the content of this object by reading from an io.Reader.
+    // If r is an XOF, it uses r to pick a valid object pseudo-randomly,
+    // which may entail reading more than Len bytes due to retries.
+    // UnmarshalFrom(r io.Reader) (int, error)
 }
 
 // // Encoding represents an abstract interface to an encoding/decoding that can be
@@ -58,8 +57,10 @@ pub trait BinaryUnmarshaller {
 
 pub fn marshal_binary<T: Serialize>(x: &T) -> Result<Vec<u8>> {
     return match bincode::serialize(x) {
-        Ok(v) => { Ok(v) }
-        Err(e) => { bail!(MarshallingError::Serialization(e)) }
+        Ok(v) => Ok(v),
+        Err(e) => {
+            bail!(MarshallingError::Serialization(e))
+        }
     };
 }
 

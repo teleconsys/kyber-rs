@@ -1,10 +1,6 @@
 mod encoding;
 
 pub use encoding::{
-    BinaryMarshaler,
-    BinaryUnmarshaller,
-    Marshaling,
+    marshal_binary, unmarshal_binary, BinaryMarshaler, BinaryUnmarshaller, Marshaling,
     MarshallingError,
-    unmarshal_binary,
-    marshal_binary,
 };
