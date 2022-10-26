@@ -1,4 +1,4 @@
-use crate::encoding::{BinaryMarshaler, BinaryUnmarshaller, Marshaling};
+use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
 use crate::group::{group, integer_field};
 use crate::util::random;
 use serde::{Deserialize, Serialize};
@@ -65,7 +65,7 @@ impl BinaryMarshaler for Scalar {
     }
 }
 
-impl BinaryUnmarshaller for Scalar {
+impl BinaryUnmarshaler for Scalar {
     fn unmarshal_binary(&mut self, _data: &[u8]) -> anyhow::Result<()> {
         todo!()
     }

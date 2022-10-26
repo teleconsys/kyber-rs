@@ -8,7 +8,7 @@ use thiserror::Error;
 /// Implementors must ensure that calls to these methods do not modify
 /// the underlying object so that other users of the object can access
 /// it concurrently.
-pub trait Marshaling: BinaryMarshaler + BinaryUnmarshaller {
+pub trait Marshaling: BinaryMarshaler + BinaryUnmarshaler {
     // String returns the human readable string representation of the object.
     // String() string
 
@@ -51,7 +51,7 @@ pub trait BinaryMarshaler {
     fn marshal_binary(&self) -> Result<Vec<u8>>;
 }
 
-pub trait BinaryUnmarshaller {
+pub trait BinaryUnmarshaler {
     fn unmarshal_binary(&mut self, data: &[u8]) -> Result<()>;
 }
 

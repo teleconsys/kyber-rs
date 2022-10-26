@@ -6,7 +6,7 @@ use num_bigint::Sign::Plus;
 use num_traits::Num;
 
 use crate::cipher::cipher::Stream;
-use crate::encoding::{BinaryMarshaler, BinaryUnmarshaller, Marshaling};
+use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
 use crate::group::group::Scalar;
 use serde::{Deserialize, Serialize};
 
@@ -256,7 +256,7 @@ impl BinaryMarshaler for Int {
     }
 }
 
-impl BinaryUnmarshaller for Int {
+impl BinaryUnmarshaler for Int {
     /// unmarshal_binary tries to decode a Int from a byte-slice buffer.
     /// Returns an error if the buffer is not exactly Len() bytes long
     /// or if the contents of the buffer represents an out-of-range integer.

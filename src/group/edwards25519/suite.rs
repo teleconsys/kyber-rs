@@ -1,13 +1,17 @@
+use crate::cipher::Stream;
 use crate::group::edwards25519::curve::Curve;
 use crate::group::edwards25519::scalar::Scalar;
 use crate::group::group::Group;
-use crate::xof;
+use crate::util::random;
+use crate::{xof, Random, Suite, XOFFactory};
+
+use super::Point;
 
 /// SuiteEd25519 implements some basic functionalities such as Group, HashFactory,
 /// and XOFFactory.
 pub struct SuiteEd25519 {
     // Curve
-    // r cipher.Stream
+    // r: Box<dyn Stream>,
     curve: Curve,
 }
 
@@ -16,11 +20,6 @@ impl SuiteEd25519 {
     // fn  Hash(&self) -> hash.Hash {
     //     return sha256.New()
     // }
-
-    /// xof returns an XOF which is implemented via the Blake2b hash.
-    pub fn xof(&self, key: &[u8]) -> xof::blake::XOF {
-        xof::blake::XOF::new(Some(key))
-    }
 
     //     func (s *SuiteEd25519) Read(r io.Reader, objs ...interface{}) error {
     // return fixbuf.Read(r, s, objs...)
@@ -33,15 +32,6 @@ impl SuiteEd25519 {
     // /// New implements the kyber.Encoding interface
     // func (s *SuiteEd25519) New(t reflect.Type) interface{} {
     // return marshalling.GroupNew(s, t)
-    // }
-    //
-    // /// RandomStream returns a cipher.Stream that returns a key stream
-    // /// from crypto/rand.
-    // func (s *SuiteEd25519) RandomStream() cipher.Stream {
-    // if s.r != nil {
-    // return s.r
-    // }
-    // return random.New()
     // }
 
     /// new_blake_sha256ed25519 returns a cipher suite based on package
@@ -63,7 +53,7 @@ impl SuiteEd25519 {
     // }
 }
 
-impl Group<Scalar> for SuiteEd25519 {
+impl Group<Scalar, Point> for SuiteEd25519 {
     fn string(&self) -> String {
         self.curve.string()
     }
@@ -71,12 +61,37 @@ impl Group<Scalar> for SuiteEd25519 {
     fn scalar(&self) -> Scalar {
         self.curve.scalar()
     }
+
+    fn point(&self) -> Point {
+        self.curve.point()
+    }
 }
 
 impl Default for SuiteEd25519 {
     fn default() -> Self {
         SuiteEd25519 {
             curve: Curve::default(),
+            // r: todo!(),
         }
     }
 }
+
+impl Random for SuiteEd25519 {
+    /// RandomStream returns a cipher.Stream that returns a key stream
+    /// from crypto/rand.
+    fn RandomStream(&self) -> Box<dyn Stream> {
+        // if self.r != nil {
+        //     return s.r;
+        // }
+        Box::new(random::Randstream::default())
+    }
+}
+
+impl XOFFactory for SuiteEd25519 {
+    /// xof returns an XOF which is implemented via the Blake2b hash.
+    fn xof(&self, key: Option<&[u8]>) -> Box<dyn crate::XOF> {
+        Box::new(xof::blake::XOF::new(key))
+    }
+}
+
+impl Suite<Scalar, Point> for SuiteEd25519 {}

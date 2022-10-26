@@ -37,6 +37,16 @@ pub trait XOF: Stream + io::Write + io::Read {
     fn clone(&self) -> Box<dyn XOF>;
 }
 
+impl<X: XOF + ?Sized> XOF for Box<X> {
+    fn reseed(&mut self) {
+        (**self).reseed()
+    }
+
+    fn clone(&self) -> Box<dyn XOF> {
+        (**self).clone()
+    }
+}
+
 /// An XOFFactory is an interface that can be mixed in to local suite definitions.
 pub trait XOFFactory {
     /// xof creates a new XOF, feeding seed to it via it's Write method. If seed

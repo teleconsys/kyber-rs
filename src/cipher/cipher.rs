@@ -14,3 +14,9 @@ pub trait Stream {
     // maintains state and does not reset at each XORKeyStream call.
     fn xor_key_stream(&mut self, dst: &mut [u8], src: &[u8]) -> Result<()>;
 }
+
+impl<S: Stream + ?Sized> Stream for Box<S> {
+    fn xor_key_stream(&mut self, dst: &mut [u8], src: &[u8]) -> Result<()> {
+        self.as_mut().xor_key_stream(dst, src)
+    }
+}

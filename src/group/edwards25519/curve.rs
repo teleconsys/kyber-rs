@@ -1,12 +1,14 @@
 use crate::group::edwards25519::scalar::Scalar;
 use crate::group::group::Group;
 
+use super::Point;
+
 /// Curve represents the Ed25519 group.
 /// There are no parameters and no initialization is required
 /// because it supports only this one specific curve.
 pub struct Curve {}
 
-impl Group<Scalar> for Curve {
+impl Group<Scalar, Point> for Curve {
     /// Return the name of the curve, "Ed25519".
     fn string(&self) -> String {
         "Ed25519".to_string()
@@ -19,6 +21,10 @@ impl Group<Scalar> for Curve {
     /// of the EdDSA signature.
     fn scalar(&self) -> Scalar {
         Scalar::default()
+    }
+
+    fn point(&self) -> Point {
+        Point::default()
     }
 }
 

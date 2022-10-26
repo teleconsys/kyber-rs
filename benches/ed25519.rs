@@ -5,14 +5,19 @@ use bencher::Bencher;
 use kyber_rs::group::edwards25519::test_scalars::SimpleCTScalar;
 use kyber_rs::group::edwards25519::SuiteEd25519;
 use kyber_rs::group::{Group, Scalar};
+use kyber_rs::XOFFactory;
 use lazy_static::lazy_static;
 
-lazy_static! {
-    pub static ref T_SUITE: SuiteEd25519 = SuiteEd25519::new_blake_sha256ed25519();
+// lazy_static! {
+//     pub static ref T_SUITE: SuiteEd25519 = SuiteEd25519::new_blake_sha256ed25519();
+// }
+
+fn t_suite() -> SuiteEd25519 {
+    SuiteEd25519::new_blake_sha256ed25519()
 }
 
 fn bench_scalar_add<T: Scalar>(bench: &mut Bencher, new: fn() -> T) {
-    let mut seed = T_SUITE.xof("hello world".as_ref());
+    let mut seed = t_suite().xof(Some("hello world".as_ref()));
     let mut s1 = new();
     let mut s2 = new();
     let mut s3 = new();
@@ -34,7 +39,7 @@ benchmark_group!(
 benchmark_main!(benches);
 
 fn bench_scalar_mul<T: Scalar>(bench: &mut Bencher, new: fn() -> T) {
-    let mut seed = T_SUITE.xof("hello world".as_bytes());
+    let mut seed = t_suite().xof(Some("hello world".as_bytes()));
     let mut s1 = new();
     let mut s2 = new();
     let mut s3 = new();
@@ -47,7 +52,7 @@ fn bench_scalar_mul<T: Scalar>(bench: &mut Bencher, new: fn() -> T) {
 }
 
 fn bench_scalar_sub<T: Scalar>(bench: &mut Bencher, new: fn() -> T) {
-    let mut seed = T_SUITE.xof("hello world".as_bytes());
+    let mut seed = t_suite().xof(Some("hello world".as_bytes()));
     let mut s1 = new();
     let mut s2 = new();
     let mut s3 = new();
@@ -62,7 +67,7 @@ fn bench_scalar_sub<T: Scalar>(bench: &mut Bencher, new: fn() -> T) {
 // addition
 
 fn benchmark_ct_scalar_add(bench: &mut Bencher) {
-    bench_scalar_add(bench, || T_SUITE.scalar());
+    bench_scalar_add(bench, || t_suite().scalar());
 }
 
 fn benchmark_ct_scalar_simple_add(bench: &mut Bencher) {
@@ -75,7 +80,7 @@ fn benchmark_ct_scalar_simple_add(bench: &mut Bencher) {
 // multiplication
 
 fn benchmark_ct_scalar_mul(bench: &mut Bencher) {
-    bench_scalar_mul(bench, || T_SUITE.scalar());
+    bench_scalar_mul(bench, || t_suite().scalar());
 }
 
 // func BenchmarkCTScalarSimpleMul(b *testing.B) { benchScalarMul(b, newSimpleCTScalar) }
@@ -85,7 +90,7 @@ fn benchmark_ct_scalar_mul(bench: &mut Bencher) {
 // substraction
 
 fn benchmark_ct_scalar_sub(bench: &mut Bencher) {
-    bench_scalar_sub(bench, || T_SUITE.scalar());
+    bench_scalar_sub(bench, || t_suite().scalar());
 }
 
 // func BenchmarkCTScalarSimpleSub(b *testing.B) { benchScalarSub(b, newSimpleCTScalar) }

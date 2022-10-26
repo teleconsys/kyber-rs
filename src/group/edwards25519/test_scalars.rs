@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     cipher::cipher::Stream,
-    encoding::{self, BinaryMarshaler, BinaryUnmarshaller, Marshaling},
+    encoding::{self, BinaryMarshaler, BinaryUnmarshaler, Marshaling},
     group::Scalar,
 };
 
@@ -43,7 +43,7 @@ impl BinaryMarshaler for SimpleCTScalar {
     }
 }
 
-impl BinaryUnmarshaller for SimpleCTScalar {
+impl BinaryUnmarshaler for SimpleCTScalar {
     fn unmarshal_binary(&mut self, data: &[u8]) -> anyhow::Result<()> {
         encoding::unmarshal_binary(self, data)
     }

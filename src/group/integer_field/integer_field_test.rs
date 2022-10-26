@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use crate::encoding::{BinaryMarshaler, BinaryUnmarshaller};
+    use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler};
     use num_bigint::BigInt;
     use num_bigint::Sign::Plus;
 
