@@ -300,7 +300,17 @@ impl Scalar for Int {
         todo!()
     }
 
-    fn mul(&mut self, _a: Self, _b: Self) -> &mut Self {
+    /// Sub sets the target to a - b mod m.
+    /// Target receives a's modulus.
+    fn sub(&mut self, a: &Self, b: &Self) -> &mut Self {
+        self.m = a.m.clone();
+        let sub = &a.v - &b.v;
+        self.v = ((sub % &self.m) + &self.m) % &self.m;
+        // i.V.Sub(&ai.V, &bi.V).Mod(&i.V, i.M)
+        self
+    }
+
+    fn mul(&mut self, _a: &Self, _b: &Self) -> &mut Self {
         todo!()
     }
 
@@ -392,16 +402,6 @@ impl Scalar for Int {
 // return i.V.Uint64()
 // }
 
-// // Sub sets the target to a - b mod m.
-// // Target receives a's modulus.
-// func (i *Int) Sub(a, b kyber.scalar) kyber.scalar {
-// ai := a.(*Int)
-// bi := b.(*Int)
-// i.M = ai.M
-// i.V.Sub(&ai.V, &bi.V).Mod(&i.V, i.M)
-// return i
-// }
-//
 // // Neg sets the target to -a mod m.
 // func (i *Int) Neg(a kyber.scalar) kyber.scalar {
 // ai := a.(*Int)

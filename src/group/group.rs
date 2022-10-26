@@ -20,9 +20,9 @@ pub trait Scalar: Marshaling + Clone + PartialEq + Debug {
     /// Set to the modular sum of scalars a and b.
     fn add(&mut self, a: &Self, b: &Self) -> &mut Self;
 
-    // // Set to the modular difference a - b.
-    // Sub(a, b scalar) scalar
-    //
+    // Set to the modular difference a - b.
+    fn sub(&mut self, a: &Self, b: &Self) -> &mut Self;
+
     // // Set to the modular negation of scalar a.
     // Neg(a scalar) scalar
     //
@@ -30,7 +30,7 @@ pub trait Scalar: Marshaling + Clone + PartialEq + Debug {
     // One() scalar
 
     /// Set to the modular product of scalars a and b.
-    fn mul(&mut self, a: Self, b: Self) -> &mut Self;
+    fn mul(&mut self, a: &Self, b: &Self) -> &mut Self;
 
     // // Set to the modular division of scalar a by scalar b.
     // Div(a, b scalar) scalar

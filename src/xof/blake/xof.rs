@@ -2,8 +2,6 @@ use std::io::{Read, Write};
 
 use anyhow::Error;
 
-use blake2::digest::{Update, VariableOutput};
-
 use crate::cipher::cipher::Stream;
 
 use crate::xof::xof;
@@ -51,7 +49,7 @@ impl Stream for XOF {
 impl std::io::Write for XOF {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         match &mut self.implementation {
-            HashState::Readable { reader } => Err(std::io::Error::new(
+            HashState::Readable { reader: _ } => Err(std::io::Error::new(
                 std::io::ErrorKind::Interrupted,
                 "write after read",
             )),
@@ -61,11 +59,11 @@ impl std::io::Write for XOF {
 
     fn flush(&mut self) -> std::io::Result<()> {
         match &mut self.implementation {
-            HashState::Readable { reader } => {
+            HashState::Readable { reader: _ } => {
                 todo!()
                 // Err(std::io::Error::new(std::io::ErrorKind::, "asdf"))
             }
-            HashState::Writeable { writer } => todo!(),
+            HashState::Writeable { writer: _ } => todo!(),
         }
         // self.implementation.flush()
     }

@@ -1,6 +1,6 @@
-// Bits chooses a uniform random BigInt with a given maximum BitLen.
-// If 'exact' is true, choose a BigInt with _exactly_ that BitLen, not less
-fn Bits(bitlen: u64, exact: bool, rand: &mut impl Stream) -> Vec<u8> {
+/// bits chooses a uniform random BigInt with a given maximum BitLen.
+/// If 'exact' is true, choose a BigInt with _exactly_ that BitLen, not less
+fn bits(bitlen: u64, exact: bool, rand: &mut impl Stream) -> Vec<u8> {
     // let mut b: Vec<u8> = Vec::with_capacity(((bitlen + 7) / 8) as usize);
     let mut b: Vec<u8> = vec![0; ((bitlen + 7) / 8) as usize];
     let b_clone = b.clone();
@@ -21,7 +21,7 @@ fn Bits(bitlen: u64, exact: bool, rand: &mut impl Stream) -> Vec<u8> {
 
 use std::{
     cmp::Ordering,
-    io::{self, Read, Write},
+    io::{Read, Write},
 };
 
 use anyhow::{bail, Result};
@@ -29,19 +29,16 @@ use num_bigint::BigInt;
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 use sha2::{Digest, Sha256};
 
-use crate::{
-    cipher::{self, cipher::Stream},
-    xof::{self, blake::XOF},
-};
+use crate::{cipher::cipher::Stream, xof::blake::XOF};
 
-// Int chooses a uniform random big.Int less than a given modulus
-pub fn Int(modulus: &BigInt, rand: &mut impl Stream) -> BigInt {
+/// random_int chooses a uniform random big.Int less than a given modulus
+pub fn random_int(modulus: &BigInt, rand: &mut impl Stream) -> BigInt {
     let bitlen = modulus.bits();
 
     loop {
-        let bits = Bits(bitlen, false, rand);
+        let bits = bits(bitlen, false, rand);
         let i = BigInt::from_bytes_be(num_bigint::Sign::Plus, bits.as_ref());
-        if i.sign() == num_bigint::Sign::Plus && i.cmp(&modulus) < Ordering::Less {
+        if i.sign() == num_bigint::Sign::Plus && i.cmp(&modulus) == Ordering::Less {
             return i;
         }
     }
@@ -52,11 +49,41 @@ pub fn Int(modulus: &BigInt, rand: &mut impl Stream) -> BigInt {
 // 	rand.XORKeyStream(b, b)
 // }
 
-pub struct randstream {
+pub struct Randstream {
     readers: Vec<Box<dyn Read>>,
 }
 
-impl Stream for randstream {
+impl Default for Randstream {
+    fn default() -> Self {
+        let rng_core = Box::new(StdRng::from_entropy()) as Box<dyn RngCore>;
+        let default: Box<dyn Read> = Box::new(rng_core) as Box<dyn Read>;
+        Randstream {
+            readers: vec![default],
+        }
+    }
+}
+
+impl Randstream {
+    /// new returns a new cipher.Stream that gets random data from the given
+    /// readers. If no reader was provided, Go's crypto/rand package is used.
+    /// Otherwise, for each source, 32 bytes are read. They are concatenated and
+    /// then hashed, and the resulting hash is used as a seed to a PRNG.
+    /// The resulting cipher.Stream can be used in multiple threads.
+    #[cfg(test)]
+    pub fn new(readers: Vec<Box<dyn Read>>) -> Randstream {
+        if readers.len() == 0 {
+            return Randstream::default();
+        }
+        return Randstream {
+            readers: readers
+                .into_iter()
+                .map(|r| Box::new(r) as Box<dyn Read>)
+                .collect(),
+        };
+    }
+}
+
+impl Stream for Randstream {
     fn xor_key_stream(&mut self, dst: &mut [u8], src: &[u8]) -> Result<()> {
         let l = dst.len();
         if src.len() != l {
@@ -64,13 +91,13 @@ impl Stream for randstream {
         }
 
         // readerBytes is how many bytes we expect from each source
-        let readerBytes = 32;
+        let reader_bytes = 32;
 
         // try to read readerBytes bytes from all readers and write them in a buffer
         // let b: bytes.Buffer;
         let mut b = vec![];
         let mut nerr = 0 as usize;
-        let mut buff = vec![0 as u8; readerBytes];
+        let mut buff = vec![0 as u8; reader_bytes];
         for reader in &mut self.readers {
             let result = reader.read_exact(&mut buff);
             // n, err := io.ReadFull(reader, buff)
@@ -98,21 +125,4 @@ impl Stream for randstream {
         // blake2 := blake2xb.New(seed)
         // blake2.XORKeyStream(dst, src)
     }
-}
-
-// New returns a new cipher.Stream that gets random data from the given
-// readers. If no reader was provided, Go's crypto/rand package is used.
-// Otherwise, for each source, 32 bytes are read. They are concatenated and
-// then hashed, and the resulting hash is used as a seed to a PRNG.
-// The resulting cipher.Stream can be used in multiple threads.
-pub fn New(readers: Vec<Box<dyn Read>>) -> randstream {
-    let rng_core = Box::new(StdRng::from_entropy()) as Box<dyn RngCore>;
-    let default: Box<dyn Read> = Box::new(rng_core) as Box<dyn Read>;
-    let r: Vec<Box<dyn Read>> = readers
-        .into_iter()
-        .map(|r| Box::new(r) as Box<dyn Read>)
-        .collect();
-    return randstream {
-        readers: if r.len() == 0 { vec![default] } else { r },
-    };
 }
