@@ -3,11 +3,15 @@
 use crate::{
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling},
     group::group,
+};
+
+use super::{
+    ge::{extendedGroupElement, geScalarMult, geScalarMultBase},
+    ge_mult_vartime::geScalarMultVartime,
     Scalar,
 };
 
-use super::ge::extendedGroupElement;
-
+#[derive(Clone, Copy)]
 pub struct Point {
     ge: extendedGroupElement,
     varTime: bool,
@@ -15,7 +19,10 @@ pub struct Point {
 
 impl Default for Point {
     fn default() -> Self {
-        todo!()
+        Self {
+            ge: extendedGroupElement::default(),
+            varTime: false,
+        }
     }
 }
 
@@ -30,9 +37,13 @@ impl BinaryUnmarshaler for Point {
     }
 }
 
-impl Marshaling for Point {}
+impl Marshaling for Point {
+    fn MarshalTo(&self, w: &mut impl std::io::Write) -> anyhow::Result<usize> {
+        todo!()
+    }
+}
 
-impl group::Point for Point {
+impl group::Point<Scalar> for Point {
     fn equal(&self, s2: &Self) -> bool {
         todo!()
     }
@@ -50,10 +61,6 @@ impl group::Point for Point {
     }
 
     fn set(&mut self, p: Self) -> &mut Self {
-        todo!()
-    }
-
-    fn clone(&self) -> Self {
         todo!()
     }
 
@@ -81,8 +88,24 @@ impl group::Point for Point {
         todo!()
     }
 
-    fn mul(&mut self, s: &impl Scalar, p: Option<&Point>) -> &mut Self {
-        todo!()
+    /// Mul multiplies point p by scalar s using the repeated doubling method.
+    fn mul(&mut self, s: &Scalar, p: Option<&Self>) -> &mut Self {
+        let mut a = s.v.clone();
+
+        match p {
+            None => {
+                geScalarMultBase(&mut self.ge, &mut a);
+            }
+            Some(A) => {
+                if self.varTime {
+                    geScalarMultVartime(&mut self.ge, &mut a, &mut A.clone().ge);
+                } else {
+                    geScalarMult(&mut self.ge, &mut a, &mut A.clone().ge);
+                }
+            }
+        }
+
+        self
     }
 }
 
@@ -264,24 +287,6 @@ impl group::Point for Point {
 // // For Edwards curves, the negative of (x,y) is (-x,y).
 // func (P *point) Neg(A kyber.Point) kyber.Point {
 // 	P.ge.Neg(&A.(*point).ge)
-// 	return P
-// }
-
-// // Mul multiplies point p by scalar s using the repeated doubling method.
-// func (P *point) Mul(s kyber.Scalar, A kyber.Point) kyber.Point {
-
-// 	a := &s.(*scalar).v
-
-// 	if A == nil {
-// 		geScalarMultBase(&P.ge, a)
-// 	} else {
-// 		if P.varTime {
-// 			geScalarMultVartime(&P.ge, a, &A.(*point).ge)
-// 		} else {
-// 			geScalarMult(&P.ge, a, &A.(*point).ge)
-// 		}
-// 	}
-
 // 	return P
 // }
 

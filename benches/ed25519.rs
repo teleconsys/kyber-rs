@@ -6,7 +6,6 @@ use kyber_rs::group::edwards25519::test_scalars::SimpleCTScalar;
 use kyber_rs::group::edwards25519::SuiteEd25519;
 use kyber_rs::group::{Group, Scalar};
 use kyber_rs::XOFFactory;
-use lazy_static::lazy_static;
 
 // lazy_static! {
 //     pub static ref T_SUITE: SuiteEd25519 = SuiteEd25519::new_blake_sha256ed25519();

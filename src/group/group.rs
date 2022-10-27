@@ -9,7 +9,7 @@ use std::fmt::Debug;
 /// This is an exponent in DSA-style groups,
 /// in which security is based on the Discrete Logarithm assumption,
 /// and a scalar multiplier in elliptic curve groups.
-pub trait Scalar: Marshaling + Clone + PartialEq + Debug {
+pub trait Scalar: Marshaling + Clone + PartialEq + Debug + ToString {
     //// Set sets the receiver equal to another scalar a.
     fn set(&mut self, a: &Self) -> &mut Self;
 
@@ -55,7 +55,7 @@ pub trait Scalar: Marshaling + Clone + PartialEq + Debug {
 /// this is a number modulo the prime P in a DSA-style Schnorr group,
 /// or an (x, y) point on an elliptic curve.
 /// A Point can contain a Diffie-Hellman public key, an ElGamal ciphertext, etc.
-pub trait Point: Marshaling {
+pub trait Point<SCALAR: Scalar>: Marshaling + Clone {
     /// Equality test for two Points derived from the same Group.
     fn equal(&self, s2: &Self) -> bool;
 
@@ -70,9 +70,6 @@ pub trait Point: Marshaling {
 
     /// Set sets the receiver equal to another Point p.
     fn set(&mut self, p: Self) -> &mut Self;
-
-    /// Clone clones the underlying point.
-    fn clone(&self) -> Self;
 
     /// Maximum number of bytes that can be embedded in a single
     /// group element via Pick().
@@ -99,7 +96,7 @@ pub trait Point: Marshaling {
 
     /// Multiply point p by the scalar s.
     /// If p == nil, multiply with the standard base point Base().
-    fn mul(&mut self, s: &impl Scalar, p: Option<&Self>) -> &mut Self;
+    fn mul(&mut self, s: &SCALAR, p: Option<&Self>) -> &mut Self;
 }
 
 /// AllowsVarTime allows callers to determine if a given kyber.scalar
@@ -147,7 +144,7 @@ pub trait AllowsVarTime {
 pub trait Group<SCALAR, POINT>
 where
     SCALAR: Scalar,
-    POINT: Point,
+    POINT: Point<SCALAR>,
 {
     fn string(&self) -> String;
 

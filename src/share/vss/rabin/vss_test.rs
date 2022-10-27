@@ -1,9 +1,8 @@
-use crypto::signature::Verifier;
 use lazy_static::lazy_static;
 
 use crate::{group::edwards25519::SuiteEd25519, Group, Point, Random, Scalar};
 
-use super::vss::{Dealer, NewDealer, Suite};
+use super::vss::{minimum_t, Dealer, NewDealer, NewVerifier, RecoverSecret, Suite, Verifier};
 
 // lazy_static! {
 //     static ref SUITE: SuiteEd25519 = SuiteEd25519::new_blake_sha256ed25519();
@@ -16,7 +15,7 @@ fn suite() -> SuiteEd25519 {
 struct TestData<POINT, SCALAR>
 where
     SCALAR: Scalar,
-    POINT: Point,
+    POINT: Point<SCALAR>,
 {
     suite: SuiteEd25519,
     nb_verifiers: usize,
@@ -41,7 +40,7 @@ fn new_test_data<POINT, SCALAR>(
     secret: SCALAR,
 ) -> TestData<POINT, SCALAR>
 where
-    POINT: Point,
+    POINT: Point<SCALAR>,
     SCALAR: Scalar,
 {
     TestData {
@@ -56,65 +55,73 @@ where
     }
 }
 
-fn default_test_data() {
-    let (verifiersSec, verifiersPub) = genCommits(NB_VERIFIERS);
-    // let dealerSec, dealerPub = genPair();
-    // let secret, _ = genPair();
-    // let vssThreshold = MinimumT(nbVerifiers);
+fn default_test_data() -> TestData<EdPoint, EdScalar> {
+    let (verifiers_sec, verifiers_pub) = genCommits(NB_VERIFIERS);
+    let (dealer_sec, dealer_pub) = genPair();
+    let (secret, _) = genPair();
+    let vss_threshold = minimum_t(NB_VERIFIERS);
+    TestData {
+        suite: suite(),
+        nb_verifiers: NB_VERIFIERS,
+        vss_threshold,
+        verifiers_pub,
+        verifiers_sec,
+        dealer_pub,
+        dealer_sec,
+        secret,
+    }
 }
 
-// func init() {
-// 	verifiersSec, verifiersPub = genCommits(nbVerifiers)
-// 	dealerSec, dealerPub = genPair()
-// 	secret, _ = genPair()
-// 	vssThreshold = MinimumT(nbVerifiers)
-// }
+#[test]
+fn test_vss_whole() {
+    let test_data = default_test_data();
 
-// #[test]
-// fn TestVSSWhole() {
-// 	dealer, verifiers := genAll()
+    let (dealer, verifiers) = genAll();
 
-// 	// 1. dispatch deal
-// 	resps := make([]*Response, nbVerifiers)
-// 	encDeals, err := dealer.EncryptedDeals()
-// 	require.Nil(t, err)
-// 	for i, d := range encDeals {
-// 		resp, err := verifiers[i].ProcessEncryptedDeal(d)
-// 		require.Nil(t, err)
-// 		resps[i] = resp
-// 	}
+    // 1. dispatch deal
+    let mut resps = Vec::with_capacity(test_data.nb_verifiers); //make([]*Response, nbVerifiers)
+    let enc_deals = dealer.encrypted_deals().unwrap();
+    for (i, d) in enc_deals.iter().enumerate() {
+        let resp = verifiers[i].process_encrypted_deal(d).unwrap();
+        resps[i] = resp;
+    }
 
-// 	// 2. dispatch responses
-// 	for _, resp := range resps {
-// 		for i, v := range verifiers {
-// 			if resp.Index == uint32(i) {
-// 				continue
-// 			}
-// 			require.Nil(t, v.ProcessResponse(resp))
-// 		}
-// 		// 2.1. check dealer (no justification here)
-// 		j, err := dealer.ProcessResponse(resp)
-// 		require.Nil(t, err)
-// 		require.Nil(t, j)
-// 	}
+    // 2. dispatch responses
+    for resp in resps {
+        for (i, v) in verifiers.iter().enumerate() {
+            if resp.index == i as u32 {
+                continue;
+            }
+            assert!(v.process_response(&resp).is_ok());
+        }
+        // 2.1. check dealer (no justification here)
+        let justification_response = dealer.process_response(&resp);
+        assert!(justification_response.is_ok());
+        assert!(justification_response.unwrap().is_none());
+    }
 
-// 	// 3. check certified
-// 	for _, v := range verifiers {
-// 		require.True(t, v.DealCertified())
-// 	}
+    // 3. check certified
+    for v in &verifiers {
+        assert!(v.deal_certified());
+    }
 
-// 	// 4. collect deals
-// 	deals := make([]*Deal, nbVerifiers)
-// 	for i, v := range verifiers {
-// 		deals[i] = v.Deal()
-// 	}
+    // 4. collect deals
+    let mut deals = Vec::with_capacity(test_data.nb_verifiers);
+    for (i, v) in verifiers.iter().enumerate() {
+        deals[i] = v.deal().unwrap();
+    }
 
-// 	// 5. recover
-// 	sec, err := RecoverSecret(suite, deals, nbVerifiers, MinimumT(nbVerifiers))
-// 	assert.Nil(t, err)
-// 	require.NotNil(t, sec)
-// 	assert.Equal(t, dealer.secret.String(), sec.String())
-// }
+    // 5. recover
+    let sec = RecoverSecret(
+        test_data.suite,
+        deals,
+        test_data.nb_verifiers,
+        minimum_t(test_data.nb_verifiers),
+    )
+    .unwrap();
+
+    assert_eq!(dealer.secret.to_string(), sec.to_string());
+}
 
 // func TestVSSDealerNew(t *testing.T) {
 // 	goodT := MinimumT(nbVerifiers)
@@ -630,22 +637,38 @@ fn genCommits(n: usize) -> (Vec<EdScalar>, Vec<EdPoint>) {
     (secrets, publics)
 }
 
-// fn genDealer() -> *Dealer {
-//     let test_data = default_test_data();
-//     NewDealer(suite, longterm, secret, verifiers, t);
-// 	d, _ := NewDealer(suite, dealerSec, secret, verifiersPub, vssThreshold)
-// 	return d
-// }
+fn genDealer() -> Dealer<EdScalar, SuiteEd25519, EdPoint> {
+    let test_data = default_test_data();
+    let d = NewDealer(
+        test_data.suite,
+        test_data.dealer_sec,
+        test_data.secret,
+        test_data.verifiers_pub,
+        test_data.vss_threshold,
+    )
+    .unwrap();
+    d
+}
 
-// fn genAll() -> (Dealer, Vec<Verifier>) {
-// 	dealer := genDealer()
-// 	// var verifiers = make([]*Verifier, nbVerifiers)
-// 	// for i := 0; i < nbVerifiers; i++ {
-// 	// 	v, _ := NewVerifier(suite, verifiersSec[i], dealerPub, verifiersPub)
-// 	// 	verifiers[i] = v
-// 	// }
-// 	// return dealer, verifiers
-// }
+fn genAll() -> (
+    Dealer<EdScalar, SuiteEd25519, EdPoint>,
+    Vec<Verifier<EdScalar, EdPoint, SuiteEd25519>>,
+) {
+    let test_data = default_test_data();
+    let dealer = genDealer();
+    let mut verifiers = Vec::with_capacity(test_data.nb_verifiers);
+    for i in 0..NB_VERIFIERS {
+        let v = NewVerifier(
+            test_data.suite,
+            test_data.verifiers_sec[i],
+            test_data.dealer_pub,
+            test_data.verifiers_pub.clone(),
+        )
+        .unwrap();
+        verifiers[i] = v;
+    }
+    (dealer, verifiers)
+}
 
 // func randomBytes(n int) []byte {
 // 	var buff = make([]byte, n)

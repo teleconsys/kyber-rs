@@ -277,7 +277,17 @@ impl BinaryUnmarshaler for Int {
     }
 }
 
-impl Marshaling for Int {}
+impl Marshaling for Int {
+    fn MarshalTo(&self, w: &mut impl std::io::Write) -> Result<usize> {
+        todo!()
+    }
+}
+
+impl ToString for Int {
+    fn to_string(&self) -> String {
+        todo!()
+    }
+}
 
 impl Scalar for Int {
     fn set(&mut self, _a: &Self) -> &mut Self {

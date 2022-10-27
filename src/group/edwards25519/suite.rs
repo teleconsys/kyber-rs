@@ -9,6 +9,7 @@ use super::Point;
 
 /// SuiteEd25519 implements some basic functionalities such as Group, HashFactory,
 /// and XOFFactory.
+#[derive(Clone, Copy)]
 pub struct SuiteEd25519 {
     // Curve
     // r: Box<dyn Stream>,

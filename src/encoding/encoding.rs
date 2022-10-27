@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, io};
 use thiserror::Error;
 
 /// Marshaling is a basic interface representing fixed-length (or known-length)
@@ -15,8 +15,8 @@ pub trait Marshaling: BinaryMarshaler + BinaryUnmarshaler {
     // Encoded length of this object in bytes.
     // MarshalSize() int
 
-    // Encode the contents of this object and write it to an io.Writer.
-    // MarshalTo(w io.Writer) (int, error)
+    /// Encode the contents of this object and write it to an io.Writer.
+    fn MarshalTo(&self, w: &mut impl io::Write) -> Result<usize>;
 
     // Decode the content of this object by reading from an io.Reader.
     // If r is an XOF, it uses r to pick a valid object pseudo-randomly,

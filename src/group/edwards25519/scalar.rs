@@ -71,6 +71,12 @@ impl BinaryUnmarshaler for Scalar {
     }
 }
 
+impl ToString for Scalar {
+    fn to_string(&self) -> String {
+        todo!()
+    }
+}
+
 impl group::Scalar for Scalar {
     /// Set equal to another scalar a
     fn set(&mut self, a: &Self) -> &mut Self {
@@ -117,7 +123,11 @@ impl group::Scalar for Scalar {
     }
 }
 
-impl Marshaling for Scalar {}
+impl Marshaling for Scalar {
+    fn MarshalTo(&self, w: &mut impl std::io::Write) -> anyhow::Result<usize> {
+        todo!()
+    }
+}
 
 // Input:
 //   a[0]+256*a[1]+...+256^31*a[31] = a

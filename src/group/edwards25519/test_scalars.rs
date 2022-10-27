@@ -35,7 +35,11 @@ impl PartialEq for SimpleCTScalar {
     }
 }
 
-impl Marshaling for SimpleCTScalar {}
+impl Marshaling for SimpleCTScalar {
+    fn MarshalTo(&self, w: &mut impl std::io::Write) -> anyhow::Result<usize> {
+        todo!()
+    }
+}
 
 impl BinaryMarshaler for SimpleCTScalar {
     fn marshal_binary(&self) -> anyhow::Result<Vec<u8>> {
@@ -46,6 +50,12 @@ impl BinaryMarshaler for SimpleCTScalar {
 impl BinaryUnmarshaler for SimpleCTScalar {
     fn unmarshal_binary(&mut self, data: &[u8]) -> anyhow::Result<()> {
         encoding::unmarshal_binary(self, data)
+    }
+}
+
+impl ToString for SimpleCTScalar {
+    fn to_string(&self) -> String {
+        todo!()
     }
 }
 

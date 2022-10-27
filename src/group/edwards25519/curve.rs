@@ -6,6 +6,7 @@ use super::Point;
 /// Curve represents the Ed25519 group.
 /// There are no parameters and no initialization is required
 /// because it supports only this one specific curve.
+#[derive(Clone, Copy)]
 pub struct Curve {}
 
 impl Group<Scalar, Point> for Curve {
