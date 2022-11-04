@@ -1,6 +1,8 @@
 // This code is a port of the public domain, "ref10" implementation of ed25519
 // from SUPERCOP.
 
+use std::clone;
+
 /// FieldElement  represents an element of the field GF(2^255 - 19).  An element
 /// t, entries t[0]...t[9], represents the integer t[0]+2^26 t[1]+2^51 t[2]+2^77
 /// t[3]+2^102 t[4]+...+2^230 t[9].  Bounds on each t[i] vary depending on
@@ -36,20 +38,20 @@ pub fn feCopy(dst: &mut FieldElement, src: &FieldElement) {
     }
 }
 
-// // Replace (f,g) with (g,g) if b == 1;
-// // replace (f,g) with (f,g) if b == 0.
-// //
-// // Preconditions: b in {0,1}.
-// func feCMove(f, g *fieldElement, b int32) {
-// 	var x fieldElement
-// 	b = -b
-// 	for i := range x {
-// 		x[i] = b & (f[i] ^ g[i])
-// 	}
-// 	for i := range f {
-// 		f[i] ^= x[i]
-// 	}
-// }
+/// Replace (f,g) with (g,g) if b == 1;
+/// replace (f,g) with (f,g) if b == 0.
+///
+/// Preconditions: b in {0,1}.
+pub fn feCMove(f: &mut FieldElement, g: &FieldElement, b: i32) {
+    let mut x = FieldElement::default();
+    let b = -b;
+    for i in 0..x.len() {
+        x[i] = b & (f[i] ^ g[i]);
+    }
+    for i in 0..f.len() {
+        f[i] ^= x[i]
+    }
+}
 
 // func load3(in []byte) int64 {
 // 	r := int64(in[0])
@@ -66,206 +68,208 @@ pub fn feCopy(dst: &mut FieldElement, src: &FieldElement) {
 // 	return r
 // }
 
-// func feFromBytes(dst *fieldElement, src []byte) {
-// 	h0 := load4(src[:])
-// 	h1 := load3(src[4:]) << 6
-// 	h2 := load3(src[7:]) << 5
-// 	h3 := load3(src[10:]) << 3
-// 	h4 := load3(src[13:]) << 2
-// 	h5 := load4(src[16:])
-// 	h6 := load3(src[20:]) << 7
-// 	h7 := load3(src[23:]) << 5
-// 	h8 := load3(src[26:]) << 4
-// 	h9 := (load3(src[29:]) & 8388607) << 2
+pub fn feFromBytes(dst: &mut FieldElement, src: &[u8]) {
+    let mut h0 = load4(&src[..]);
+    let mut h1 = load3(&src[4..]) << 6;
+    let mut h2 = load3(&src[7..]) << 5;
+    let mut h3 = load3(&src[10..]) << 3;
+    let mut h4 = load3(&src[13..]) << 2;
+    let mut h5 = load4(&src[16..]);
+    let mut h6 = load3(&src[20..]) << 7;
+    let mut h7 = load3(&src[23..]) << 5;
+    let mut h8 = load3(&src[26..]) << 4;
+    let mut h9 = (load3(&src[29..]) & 8388607) << 2;
 
-// 	var carry [10]int64
-// 	carry[9] = (h9 + 1<<24) >> 25
-// 	h0 += carry[9] * 19
-// 	h9 -= carry[9] << 25
-// 	carry[1] = (h1 + 1<<24) >> 25
-// 	h2 += carry[1]
-// 	h1 -= carry[1] << 25
-// 	carry[3] = (h3 + 1<<24) >> 25
-// 	h4 += carry[3]
-// 	h3 -= carry[3] << 25
-// 	carry[5] = (h5 + 1<<24) >> 25
-// 	h6 += carry[5]
-// 	h5 -= carry[5] << 25
-// 	carry[7] = (h7 + 1<<24) >> 25
-// 	h8 += carry[7]
-// 	h7 -= carry[7] << 25
+    let mut carry = [0 as i64; 10];
+    carry[9] = (h9 + (1 << 24)) >> 25;
+    h0 += carry[9] * 19;
+    h9 -= carry[9] << 25;
+    carry[1] = (h1 + (1 << 24)) >> 25;
+    h2 += carry[1];
+    h1 -= carry[1] << 25;
+    carry[3] = (h3 + (1 << 24)) >> 25;
+    h4 += carry[3];
+    h3 -= carry[3] << 25;
+    carry[5] = (h5 + (1 << 24)) >> 25;
+    h6 += carry[5];
+    h5 -= carry[5] << 25;
+    carry[7] = (h7 + (1 << 24)) >> 25;
+    h8 += carry[7];
+    h7 -= carry[7] << 25;
 
-// 	carry[0] = (h0 + 1<<25) >> 26
-// 	h1 += carry[0]
-// 	h0 -= carry[0] << 26
-// 	carry[2] = (h2 + 1<<25) >> 26
-// 	h3 += carry[2]
-// 	h2 -= carry[2] << 26
-// 	carry[4] = (h4 + 1<<25) >> 26
-// 	h5 += carry[4]
-// 	h4 -= carry[4] << 26
-// 	carry[6] = (h6 + 1<<25) >> 26
-// 	h7 += carry[6]
-// 	h6 -= carry[6] << 26
-// 	carry[8] = (h8 + 1<<25) >> 26
-// 	h9 += carry[8]
-// 	h8 -= carry[8] << 26
+    carry[0] = (h0 + (1 << 25)) >> 26;
+    h1 += carry[0];
+    h0 -= carry[0] << 26;
+    carry[2] = (h2 + (1 << 25)) >> 26;
+    h3 += carry[2];
+    h2 -= carry[2] << 26;
+    carry[4] = (h4 + (1 << 25)) >> 26;
+    h5 += carry[4];
+    h4 -= carry[4] << 26;
+    carry[6] = (h6 + (1 << 25)) >> 26;
+    h7 += carry[6];
+    h6 -= carry[6] << 26;
+    carry[8] = (h8 + (1 << 25)) >> 26;
+    h9 += carry[8];
+    h8 -= carry[8] << 26;
 
-// 	dst[0] = int32(h0)
-// 	dst[1] = int32(h1)
-// 	dst[2] = int32(h2)
-// 	dst[3] = int32(h3)
-// 	dst[4] = int32(h4)
-// 	dst[5] = int32(h5)
-// 	dst[6] = int32(h6)
-// 	dst[7] = int32(h7)
-// 	dst[8] = int32(h8)
-// 	dst[9] = int32(h9)
-// }
+    dst[0] = (h0) as i32;
+    dst[1] = (h1) as i32;
+    dst[2] = (h2) as i32;
+    dst[3] = (h3) as i32;
+    dst[4] = (h4) as i32;
+    dst[5] = (h5) as i32;
+    dst[6] = (h6) as i32;
+    dst[7] = (h7) as i32;
+    dst[8] = (h8) as i32;
+    dst[9] = (h9) as i32;
+}
 
-// // feToBytes marshals h to s.
-// // Preconditions:
-// //   |h| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
-// //
-// // Write p=2^255-19; q=floor(h/p).
-// // Basic claim: q = floor(2^(-255)(h + 19 2^(-25)h9 + 2^(-1))).
-// //
-// // Proof:
-// //   Have |h|<=p so |q|<=1 so |19^2 2^(-255) q|<1/4.
-// //   Also have |h-2^230 h9|<2^230 so |19 2^(-255)(h-2^230 h9)|<1/4.
-// //
-// //   Write y=2^(-1)-19^2 2^(-255)q-19 2^(-255)(h-2^230 h9).
-// //   Then 0<y<1.
-// //
-// //   Write r=h-pq.
-// //   Have 0<=r<=p-1=2^255-20.
-// //   Thus 0<=r+19(2^-255)r<r+19(2^-255)2^255<=2^255-1.
-// //
-// //   Write x=r+19(2^-255)r+y.
-// //   Then 0<x<2^255 so floor(2^(-255)x) = 0 so floor(q+2^(-255)x) = q.
-// //
-// //   Have q+2^(-255)x = 2^(-255)(h + 19 2^(-25) h9 + 2^(-1))
-// //   so floor(2^(-255)(h + 19 2^(-25) h9 + 2^(-1))) = q.
-// func feToBytes(s *[32]byte, h *fieldElement) {
-// 	var carry [10]int32
+/// feToBytes marshals h to s.
+/// Preconditions:
+///   |h| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
+///
+/// Write p=2^255-19; q=floor(h/p).
+/// Basic claim: q = floor(2^(-255)(h + 19 2^(-25)h9 + 2^(-1))).
+///
+/// Proof:
+///   Have |h|<=p so |q|<=1 so |19^2 2^(-255) q|<1/4.
+///   Also have |h-2^230 h9|<2^230 so |19 2^(-255)(h-2^230 h9)|<1/4.
+///
+///   Write y=2^(-1)-19^2 2^(-255)q-19 2^(-255)(h-2^230 h9).
+///   Then 0<y<1.
+///
+///   Write r=h-pq.
+///   Have 0<=r<=p-1=2^255-20.
+///   Thus 0<=r+19(2^-255)r<r+19(2^-255)2^255<=2^255-1.
+///
+///   Write x=r+19(2^-255)r+y.
+///   Then 0<x<2^255 so floor(2^(-255)x) = 0 so floor(q+2^(-255)x) = q.
+///
+///   Have q+2^(-255)x = 2^(-255)(h + 19 2^(-25) h9 + 2^(-1))
+///   so floor(2^(-255)(h + 19 2^(-25) h9 + 2^(-1))) = q.
+pub fn feToBytes(s: &mut [u8; 32], h: &FieldElement) {
+    let mut h = h.clone();
 
-// 	q := (19*h[9] + (1 << 24)) >> 25
-// 	q = (h[0] + q) >> 26
-// 	q = (h[1] + q) >> 25
-// 	q = (h[2] + q) >> 26
-// 	q = (h[3] + q) >> 25
-// 	q = (h[4] + q) >> 26
-// 	q = (h[5] + q) >> 25
-// 	q = (h[6] + q) >> 26
-// 	q = (h[7] + q) >> 25
-// 	q = (h[8] + q) >> 26
-// 	q = (h[9] + q) >> 25
+    let mut carry = [0 as i32; 10];
 
-// 	// Goal: Output h-(2^255-19)q, which is between 0 and 2^255-20.
-// 	h[0] += 19 * q
-// 	// Goal: Output h-2^255 q, which is between 0 and 2^255-20.
+    let mut q = (19 * h[9] + (1 << 24)) >> 25;
+    q = (h[0] + q) >> 26;
+    q = (h[1] + q) >> 25;
+    q = (h[2] + q) >> 26;
+    q = (h[3] + q) >> 25;
+    q = (h[4] + q) >> 26;
+    q = (h[5] + q) >> 25;
+    q = (h[6] + q) >> 26;
+    q = (h[7] + q) >> 25;
+    q = (h[8] + q) >> 26;
+    q = (h[9] + q) >> 25;
 
-// 	carry[0] = h[0] >> 26
-// 	h[1] += carry[0]
-// 	h[0] -= carry[0] << 26
-// 	carry[1] = h[1] >> 25
-// 	h[2] += carry[1]
-// 	h[1] -= carry[1] << 25
-// 	carry[2] = h[2] >> 26
-// 	h[3] += carry[2]
-// 	h[2] -= carry[2] << 26
-// 	carry[3] = h[3] >> 25
-// 	h[4] += carry[3]
-// 	h[3] -= carry[3] << 25
-// 	carry[4] = h[4] >> 26
-// 	h[5] += carry[4]
-// 	h[4] -= carry[4] << 26
-// 	carry[5] = h[5] >> 25
-// 	h[6] += carry[5]
-// 	h[5] -= carry[5] << 25
-// 	carry[6] = h[6] >> 26
-// 	h[7] += carry[6]
-// 	h[6] -= carry[6] << 26
-// 	carry[7] = h[7] >> 25
-// 	h[8] += carry[7]
-// 	h[7] -= carry[7] << 25
-// 	carry[8] = h[8] >> 26
-// 	h[9] += carry[8]
-// 	h[8] -= carry[8] << 26
-// 	carry[9] = h[9] >> 25
-// 	h[9] -= carry[9] << 25
-// 	// h10 = carry9
+    // Goal: Output h-(2^255-19)q, which is between 0 and 2^255-20.
+    h[0] += 19 * q;
+    // Goal: Output h-2^255 q, which is between 0 and 2^255-20.
 
-// 	// Goal: Output h[0]+...+2^255 h10-2^255 q, which is between 0 and 2^255-20.
-// 	// Have h[0]+...+2^230 h[9] between 0 and 2^255-1;
-// 	// evidently 2^255 h10-2^255 q = 0.
-// 	// Goal: Output h[0]+...+2^230 h[9].
+    carry[0] = h[0] >> 26;
+    h[1] += carry[0];
+    h[0] -= carry[0] << 26;
+    carry[1] = h[1] >> 25;
+    h[2] += carry[1];
+    h[1] -= carry[1] << 25;
+    carry[2] = h[2] >> 26;
+    h[3] += carry[2];
+    h[2] -= carry[2] << 26;
+    carry[3] = h[3] >> 25;
+    h[4] += carry[3];
+    h[3] -= carry[3] << 25;
+    carry[4] = h[4] >> 26;
+    h[5] += carry[4];
+    h[4] -= carry[4] << 26;
+    carry[5] = h[5] >> 25;
+    h[6] += carry[5];
+    h[5] -= carry[5] << 25;
+    carry[6] = h[6] >> 26;
+    h[7] += carry[6];
+    h[6] -= carry[6] << 26;
+    carry[7] = h[7] >> 25;
+    h[8] += carry[7];
+    h[7] -= carry[7] << 25;
+    carry[8] = h[8] >> 26;
+    h[9] += carry[8];
+    h[8] -= carry[8] << 26;
+    carry[9] = h[9] >> 25;
+    h[9] -= carry[9] << 25;
+    // h10 = carry9
 
-// 	s[0] = byte(h[0] >> 0)
-// 	s[1] = byte(h[0] >> 8)
-// 	s[2] = byte(h[0] >> 16)
-// 	s[3] = byte((h[0] >> 24) | (h[1] << 2))
-// 	s[4] = byte(h[1] >> 6)
-// 	s[5] = byte(h[1] >> 14)
-// 	s[6] = byte((h[1] >> 22) | (h[2] << 3))
-// 	s[7] = byte(h[2] >> 5)
-// 	s[8] = byte(h[2] >> 13)
-// 	s[9] = byte((h[2] >> 21) | (h[3] << 5))
-// 	s[10] = byte(h[3] >> 3)
-// 	s[11] = byte(h[3] >> 11)
-// 	s[12] = byte((h[3] >> 19) | (h[4] << 6))
-// 	s[13] = byte(h[4] >> 2)
-// 	s[14] = byte(h[4] >> 10)
-// 	s[15] = byte(h[4] >> 18)
-// 	s[16] = byte(h[5] >> 0)
-// 	s[17] = byte(h[5] >> 8)
-// 	s[18] = byte(h[5] >> 16)
-// 	s[19] = byte((h[5] >> 24) | (h[6] << 1))
-// 	s[20] = byte(h[6] >> 7)
-// 	s[21] = byte(h[6] >> 15)
-// 	s[22] = byte((h[6] >> 23) | (h[7] << 3))
-// 	s[23] = byte(h[7] >> 5)
-// 	s[24] = byte(h[7] >> 13)
-// 	s[25] = byte((h[7] >> 21) | (h[8] << 4))
-// 	s[26] = byte(h[8] >> 4)
-// 	s[27] = byte(h[8] >> 12)
-// 	s[28] = byte((h[8] >> 20) | (h[9] << 6))
-// 	s[29] = byte(h[9] >> 2)
-// 	s[30] = byte(h[9] >> 10)
-// 	s[31] = byte(h[9] >> 18)
-// }
+    // Goal: Output h[0]+...+2^255 h10-2^255 q, which is between 0 and 2^255-20.
+    // Have h[0]+...+2^230 h[9] between 0 and 2^255-1;
+    // evidently 2^255 h10-2^255 q = 0.
+    // Goal: Output h[0]+...+2^230 h[9].
 
-// func feIsNegative(f *fieldElement) byte {
-// 	var s [32]byte
-// 	feToBytes(&s, f)
-// 	return s[0] & 1
-// }
+    s[0] = (h[0] >> 0) as u8;
+    s[1] = (h[0] >> 8) as u8;
+    s[2] = (h[0] >> 16) as u8;
+    s[3] = ((h[0] >> 24) | (h[1] << 2)) as u8;
+    s[4] = (h[1] >> 6) as u8;
+    s[5] = (h[1] >> 14) as u8;
+    s[6] = ((h[1] >> 22) | (h[2] << 3)) as u8;
+    s[7] = (h[2] >> 5) as u8;
+    s[8] = (h[2] >> 13) as u8;
+    s[9] = ((h[2] >> 21) | (h[3] << 5)) as u8;
+    s[10] = (h[3] >> 3) as u8;
+    s[11] = (h[3] >> 11) as u8;
+    s[12] = ((h[3] >> 19) | (h[4] << 6)) as u8;
+    s[13] = (h[4] >> 2) as u8;
+    s[14] = (h[4] >> 10) as u8;
+    s[15] = (h[4] >> 18) as u8;
+    s[16] = (h[5] >> 0) as u8;
+    s[17] = (h[5] >> 8) as u8;
+    s[18] = (h[5] >> 16) as u8;
+    s[19] = ((h[5] >> 24) | (h[6] << 1)) as u8;
+    s[20] = (h[6] >> 7) as u8;
+    s[21] = (h[6] >> 15) as u8;
+    s[22] = ((h[6] >> 23) | (h[7] << 3)) as u8;
+    s[23] = (h[7] >> 5) as u8;
+    s[24] = (h[7] >> 13) as u8;
+    s[25] = ((h[7] >> 21) | (h[8] << 4)) as u8;
+    s[26] = (h[8] >> 4) as u8;
+    s[27] = (h[8] >> 12) as u8;
+    s[28] = ((h[8] >> 20) | (h[9] << 6)) as u8;
+    s[29] = (h[9] >> 2) as u8;
+    s[30] = (h[9] >> 10) as u8;
+    s[31] = (h[9] >> 18) as u8;
+}
 
-// func feIsNonZero(f *fieldElement) int32 {
-// 	var s [32]byte
-// 	feToBytes(&s, f)
-// 	var x uint8
-// 	for _, b := range s {
-// 		x |= b
-// 	}
-// 	x |= x >> 4
-// 	x |= x >> 2
-// 	x |= x >> 1
-// 	return int32(x & 1)
-// }
+pub fn feIsNegative(f: &FieldElement) -> u8 {
+    let mut s = [0 as u8; 32];
+    feToBytes(&mut s, f);
+    s[0] & 1
+}
 
-// // feNeg sets h = -f
-// //
-// // Preconditions:
-// //    |f| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
-// //
-// // Postconditions:
-// //    |h| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
-// func feNeg(h, f *fieldElement) {
-// 	for i := range h {
-// 		h[i] = -f[i]
-// 	}
-// }
+pub fn feIsNonZero(f: &FieldElement) -> i32 {
+    let mut s = [0 as u8; 32];
+    feToBytes(&mut s, f);
+    let mut x = 0 as u8;
+    for b in s {
+        x |= b
+    }
+    x |= x >> 4;
+    x |= x >> 2;
+    x |= x >> 1;
+    (x & 1) as i32
+}
+
+// feNeg sets h = -f
+//
+// Preconditions:
+//    |f| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
+//
+// Postconditions:
+//    |h| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
+pub fn feNeg(h: &mut FieldElement, f: &FieldElement) {
+    for i in 0..h.len() {
+        h[i] = -f[i]
+    }
+}
 
 /// feMul calculates h = f * g
 /// Can overlap h with f or g.
@@ -852,121 +856,186 @@ pub fn feSquare2(h: &mut FieldElement, f: &FieldElement) {
     h[9] = (h9) as i32;
 }
 
-// func feInvert(out, z *fieldElement) {
-// 	var t0, t1, t2, t3 fieldElement
-// 	var i int
+pub fn feInvert(out: &mut FieldElement, z: &FieldElement) {
+    let mut t0 = FieldElement::default();
+    let mut t1 = FieldElement::default();
+    let mut t2 = FieldElement::default();
+    let mut t3 = FieldElement::default();
 
-// 	feSquare(&t0, z)        // 2^1
-// 	feSquare(&t1, &t0)      // 2^2
-// 	for i = 1; i < 2; i++ { // 2^3
-// 		feSquare(&t1, &t1)
-// 	}
-// 	feMul(&t1, z, &t1)      // 2^3 + 2^0
-// 	feMul(&t0, &t0, &t1)    // 2^3 + 2^1 + 2^0
-// 	feSquare(&t2, &t0)      // 2^4 + 2^2 + 2^1
-// 	feMul(&t1, &t1, &t2)    // 2^4 + 2^3 + 2^2 + 2^1 + 2^0
-// 	feSquare(&t2, &t1)      // 5,4,3,2,1
-// 	for i = 1; i < 5; i++ { // 9,8,7,6,5
-// 		feSquare(&t2, &t2)
-// 	}
-// 	feMul(&t1, &t2, &t1)     // 9,8,7,6,5,4,3,2,1,0
-// 	feSquare(&t2, &t1)       // 10..1
-// 	for i = 1; i < 10; i++ { // 19..10
-// 		feSquare(&t2, &t2)
-// 	}
-// 	feMul(&t2, &t2, &t1)     // 19..0
-// 	feSquare(&t3, &t2)       // 20..1
-// 	for i = 1; i < 20; i++ { // 39..20
-// 		feSquare(&t3, &t3)
-// 	}
-// 	feMul(&t2, &t3, &t2)     // 39..0
-// 	feSquare(&t2, &t2)       // 40..1
-// 	for i = 1; i < 10; i++ { // 49..10
-// 		feSquare(&t2, &t2)
-// 	}
-// 	feMul(&t1, &t2, &t1)     // 49..0
-// 	feSquare(&t2, &t1)       // 50..1
-// 	for i = 1; i < 50; i++ { // 99..50
-// 		feSquare(&t2, &t2)
-// 	}
-// 	feMul(&t2, &t2, &t1)      // 99..0
-// 	feSquare(&t3, &t2)        // 100..1
-// 	for i = 1; i < 100; i++ { // 199..100
-// 		feSquare(&t3, &t3)
-// 	}
-// 	feMul(&t2, &t3, &t2)     // 199..0
-// 	feSquare(&t2, &t2)       // 200..1
-// 	for i = 1; i < 50; i++ { // 249..50
-// 		feSquare(&t2, &t2)
-// 	}
-// 	feMul(&t1, &t2, &t1)    // 249..0
-// 	feSquare(&t1, &t1)      // 250..1
-// 	for i = 1; i < 5; i++ { // 254..5
-// 		feSquare(&t1, &t1)
-// 	}
-// 	feMul(out, &t1, &t0) // 254..5,3,1,0
-// }
+    feSquare(&mut t0, z); // 2^1
 
-// func fePow22523(out, z *fieldElement) {
-// 	var t0, t1, t2 fieldElement
-// 	var i int
+    feSquare(&mut t1, &t0); // 2^2
+    for _ in 1..2 {
+        // 2^3
+        let t1_clone = t1.clone();
+        feSquare(&mut t1, &t1_clone);
+    }
+    let t1_clone = t1.clone();
+    feMul(&mut t1, z, &t1_clone); // 2^3 + 2^0
+    let t0_clone = t0.clone();
+    feMul(&mut t0, &t0_clone, &t1); // 2^3 + 2^1 + 2^0
+    feSquare(&mut t2, &t0); // 2^4 + 2^2 + 2^1
+    let t1_clone = t1.clone();
+    feMul(&mut t1, &t1_clone, &t2); // 2^4 + 2^3 + 2^2 + 2^1 + 2^0
+    feSquare(&mut t2, &t1); // 5,4,3,2,1
+    for _ in 1..5 {
+        // 9,8,7,6,5
+        let t2_clone = t2.clone();
+        feSquare(&mut t2, &t2_clone);
+    }
+    let t1_clone = t1.clone();
+    feMul(&mut t1, &t2, &t1_clone); // 9,8,7,6,5,4,3,2,1,0
+    feSquare(&mut t2, &t1); // 10..1
+    for _ in 1..10 {
+        // 19..10
+        let t2_clone = t2.clone();
+        feSquare(&mut t2, &t2_clone);
+    }
+    let t2_clone = t2.clone();
+    feMul(&mut t2, &t2_clone, &t1); // 19..0
+    feSquare(&mut t3, &t2); // 20..1
+    for _ in 1..20 {
+        // 39..20
+        let t3_clone = t3.clone();
+        feSquare(&mut t3, &t3_clone);
+    }
+    let t2_clone = t2.clone();
+    feMul(&mut t2, &t3, &t2_clone); // 39..0
+    let t2_clone = t2.clone();
+    feSquare(&mut t2, &t2_clone); // 40..1
+    for _ in 1..10 {
+        // 49..10
+        let t2_clone = t2.clone();
+        feSquare(&mut t2, &t2_clone);
+    }
+    let t1_clone = t1.clone();
+    feMul(&mut t1, &t2, &t1_clone); // 49..0
+    feSquare(&mut t2, &t1); // 50..1
+    for _ in 1..50 {
+        // 99..50
+        let t2_clone = t2.clone();
+        feSquare(&mut t2, &t2_clone);
+    }
+    let t2_clone = t2.clone();
+    feMul(&mut t2, &t2_clone, &t1); // 99..0
+    feSquare(&mut t3, &t2); // 100..1
+    for _ in 1..100 {
+        // 199..100
+        let t3_clone = t3.clone();
+        feSquare(&mut t3, &t3_clone);
+    }
+    let t2_clone = t2.clone();
+    feMul(&mut t2, &t3, &t2_clone); // 199..0
+    let t2_clone = t2.clone();
+    feSquare(&mut t2, &t2_clone); // 200..1
+    for _ in 1..50 {
+        // 249..50
+        let t2_clone = t2.clone();
+        feSquare(&mut t2, &t2_clone);
+    }
+    let t1_clone = t1.clone();
+    feMul(&mut t1, &t2, &t1_clone); // 249..0
+    let t1_clone = t1.clone();
+    feSquare(&mut t1, &t1_clone); // 250..1
+    for _ in 1..5 {
+        // 254..5
+        let t1_clone = t1.clone();
+        feSquare(&mut t1, &t1_clone);
+    }
+    feMul(out, &t1, &t0) // 254..5,3,1,0
+}
 
-// 	feSquare(&t0, z)
-// 	for i = 1; i < 1; i++ {
-// 		feSquare(&t0, &t0)
-// 	}
-// 	feSquare(&t1, &t0)
-// 	for i = 1; i < 2; i++ {
-// 		feSquare(&t1, &t1)
-// 	}
-// 	feMul(&t1, z, &t1)
-// 	feMul(&t0, &t0, &t1)
-// 	feSquare(&t0, &t0)
-// 	for i = 1; i < 1; i++ {
-// 		feSquare(&t0, &t0)
-// 	}
-// 	feMul(&t0, &t1, &t0)
-// 	feSquare(&t1, &t0)
-// 	for i = 1; i < 5; i++ {
-// 		feSquare(&t1, &t1)
-// 	}
-// 	feMul(&t0, &t1, &t0)
-// 	feSquare(&t1, &t0)
-// 	for i = 1; i < 10; i++ {
-// 		feSquare(&t1, &t1)
-// 	}
-// 	feMul(&t1, &t1, &t0)
-// 	feSquare(&t2, &t1)
-// 	for i = 1; i < 20; i++ {
-// 		feSquare(&t2, &t2)
-// 	}
-// 	feMul(&t1, &t2, &t1)
-// 	feSquare(&t1, &t1)
-// 	for i = 1; i < 10; i++ {
-// 		feSquare(&t1, &t1)
-// 	}
-// 	feMul(&t0, &t1, &t0)
-// 	feSquare(&t1, &t0)
-// 	for i = 1; i < 50; i++ {
-// 		feSquare(&t1, &t1)
-// 	}
-// 	feMul(&t1, &t1, &t0)
-// 	feSquare(&t2, &t1)
-// 	for i = 1; i < 100; i++ {
-// 		feSquare(&t2, &t2)
-// 	}
-// 	feMul(&t1, &t2, &t1)
-// 	feSquare(&t1, &t1)
-// 	for i = 1; i < 50; i++ {
-// 		feSquare(&t1, &t1)
-// 	}
-// 	feMul(&t0, &t1, &t0)
-// 	feSquare(&t0, &t0)
-// 	for i = 1; i < 2; i++ {
-// 		feSquare(&t0, &t0)
-// 	}
-// 	feMul(out, &t0, z)
-// }
+pub fn fePow22523(out: &mut FieldElement, z: &FieldElement) {
+    let mut t0 = FieldElement::default();
+    let mut t1 = FieldElement::default();
+    let mut t2 = FieldElement::default();
+
+    let i = 0;
+
+    feSquare(&mut t0, z);
+
+    // TODO: Understand this madness
+    // for i = 1; i < 1; i++ {
+    for i in 1..1 {
+        let t0_clone = t0.clone();
+        feSquare(&mut t0, &t0_clone);
+    }
+    feSquare(&mut t1, &t0);
+    for i in 1..2 {
+        let t1_clone = t1.clone();
+        feSquare(&mut t1, &t1_clone);
+    }
+    let t1_clone = t1.clone();
+    feMul(&mut t1, z, &t1_clone);
+    let t0_clone = t0.clone();
+    feMul(&mut t0, &t0_clone, &t1);
+    let t0_clone = t0.clone();
+    feSquare(&mut t0, &t0_clone);
+    for i in 1..1 {
+        let t0_clone = t0.clone();
+        feSquare(&mut t0, &t0_clone)
+    }
+    let t0_clone = t0.clone();
+    feMul(&mut t0, &t1, &t0_clone);
+    feSquare(&mut t1, &t0);
+    for i in 1..5 {
+        let t1_clone = t1.clone();
+        feSquare(&mut t1, &t1_clone)
+    }
+    let t0_clone = t0.clone();
+    feMul(&mut t0, &t1, &t0_clone);
+    feSquare(&mut t1, &t0);
+    for i in 1..10 {
+        let t1_clone = t1.clone();
+        feSquare(&mut t1, &t1_clone);
+    }
+    let t1_clone = t1.clone();
+    feMul(&mut t1, &t1_clone, &t0);
+    feSquare(&mut t2, &t1);
+    for i in 1..20 {
+        let t2_clone = t2.clone();
+        feSquare(&mut t2, &t2_clone);
+    }
+    let t1_clone = t1.clone();
+    feMul(&mut t1, &t2, &t1_clone);
+    let t1_clone = t1.clone();
+    feSquare(&mut t1, &t1_clone);
+    for i in 1..10 {
+        let t1_clone = t1.clone();
+        feSquare(&mut t1, &t1_clone);
+    }
+    let t0_clone = t0.clone();
+    feMul(&mut t0, &t1, &t0_clone);
+    feSquare(&mut t1, &t0);
+    for i in 1..50 {
+        let t1_clone = t1.clone();
+        feSquare(&mut t1, &t1_clone);
+    }
+    let t1_clone = t1.clone();
+    feMul(&mut t1, &t1_clone, &t0);
+    feSquare(&mut t2, &t1);
+    for i in 1..100 {
+        let t2_clone = t2.clone();
+        feSquare(&mut t2, &t2_clone);
+    }
+    let t1_clone = t1.clone();
+    feMul(&mut t1, &t2, &t1_clone);
+    let t1_clone = t1.clone();
+    feSquare(&mut t1, &t1_clone);
+    for i in 1..50 {
+        let t1_clone = t1.clone();
+        feSquare(&mut t1, &t1_clone);
+    }
+    let t0_clone = t0.clone();
+    feMul(&mut t0, &t1, &t0_clone);
+    let t0_clone = t0.clone();
+    feSquare(&mut t0, &t0_clone);
+    for i in 1..2 {
+        let t0_clone = t0.clone();
+        feSquare(&mut t0, &t0_clone);
+    }
+    feMul(out, &t0, z);
+}
 
 // func (fe *fieldElement) String() string {
 // 	s := "fieldElement{"

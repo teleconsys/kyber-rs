@@ -278,7 +278,7 @@ impl BinaryUnmarshaler for Int {
 }
 
 impl Marshaling for Int {
-    fn MarshalTo(&self, w: &mut impl std::io::Write) -> Result<usize> {
+    fn MarshalTo(&self, w: &mut impl std::io::Write) -> Result<()> {
         todo!()
     }
 }
@@ -324,7 +324,7 @@ impl Scalar for Int {
         todo!()
     }
 
-    fn pick(&mut self, _rand: &mut impl Stream) -> &mut Self {
+    fn pick(self, _rand: &mut impl Stream) -> Self {
         todo!()
     }
 

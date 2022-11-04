@@ -45,7 +45,7 @@ fn test_simple<T: Scalar>(new: fn() -> T) {
     let mut s3 = new();
     s1.set_int64(2);
     let mut r = random::Randstream::default();
-    s2.pick(&mut r);
+    s2 = s2.pick(&mut r);
 
     let mut tmp = new();
     let s22 = tmp.add(&s2, &s2);

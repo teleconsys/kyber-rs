@@ -1,3 +1,4 @@
+use anyhow::Result;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
@@ -36,7 +37,7 @@ impl PartialEq for SimpleCTScalar {
 }
 
 impl Marshaling for SimpleCTScalar {
-    fn MarshalTo(&self, w: &mut impl std::io::Write) -> anyhow::Result<usize> {
+    fn MarshalTo(&self, w: &mut impl std::io::Write) -> Result<()> {
         todo!()
     }
 }
@@ -73,7 +74,7 @@ impl Scalar for SimpleCTScalar {
         todo!()
     }
 
-    fn pick(&mut self, rand: &mut impl Stream) -> &mut Self {
+    fn pick(self, rand: &mut impl Stream) -> Self {
         self.s.pick(rand);
         self
     }

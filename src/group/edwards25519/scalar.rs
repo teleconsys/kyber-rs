@@ -1,6 +1,7 @@
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
 use crate::group::{group, integer_field};
 use crate::util::random;
+use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 
 use crate::cipher::cipher::Stream;
@@ -10,6 +11,8 @@ use crate::group::edwards25519::fe::{load3, load4};
 use crate::group::integer_field::integer_field::ByteOrder::LittleEndian;
 use crate::group::integer_field::integer_field::Int;
 use subtle::ConstantTimeEq;
+
+use super::constants::FULL_ORDER;
 
 const MARSHAL_SCALAR_ID: [u8; 8] = [
     'e' as u8, 'd' as u8, '.' as u8, 's' as u8, 'c' as u8, 'a' as u8, 'l' as u8, 'a' as u8,
@@ -110,12 +113,12 @@ impl group::Scalar for Scalar {
         self
     }
 
-    fn pick(&mut self, rand: &mut impl Stream) -> &mut Self {
+    fn pick(mut self, rand: &mut impl Stream) -> Self {
         let i = integer_field::integer_field::Int::new_int(
             random::random_int(&PRIME_ORDER, rand),
             PRIME_ORDER.clone(),
         );
-        self.set_int(&i)
+        *self.set_int(&i)
     }
 
     fn set_bytes(&mut self, bytes: &[u8]) -> Self {
@@ -124,7 +127,7 @@ impl group::Scalar for Scalar {
 }
 
 impl Marshaling for Scalar {
-    fn MarshalTo(&self, w: &mut impl std::io::Write) -> anyhow::Result<usize> {
+    fn MarshalTo(&self, w: &mut impl std::io::Write) -> anyhow::Result<()> {
         todo!()
     }
 }
@@ -1921,4 +1924,10 @@ fn sc_mul(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32]) {
     s[29] = (s11 >> 1) as u8;
     s[30] = (s11 >> 9) as u8;
     s[31] = (s11 >> 17) as u8;
+}
+
+pub(crate) fn newScalarInt(i: BigInt) -> Scalar {
+    let mut s = Scalar::default();
+    s.set_int(&Int::new_int(i, FULL_ORDER.clone()));
+    s
 }

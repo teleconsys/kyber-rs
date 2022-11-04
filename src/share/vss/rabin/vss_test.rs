@@ -1,5 +1,3 @@
-use lazy_static::lazy_static;
-
 use crate::{group::edwards25519::SuiteEd25519, Group, Point, Random, Scalar};
 
 use super::vss::{minimum_t, Dealer, NewDealer, NewVerifier, RecoverSecret, Suite, Verifier};
@@ -618,12 +616,15 @@ use crate::group::edwards25519::scalar::Scalar as EdScalar;
 use crate::group::edwards25519::Point as EdPoint;
 fn genPair() -> (EdScalar, EdPoint) {
     let SUITE = suite();
-    let mut s1 = SUITE.scalar();
-    let mut rs1 = SUITE.RandomStream();
-    let secret = s1.pick(&mut rs1);
-    let mut p1 = SUITE.point();
-    let _public = p1.mul(secret, None);
-    (*secret, p1)
+    // let mut s1 = SUITE.scalar();
+    // let mut rs1 = SUITE.RandomStream();
+    // let secret = s1.pick(&mut rs1);
+    // let mut p1 = SUITE.point();
+    // let _public = p1.mul(secret, None);
+    // (*secret, p1)
+    let secret = SUITE.scalar().pick(&mut SUITE.RandomStream());
+    let public = SUITE.point().mul(&secret, None);
+    (secret, public)
 }
 
 fn genCommits(n: usize) -> (Vec<EdScalar>, Vec<EdPoint>) {

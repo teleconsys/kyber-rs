@@ -3,6 +3,7 @@ use anyhow::Result;
 use crate::cipher::cipher::Stream;
 use crate::encoding::Marshaling;
 use std::fmt::Debug;
+use std::ops::Add;
 
 /// scalar represents a scalar value by which
 /// a Point (group element) may be encrypted to produce another Point.
@@ -41,7 +42,7 @@ pub trait Scalar: Marshaling + Clone + PartialEq + Debug + ToString {
     // Inv(a scalar) scalar
 
     // Set to a fresh random or pseudo-random scalar.
-    fn pick(&mut self, rand: &mut impl Stream) -> &mut Self;
+    fn pick(self, rand: &mut impl Stream) -> Self;
 
     /// set_bytes sets the scalar from a byte-slice,
     /// reducing if necessary to the appropriate modulus.
@@ -63,10 +64,10 @@ pub trait Point<SCALAR: Scalar>: Marshaling + Clone {
     fn null(&mut self) -> &mut Self;
 
     /// Base sets the receiver to this group's standard base point.
-    fn base(&mut self) -> &mut Self;
+    fn base(self) -> Self;
 
     /// Pick sets the receiver to a fresh random or pseudo-random Point.
-    fn pick<S: Stream>(&mut self, rand: S) -> &mut Self;
+    fn pick<S: Stream>(self, rand: &mut S) -> Self;
 
     /// Set sets the receiver equal to another Point p.
     fn set(&mut self, p: Self) -> &mut Self;
@@ -79,7 +80,7 @@ pub trait Point<SCALAR: Scalar>: Marshaling + Clone {
     /// Point, using r as a source of cryptographically secure
     /// random data.  Implementations only embed the first EmbedLen
     /// bytes of the given data.
-    fn embed<S: Stream>(&mut self, data: &[u8], r: S) -> &mut Self;
+    fn embed<S: Stream>(self, data: Option<&[u8]>, rand: &mut S) -> Self;
 
     /// Extract data embedded in a point chosen via Embed().
     /// Returns an error if doesn't represent valid embedded data.
@@ -96,7 +97,7 @@ pub trait Point<SCALAR: Scalar>: Marshaling + Clone {
 
     /// Multiply point p by the scalar s.
     /// If p == nil, multiply with the standard base point Base().
-    fn mul(&mut self, s: &SCALAR, p: Option<&Self>) -> &mut Self;
+    fn mul(self, s: &SCALAR, p: Option<&Self>) -> Self;
 }
 
 /// AllowsVarTime allows callers to determine if a given kyber.scalar
