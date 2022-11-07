@@ -622,7 +622,7 @@ fn genPair() -> (EdScalar, EdPoint) {
     // let mut p1 = SUITE.point();
     // let _public = p1.mul(secret, None);
     // (*secret, p1)
-    let secret = SUITE.scalar().pick(&mut SUITE.RandomStream());
+    let secret = SUITE.scalar().pick(&mut SUITE.random_stream());
     let public = SUITE.point().mul(&secret, None);
     (secret, public)
 }
