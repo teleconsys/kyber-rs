@@ -34,9 +34,9 @@ use crate::group::HashFactory;
 use crate::share::poly::{NewPriPoly, PriShare};
 use crate::sign::schnorr;
 use crate::Scalar;
-use crate::{cipher::Stream, Group, Point, Random, XOFFactory};
+use crate::{Group, Point, Random, XOFFactory};
 
-use crate::group::edwards25519::{scalar::Scalar as EdScalar, Point as EdPoint, SuiteEd25519};
+
 
 use anyhow::{bail, Error, Ok, Result};
 use byteorder::{LittleEndian, WriteBytesExt};
@@ -282,10 +282,10 @@ where
         let dhPublic = self.suite.point().mul(&dhSecret, None);
         // signs the public key
         let dhPublicBuff = dhPublic.marshal_binary()?;
-        let signature = schnorr::Sign(self.suite, self.long.clone(), &dhPublicBuff)?;
+        let _signature = schnorr::Sign(self.suite, self.long.clone(), &dhPublicBuff)?;
 
         // AES128-GCM
-        let pre = dhExchange(self.suite, dhSecret, vPub);
+        let _pre = dhExchange(self.suite, dhSecret, vPub);
         // gcm, err := newAEAD(self.suite.Hash, pre, self.hkdfContext)
         // if err != nil {
         // 	return nil, err
@@ -324,7 +324,7 @@ where
     /// it returns a Justification. This Justification must be broadcasted to every
     /// participants. If it's an invalid complaint, it returns an error about the
     /// complaint. The verifiers will also ignore an invalid Complaint.
-    pub fn process_response(&self, r: &Response) -> Result<Option<Justification<SCALAR, POINT>>> {
+    pub fn process_response(&self, _r: &Response) -> Result<Option<Justification<SCALAR, POINT>>> {
         // if err := d.verifyResponse(r); err != nil {
         // 	return nil, err
         // }
@@ -494,7 +494,7 @@ where
     // broadcasted to every other participants including the dealer.
     // If the deal has already been received, or the signature generation of the
     // response failed, it returns an error without any responses.
-    pub fn process_encrypted_deal(&self, e: &EncryptedDeal<POINT, SCALAR>) -> Result<Response> {
+    pub fn process_encrypted_deal(&self, _e: &EncryptedDeal<POINT, SCALAR>) -> Result<Response> {
         // d, err := v.decryptDeal(e)
         // if err != nil {
         // 	return nil, err
@@ -567,7 +567,7 @@ where
     /// verifier should expect to see a Justification from the Dealer. It returns an
     /// error if it's not a valid response.
     /// Call `v.DealCertified()` to check if the whole protocol is finished.
-    pub fn process_response(&self, resp: &Response) -> Result<()> {
+    pub fn process_response(&self, _resp: &Response) -> Result<()> {
         // v.aggregator.verifyResponse(resp)
         todo!();
     }
@@ -927,10 +927,10 @@ where
 /// Deals from the verifiers. It returns an error if there is not enough Deals or
 /// if all Deals don't have the same SessionID.
 pub fn RecoverSecret<SCALAR, POINT, SUITE>(
-    suite: SUITE,
-    deals: Vec<Deal<SCALAR, POINT>>,
-    n: usize,
-    t: usize,
+    _suite: SUITE,
+    _deals: Vec<Deal<SCALAR, POINT>>,
+    _n: usize,
+    _t: usize,
 ) -> Result<SCALAR>
 where
     SCALAR: Scalar,

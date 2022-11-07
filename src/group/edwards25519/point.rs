@@ -40,7 +40,7 @@ impl BinaryMarshaler for Point {
     }
 }
 impl BinaryUnmarshaler for Point {
-    fn unmarshal_binary(&mut self, data: &[u8]) -> Result<()> {
+    fn unmarshal_binary(&mut self, _data: &[u8]) -> Result<()> {
         todo!()
     }
 }
@@ -82,7 +82,7 @@ impl group::Point<Scalar> for Point {
         self.embed(None, rand)
     }
 
-    fn set(&mut self, p: Self) -> &mut Self {
+    fn set(&mut self, _p: Self) -> &mut Self {
         todo!()
     }
 
@@ -169,11 +169,11 @@ impl group::Point<Scalar> for Point {
         self
     }
 
-    fn sub(&mut self, a: &Self, b: &Self) -> &mut Self {
+    fn sub(&mut self, _a: &Self, _b: &Self) -> &mut Self {
         todo!()
     }
 
-    fn neg(&self, a: &Self) -> &mut Self {
+    fn neg(&self, _a: &Self) -> &mut Self {
         todo!()
     }
 

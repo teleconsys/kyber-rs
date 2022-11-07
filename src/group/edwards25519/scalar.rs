@@ -1,4 +1,4 @@
-use std::ops::{Add, Mul};
+
 
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
 use crate::group::{group, integer_field};
@@ -132,7 +132,7 @@ impl group::Scalar for Scalar {
 }
 
 impl Marshaling for Scalar {
-    fn MarshalTo(&self, w: &mut impl std::io::Write) -> anyhow::Result<()> {
+    fn MarshalTo(&self, _w: &mut impl std::io::Write) -> anyhow::Result<()> {
         todo!()
     }
 }
@@ -1932,6 +1932,6 @@ fn sc_mul(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32]) {
 }
 
 pub(crate) fn newScalarInt(i: BigInt) -> Scalar {
-    let mut s = Scalar::default();
+    let s = Scalar::default();
     s.set_int(&Int::new_int(i, FULL_ORDER.clone()))
 }

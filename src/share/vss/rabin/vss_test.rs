@@ -1,6 +1,6 @@
 use crate::{group::edwards25519::SuiteEd25519, Group, Point, Random, Scalar};
 
-use super::vss::{minimum_t, Dealer, NewDealer, NewVerifier, RecoverSecret, Suite, Verifier};
+use super::vss::{minimum_t, Dealer, NewDealer, NewVerifier, RecoverSecret, Verifier};
 
 // lazy_static! {
 //     static ref SUITE: SuiteEd25519 = SuiteEd25519::new_blake_sha256ed25519();

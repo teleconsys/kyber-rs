@@ -5,7 +5,6 @@ use num_traits::Num;
 use crate::{
     group::{
         edwards25519::{scalar::newScalarInt, Point as EdPoint, Scalar},
-        integer_field,
     },
     Point,
 };

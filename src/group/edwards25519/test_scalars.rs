@@ -50,7 +50,7 @@ impl PartialEq for SimpleCTScalar {
 }
 
 impl Marshaling for SimpleCTScalar {
-    fn MarshalTo(&self, w: &mut impl std::io::Write) -> Result<()> {
+    fn MarshalTo(&self, _w: &mut impl std::io::Write) -> Result<()> {
         todo!()
     }
 }

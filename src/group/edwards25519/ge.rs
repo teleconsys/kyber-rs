@@ -542,7 +542,7 @@ pub fn geScalarMult(h: &mut extendedGroupElement, a: &mut [u8; 32], A: &mut exte
     let mut u = extendedGroupElement::default();
     let mut r = projectiveGroupElement::default();
     let mut c = cachedGroupElement::default();
-    let i = 0;
+    let _i = 0;
 
     // Break the exponent into 4-bit nybbles.
     let mut e = [0 as i8; 64];

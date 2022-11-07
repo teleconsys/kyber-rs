@@ -1,5 +1,5 @@
-use crate::group::edwards25519::{Point as EdPoint, Scalar as EdScalar};
-use crate::{group::edwards25519::SuiteEd25519, Group, Point, Random, Scalar};
+
+use crate::{Group, Point, Random, Scalar};
 use anyhow::Result;
 
 /// Suite represents the set of functionalities needed by the package schnorr.
@@ -23,9 +23,9 @@ where
 /// signature can be verified with VerifySchnorr. It's also a valid EdDSA
 /// signature when using the edwards25519 Group.
 pub fn Sign<SUITE: Suite<SCALAR, POINT>, SCALAR: Scalar, POINT: Point<SCALAR>>(
-    s: SUITE,
-    private: SCALAR,
-    msg: &[u8],
+    _s: SUITE,
+    _private: SCALAR,
+    _msg: &[u8],
 ) -> Result<Vec<u8>> {
     // var g kyber.Group = s
     // // create random secret k and public point commitment R

@@ -279,7 +279,7 @@ impl BinaryUnmarshaler for Int {
 }
 
 impl Marshaling for Int {
-    fn MarshalTo(&self, w: &mut impl std::io::Write) -> Result<()> {
+    fn MarshalTo(&self, _w: &mut impl std::io::Write) -> Result<()> {
         todo!()
     }
 }
@@ -293,7 +293,7 @@ impl ToString for Int {
 impl Mul for Int {
     type Output = Self;
 
-    fn mul(self, rhs: Self) -> Self {
+    fn mul(self, _rhs: Self) -> Self {
         todo!()
     }
 }
@@ -301,7 +301,7 @@ impl Mul for Int {
 impl Add for Int {
     type Output = Self;
 
-    fn add(self, rhs: Self) -> Self::Output {
+    fn add(self, _rhs: Self) -> Self::Output {
         todo!()
     }
 }

@@ -7,9 +7,9 @@ use super::ge::extendedGroupElement;
 // Preconditions:
 //   a[31] <= 127
 pub fn geScalarMultVartime(
-    h: &mut extendedGroupElement,
-    a: &mut [u8; 32],
-    A: &mut extendedGroupElement,
+    _h: &mut extendedGroupElement,
+    _a: &mut [u8; 32],
+    _A: &mut extendedGroupElement,
 ) {
     // var aSlide [256]int8
     // var Ai [8]cachedGroupElement // A,3A,5A,7A,9A,11A,13A,15A
