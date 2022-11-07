@@ -36,8 +36,6 @@ use crate::sign::schnorr;
 use crate::Scalar;
 use crate::{Group, Point, Random, XOFFactory};
 
-
-
 use anyhow::{bail, Error, Ok, Result};
 use byteorder::{LittleEndian, WriteBytesExt};
 use digest::DynDigest;
@@ -852,7 +850,7 @@ where
 {
     let mut b = vec![];
     for v in verifiers {
-        v.MarshalTo(&mut b).unwrap();
+        v.marshal_to(&mut b).unwrap();
     }
     let base = suite.point().pick(&mut suite.xof(Some(&b)));
     base
@@ -878,14 +876,14 @@ where
     SUITE: Suite<SCALAR, POINT>,
 {
     let mut h = suite.hash();
-    dealer.MarshalTo(&mut h)?;
+    dealer.marshal_to(&mut h)?;
 
     for v in verifiers {
-        v.MarshalTo(&mut h)?;
+        v.marshal_to(&mut h)?;
     }
 
     for c in commitments {
-        c.MarshalTo(&mut h)?;
+        c.marshal_to(&mut h)?;
     }
 
     h.write_u32::<LittleEndian>(t as u32)?;

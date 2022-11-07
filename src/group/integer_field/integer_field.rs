@@ -279,7 +279,7 @@ impl BinaryUnmarshaler for Int {
 }
 
 impl Marshaling for Int {
-    fn MarshalTo(&self, _w: &mut impl std::io::Write) -> Result<()> {
+    fn marshal_to(&self, _w: &mut impl std::io::Write) -> Result<()> {
         todo!()
     }
 }

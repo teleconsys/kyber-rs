@@ -1,5 +1,3 @@
-
-
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
 use crate::group::{group, integer_field};
 use crate::util::random;
@@ -132,7 +130,7 @@ impl group::Scalar for Scalar {
 }
 
 impl Marshaling for Scalar {
-    fn MarshalTo(&self, _w: &mut impl std::io::Write) -> anyhow::Result<()> {
+    fn marshal_to(&self, _w: &mut impl std::io::Write) -> anyhow::Result<()> {
         todo!()
     }
 }

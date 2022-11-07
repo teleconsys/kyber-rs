@@ -16,7 +16,7 @@ pub trait Marshaling: BinaryMarshaler + BinaryUnmarshaler {
     // MarshalSize() int
 
     /// Encode the contents of this object and write it to an io.Writer.
-    fn MarshalTo(&self, w: &mut impl io::Write) -> Result<()>;
+    fn marshal_to(&self, w: &mut impl io::Write) -> Result<()>;
 
     // Decode the content of this object by reading from an io.Reader.
     // If r is an XOF, it uses r to pick a valid object pseudo-randomly,

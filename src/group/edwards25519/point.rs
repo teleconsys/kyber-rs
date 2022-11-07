@@ -10,8 +10,8 @@ use crate::{
 use super::{
     constants::{BASEEXT, COFACTOR_SCALAR, NULL_POINT, PRIME_ORDER_SCALAR},
     ge::{
-        cachedGroupElement, completedGroupElement, extendedGroupElement, geScalarMult,
-        geScalarMultBase,
+        geScalarMult, geScalarMultBase, CachedGroupElement, CompletedGroupElement,
+        ExtendedGroupElement,
     },
     ge_mult_vartime::geScalarMultVartime,
     Scalar,
@@ -19,14 +19,14 @@ use super::{
 
 #[derive(Clone, Copy)]
 pub struct Point {
-    ge: extendedGroupElement,
+    ge: ExtendedGroupElement,
     varTime: bool,
 }
 
 impl Default for Point {
     fn default() -> Self {
         Self {
-            ge: extendedGroupElement::default(),
+            ge: ExtendedGroupElement::default(),
             varTime: false,
         }
     }
@@ -46,7 +46,7 @@ impl BinaryUnmarshaler for Point {
 }
 
 impl Marshaling for Point {
-    fn MarshalTo(&self, w: &mut impl std::io::Write) -> Result<()> {
+    fn marshal_to(&self, w: &mut impl std::io::Write) -> Result<()> {
         marshalling::point_marshal_to(*self, w)
     }
 }
@@ -159,8 +159,8 @@ impl group::Point<Scalar> for Point {
     }
 
     fn add(mut self, p1: &Self, p2: &Self) -> Self {
-        let mut t2 = cachedGroupElement::default();
-        let mut r = completedGroupElement::default();
+        let mut t2 = CachedGroupElement::default();
+        let mut r = CompletedGroupElement::default();
 
         p2.ge.ToCached(&mut t2);
         r.Add(&p1.ge, &t2);

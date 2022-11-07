@@ -3,15 +3,13 @@ use num_bigint::BigInt;
 use num_traits::Num;
 
 use crate::{
-    group::{
-        edwards25519::{scalar::newScalarInt, Point as EdPoint, Scalar},
-    },
+    group::edwards25519::{scalar::newScalarInt, Point as EdPoint, Scalar},
     Point,
 };
 
 use super::{
     fe::FieldElement,
-    ge::{extendedGroupElement, preComputedGroupElement},
+    ge::{ExtendedGroupElement, PreComputedGroupElement},
 };
 
 lazy_static! {
@@ -53,7 +51,7 @@ pub const D2: FieldElement = [
     9444199,
 ];
 
-pub const BASEEXT: extendedGroupElement = extendedGroupElement {
+pub const BASEEXT: ExtendedGroupElement = ExtendedGroupElement {
     X: [
         25485296, 5318399, 8791791, -8299916, -14349720, 6939349, -3324311, -7717049, 7287234,
         -6577708,
@@ -72,9 +70,9 @@ pub const BASEEXT: extendedGroupElement = extendedGroupElement {
     ],
 };
 
-pub const BASE: [[preComputedGroupElement; 8]; 32] = [
+pub const BASE: [[PreComputedGroupElement; 8]; 32] = [
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 25967493, -14356035, 29566456, 3660896, -12694345, 4014787, 27544626, -11754271,
                 -6079156, 2047605,
@@ -88,7 +86,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -24514362, -4438546,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -12815894, -12976347, -21581243, 11784320, -25355658, -2750717, -11717903,
                 -3814571, -358445, -10211303,
@@ -102,7 +100,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -15472047, -4166697,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 15636291, -9688557, 24204773, -7912398, 616977, -16685262, 27787600, -14772189,
                 28944400, -1550024,
@@ -116,7 +114,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -17749093, -9920357,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -17036878, 13921892, 10945806, -6033431, 27105052, -16084379, -28926210, 15006023,
                 3284568, -6276540,
@@ -130,7 +128,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -641708, -101325,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 10861363, 11473154, 27284546, 1981175, -30064349, 12577861, 32867885, 14515107,
                 -15438304, 10819380,
@@ -144,7 +142,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -23678021, -15815942,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -15371964, -12862754, 32573250, 4720197, -26436522, 5875511, -19188627, -15224819,
                 -9818940, -12085777,
@@ -158,7 +156,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 27914454, 4383652,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 5153746, 9909285, 1723747, -2777874, 30523605, 5516873, 19480852, 5230134,
                 -23952439, -15175766,
@@ -172,7 +170,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 29794553, -1409300,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 14499471, -2729599, -33191113, -4254652, 28494862, 14271267, 30290735, 10876454,
                 -33154098, 2381726,
@@ -188,7 +186,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -13657040, -13155431, -31283750, 11777098, 21447386, 6519384, -2378284, -1627556,
                 10092783, -4764171,
@@ -202,7 +200,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 18016357, 4397660,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -10958843, -7690207, 4776341, -14954238, 27850028, -15602212, -26619106, 14544525,
                 -17477504, 982639,
@@ -216,7 +214,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -30123922, -10897950,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -27643952, -11493006, 16282657, -11036493, 28414021, -15012264, 24191034, 4541697,
                 -13338309, 5500568,
@@ -230,7 +228,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -22528059, 5376628,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -26088264, -4011052, -17013699, -3537628, -6726793, 1920897, -22321305, -9447443,
                 4535768, 1569007,
@@ -244,7 +242,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 7718482, 14474653,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 2385315, 2454213, -22631320, 46603, -4437935, -15680415, 656965, -7236665,
                 24316168, -5253567,
@@ -258,7 +256,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -9984458, 608372,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -13672732, -15087586, -10889693, -7557059, -6036909, 11305547, 1123968, -6780577,
                 27229399, 23887,
@@ -272,7 +270,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -17169265, 4904953,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 24059557, 14617003, 19037157, -15039908, 19766093, -14906429, 5169211, 16191880,
                 2128236, -4326833,
@@ -286,7 +284,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 15736322, 4143876,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 2379352, 11839345, -4110402, -5988665, 11274298, 794957, 212801, -14594663,
                 23527084, -16458268,
@@ -302,7 +300,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 6721966, 13833823, -23523388, -1551314, 26354293, -11863321, 23365147, -3949732,
                 7390890, 2759800,
@@ -316,7 +314,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 15886429, 16489664,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 1996075, 10375649, 14346367, 13311202, -6874135, -16438411, -13693198, 398369,
                 -30606455, -712933,
@@ -330,7 +328,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 13847711, 5387222,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -18582163, -3416217, 17824843, -2340966, 22744343, -10442611, 8763061, 3617786,
                 -19600662, 10370991,
@@ -344,7 +342,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 3140038, -16510092,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -16160072, 5472695, 31895588, 4744994, 8823515, 10365685, -27224800, 9448613,
                 -28774454, 366295,
@@ -358,7 +356,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 27000813, -10195553,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -15157904, 7134312, 8639287, -2814877, -7235688, 10421742, 564065, 5336097,
                 6750977, -14521026,
@@ -372,7 +370,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -5990708, -14166033,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -23308498, -10968312, 15213228, -10081214, -30853605, -11050004, 27884329, 2847284,
                 2655861, 1738395,
@@ -386,7 +384,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 10478196, 8544890,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 32173121, -16129311, 24896207, 3921497, 22579056, -3410854, 19270449, 12217473,
                 17789017, -3395995,
@@ -400,7 +398,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 3179268, -9478891,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 31947069, -14366651, -4640583, -15339921, -15125977, -6039709, -14756777,
                 -16411740, 19072640, -9511060,
@@ -416,7 +414,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 7881532, 10687937, 7578723, 7738378, -18951012, -2553952, 21820786, 8076149,
                 -27868496, 11538389,
@@ -430,7 +428,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -2369172, -5877341,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -22472376, -11568741, -27682020, 1146375, 18956691, 16640559, 1192730, -3714199,
                 15123619, 10811505,
@@ -444,7 +442,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 4714547, -9600655,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 15200332, 8368572, 19679101, 15970074, -31872674, 1959451, 24611599, -4543832,
                 -11745876, 12340220,
@@ -458,7 +456,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -28210621, -8814099,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 26660628, -15677655, 8393734, 358047, -7401291, 992988, -23904233, 858697,
                 20571223, 8420556,
@@ -472,7 +470,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 15069930,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 1276410, -9371918, 22949635, -16322807, -23493039, -5702186, 14711875, 4874229,
                 -30663140, -2331391,
@@ -486,7 +484,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 18979186, 13396066,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 24474287, 4968103, 22267082, 4407354, 24063882, -8325180, -18816887, 13594782,
                 33514650, 7021958,
@@ -500,7 +498,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -12455797, -8089383,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -30595528, 13793479, -5852820, 319136, -25723172, -6263899, 33086546, 8957937,
                 -15233648, 5540521,
@@ -514,7 +512,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -11513277, -15205948,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 9770129, 9586738, 26496094, 4324120, 1556511, -3550024, 27453819, 4763127,
                 -19179614, 5867134,
@@ -530,7 +528,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -8010264, -9590817, -11120403, 6196038, 29344158, -13430885, 7585295, -3176626,
                 18549497, 15302069,
@@ -544,7 +542,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -11284482, -828919,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 11334899, -9218022, 8025293, 12707519, 17523892, -10476071, 10243738, -14685461,
                 -5066034, 16498837,
@@ -558,7 +556,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -27235709, 8876771,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -25742899, -12566864, -15649966, -846607, -33026686, -796288, -33481822, 15824474,
                 -604426, -9039817,
@@ -572,7 +570,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -30233575, 15272409,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -12288309, 3169463, 28813183, 16658753, 25116432, -5630466, -25173957, -12636138,
                 -25014757, 1950504,
@@ -586,7 +584,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -2878207, 15190420,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -32932876, 13806336, -14337485, -15794431, -24004620, 10940928, 8669718, 2742393,
                 -26033313, -6875003,
@@ -600,7 +598,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 11213262, 9168384,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -26280513, 11007847, 19408960, -940758, -18592965, -4328580, -5088060, -11105150,
                 20470157, -16398701,
@@ -614,7 +612,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -5933891, -12449708,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -3144746, 8744661, 19704003, 4581278, -20430686, 6830683, -21284170, 8971513,
                 -28539189, 15326563,
@@ -628,7 +626,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 33087103, -9011387,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -19443170, -15512900, -20797467, -12445323, -29824447, 10229461, -27444329,
                 -15000531, -5996870, 15664672,
@@ -644,7 +642,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 11433042, -13228665, 8239631, -5279517, -1985436, -725718, -18698764, 2167544,
                 -6921301, -13440182,
@@ -658,7 +656,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -16900089, -655628,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -4026201, -15240835, 11893168, 13718664, -14809462, 1847385, -15819999, 10154009,
                 23973261, -12684474,
@@ -672,7 +670,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 4425632, -837822,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -10433389, -14612966, 22229858, -3091047, -13191166, 776729, -17415375, -12020462,
                 4725005, 14044970,
@@ -686,7 +684,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 9282262, 10282508,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -26205082, 4428547, -8661196, -13194263, 4098402, -14165257, 15522535, 8372215,
                 5542595, -10702683,
@@ -700,7 +698,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 25953725, -106158,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -4234397, -8039292, -9119125, 3046000, 2101609, -12607294, 19390020, 6094296,
                 -3315279, 12831125,
@@ -714,7 +712,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -15362489, 12339664,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 27724736, 2291157, 6088201, -14184798, 1792727, 5857634, 13848414, 15768922,
                 25091167, 14856294,
@@ -728,7 +726,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 30146206, 9142070,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 3924129, -15307516, -13817122, -10054960, 12291820, -668366, -27702774, 9326384,
                 -8237858, 4171294,
@@ -742,7 +740,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -16253183, -13582083,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 31016211, -16722429, 26371392, -14451233, -5027349, 14854137, 17477601, 3842657,
                 28012650, -16405420,
@@ -758,7 +756,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -12185861, -7679788, 16438269, 10826160, -8696817, -6235611, 17860444, -9273846,
                 -2095802, 9304567,
@@ -772,7 +770,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 26939669, -3752294,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -12889898, 9373458, 31595848, 16374215, 21471720, 13221525, -27283495, -12348559,
                 -3698806, 117887,
@@ -786,7 +784,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -13337066, -13552195,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 9378160, -13140186, -22845982, -12745264, 28198281, -7244098, -2399684, -717351,
                 690426, 14876244,
@@ -800,7 +798,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 32239829, -5652762,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -18603066, 4762990, -926250, 8885304, -28412480, -3187315, 9781647, -10350059,
                 32779359, 5095274,
@@ -814,7 +812,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 17874574, 558605,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -13600129, 10240081, 9171883, 16131053, -20869254, 9599700, 33499487, 5080151,
                 2085892, 5119761,
@@ -828,7 +826,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -22351378, 12961482,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -24492060, -9570771, 10368194, 11582341, -23397293, -2245287, 16533930, 8206996,
                 -30194652, -5159638,
@@ -842,7 +840,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 24099109, -14456170,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 5019558, -7907470, 4244127, -14714356, -26933272, 6453165, -19118182, -13289025,
                 -6231896, -10280736,
@@ -856,7 +854,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -13866408, 7421392,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 8139927, -6546497, 32257646, -5890546, 30375719, 1886181, -21175108, 15441252,
                 28826358, -4123029,
@@ -872,7 +870,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 24949256, 6376279, -27466481, -8174608, -18646154, -9930606, 33543569, -12141695,
                 3569627, 11342593,
@@ -886,7 +884,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -17646694, -8186692,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 11431204, 15823007, 26570245, 14329124, 18029990, 4796082, -31446179, 15580664,
                 9280358, -3973687,
@@ -900,7 +898,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 20617071, -7482001,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -938825, -3930586, -8714311, 16124718, 24603125, -6225393, -13775352, -11875822,
                 24345683, 10325460,
@@ -914,7 +912,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 10988822, -3994762,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 15564307, -14311570, 3101243, 5684148, 30446780, -8051356, 12677127, -6505343,
                 -8295852, 13296005,
@@ -928,7 +926,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 29832613, -16391035,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 7064884, -7541174, -19161962, -5067537, -18891269, -2912736, 25825242, 5293297,
                 -27122660, 13101590,
@@ -942,7 +940,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 19568978, 9628812,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 33053803, 199357, 15894591, 1583059, 27380243, -4580435, -17838894, -6106839,
                 -6291786, 3437740,
@@ -956,7 +954,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 24216882, 5944158,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 8894125, 7450974, -2664149, -9765752, -28080517, -12389115, 19345746, 14680796,
                 11632993, 5847885,
@@ -970,7 +968,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 6358847, -1873857,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 801428, -2081702, 16569428, 11065167, 29875704, 96627, 7908388, -4480480,
                 -13538503, 1387155,
@@ -986,7 +984,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -3017432, 10058206, 1980837, 3964243, 22160966, 12322533, -6431123, -12618185,
                 12228557, -7003677,
@@ -1000,7 +998,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 28483275, 2841751,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -16420968, -1113305, -327719, -12107856, 21886282, -15552774, -1887966, -315658,
                 19932058, -12739203,
@@ -1014,7 +1012,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -14013818, 3093230,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 16650921, -11037932, -1064178, 1570629, -8329746, 7352753, -302424, 16271225,
                 -24049421, -6691850,
@@ -1028,7 +1026,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 17361620, 11864968,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -11307610, 6210372, 13206574, 5806320, -29017692, -13967200, -12331205, -7486601,
                 -25578460, -16240689,
@@ -1042,7 +1040,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -5652273, -3050304,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 30625386, -4729400, -25555961, -12792866, -20484575, 7695099, 17097188, -16303496,
                 -27999779, 1803632,
@@ -1056,7 +1054,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -32343828, -10257566,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -20788824, 14084654, -13531713, 7842147, 19119038, -13822605, 4752377, -8714640,
                 -21679658, 2288038,
@@ -1070,7 +1068,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -11974704, 4724943,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 17960970, -11775534, -4140968, -9702530, -8876562, -1410617, -12907383, -8659932,
                 -29576300, 1903856,
@@ -1084,7 +1082,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 31960942, 11934971,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -27395711, 8435796, 4109644, 12222639, -24627868, 14818669, 20638173, 4875028,
                 10491392, 1379718,
@@ -1100,7 +1098,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 5414091, -15386041, -21007664, 9643570, 12834970, 1186149, -2622916, -1342231,
                 26128231, 6032912,
@@ -1114,7 +1112,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 12376617, 3188849,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 29190488, -14659046, 27549113, -1183516, 3520066, -10697301, 32049515, -7309113,
                 -16109234, -9852307,
@@ -1128,7 +1126,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 10530747, 1053335,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -29265967, -14186805, -13538216, -12117373, -19457059, -10655384, -31462369,
                 -2948985, 24018831, 15026644,
@@ -1142,7 +1140,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -23166419, -2531735,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -21744398, -13810475, 1844840, 5021428, -10434399, -15911473, 9716667, 16266922,
                 -5070217, 726099,
@@ -1156,7 +1154,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 4555336,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -23376435, 1410446, -22253753, -12899614, 30867635, 15826977, 17693930, 544696,
                 -11985298, 12422646,
@@ -1170,7 +1168,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 7240931, -237388,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -31361739, -11346780, -15007447, -5856218, -22453340, -12152771, 1222336, 4389483,
                 3293637, -15551743,
@@ -1184,7 +1182,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 3222231, -11160462,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 18606113, 1693100, -25448386, -15170272, 4112353, 10045021, 23603893, -2048234,
                 -7550776, 2484985,
@@ -1198,7 +1196,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -30097688, -10618797,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 21878590, -5001297, 4338336, 13643897, -3036865, 13160960, 19708896, 5415497,
                 -7360503, -4109293,
@@ -1214,7 +1212,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 12015105, 2801261, 28198131, 10151021, 24818120, -4743133, -11194191, -5645734,
                 5150968, 7274186,
@@ -1228,7 +1226,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 15067285, -14147707,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 7840942, 14037873, -33364863, 15934016, -728213, -3642706, 21403988, 1057586,
                 -19379462, -12403220,
@@ -1242,7 +1240,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 23834301, 6588044,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 32752030, 11232950, 3381995, -8714866, 22652988, -10744103, 17159699, 16689107,
                 -20314580, -1305992,
@@ -1256,7 +1254,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 12331345, -8237197,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 8651614, -4477032, -16085636, -4996994, 13002507, 2950805, 29054427, -5106970,
                 10008136, -4667901,
@@ -1270,7 +1268,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 31316348, 14219878,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -28594490, 1193785, 32245219, 11392485, 31092169, 15722801, 27146014, 6992409,
                 29126555, 9207390,
@@ -1284,7 +1282,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 28346258, 1994730,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -19578299, 8085545, -14000519, -3948622, 2785838, -16231307, -19516951, 7174894,
                 22628102, 8115180,
@@ -1298,7 +1296,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -22765376, -10650715,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -22751231, -5303997, -12907607, -12768866, -15811511, -7797053, -14839018,
                 -16554220, -1867018, 8398970,
@@ -1312,7 +1310,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 19288549, 1325865,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 15100157, -15835752, -23923978, -1005098, -26450192, 15509408, 12376730, -3479146,
                 33166107, -8042750,
@@ -1328,7 +1326,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 9923462, 11271500, 12616794, 3544722, -29998368, -1721626, 12891687, -8193132,
                 -26442943, 10486144,
@@ -1342,7 +1340,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 19985175, -3436086,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -13994457, 16616821, 14549246, 3341099, 32155958, 13648976, -17577068, 8849297,
                 65030, 8370684,
@@ -1356,7 +1354,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 18800704, 255233,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -5269658, -1773886, 13957886, 7990715, 23132995, 728773, 13393847, 9066957,
                 19258688, -14753793,
@@ -1370,7 +1368,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -30021019, 7394435,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 23838809, 1822728, -15738443, 15242727, 8318092, -3733104, -21672180, -3492205,
                 -4821741, 14799921,
@@ -1384,7 +1382,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 8205061, 1607563,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 14414086, -8002132, 3331830, -3208217, 22249151, -5594188, 18364661, -2906958,
                 30019587, -9029278,
@@ -1398,7 +1396,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -8142388, 5640030,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 10299610, 13746483, 11661824, 16234854, 7630238, 5998374, 9809887, -16694564,
                 15219798, -14327783,
@@ -1412,7 +1410,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 1994844,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 14012521, -5024720, -18384453, -9578469, -26485342, -3936439, -13033478, -10909803,
                 24319929, -6446333,
@@ -1426,7 +1424,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 21880021, -12250760,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -4283307, 5368523, -31117018, 8163389, -30323063, 3209128, 16557151, 8890729,
                 8840445, 4957760,
@@ -1442,7 +1440,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -19025756, 1632005, 13466291, -7995100, -23640451, 16573537, -32013908, -3057104,
                 22208662, 2000468,
@@ -1456,7 +1454,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -3132688, 16400289,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 15716668, 1254266, -18472690, 7446274, -8448918, 6344164, -22097271, -7285580,
                 26894937, 9132066,
@@ -1470,7 +1468,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -4688006, 2364226,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 16335052, 9132434, 25640582, 6678888, 1725628, 8517937, -11807024, -11697457,
                 15445875, -7798101,
@@ -1484,7 +1482,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -29828287, -10815811,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 27081650, 3463984, 14099042, -4517604, 1616303, -6205604, 29542636, 15372179,
                 17293797, 960709,
@@ -1498,7 +1496,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 29994677, -15808121,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 9769828, 5202651, -24157398, -13631392, -28051003, -11561624, -24613141, -13860782,
                 -31184575, 709464,
@@ -1512,7 +1510,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 10151379, 10394400,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 4024660, -16137551, 22436262, 12276534, -9099015, -2686099, 19698229, 11743039,
                 -33302334, 8934414,
@@ -1526,7 +1524,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -9205489, -1280045,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -461409, -7830014, 20614118, 16688288, -7514766, -4807119, 22300304, 505429,
                 6108462, -6183415,
@@ -1540,7 +1538,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 7592688, -14992079,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 21594432, -14964228, 17466408, -4077222, 32537084, 2739898, 6407723, 12018833,
                 -28256052, 4298412,
@@ -1556,7 +1554,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 12962541, 5311799, -10060768, 11658280, 18855286, -7954201, 13286263, -12808704,
                 -4381056, 9882022,
@@ -1570,7 +1568,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -2403099, 5276065,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 30169808, -5317648, 26306206, -11750859, 27814964, 7069267, 7152851, 3684982,
                 1449224, 13082861,
@@ -1584,7 +1582,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -10300080, -11060101,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 32869458, -5408545, 25609743, 15678670, -10687769, -15471071, 26112421, 2521008,
                 -22664288, 6904815,
@@ -1598,7 +1596,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -25584551, 5181966,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 25940115, -12658025, 17324188, -10307374, -8671468, 15029094, 24396252, -16450922,
                 -2322852, -12388574,
@@ -1612,7 +1610,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 4662781, 7820689,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 12241050, -425982, 8132691, 9393934, 32846760, -1599620, 29749456, 12172924,
                 16136752, 15264020,
@@ -1626,7 +1624,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 20527771, 12988982,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -14822485, -5797269, -3707987, 12689773, -898983, -10914866, -24183046, -10564943,
                 3299665, -12424953,
@@ -1640,7 +1638,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -30242287, 1507265,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 29692663, 6829891, -10498800, 4334896, 20945975, -11906496, -28887608, 8209391,
                 14606362, -10647073,
@@ -1654,7 +1652,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -14276837, -8400798,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -4811456, 13761029, -31703877, -2483919, -3312471, 7869047, -7113572, -9620092,
                 13240845, 10965870,
@@ -1670,7 +1668,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -2244452, -754728, -4597030, -1066309, -6247172, 1455299, -21647728, -9214789,
                 -5222701, 12650267,
@@ -1684,7 +1682,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -25083830, 4271862,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -25169565, -10053642, -19909332, 15361595, -5984358, 2159192, 75375, -4278529,
                 -32526221, 8469673,
@@ -1698,7 +1696,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 24913809, 9815020,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -4709286, -5614269, -31841498, -12288893, -14443537, 10799414, -9103676, 13438769,
                 18735128, 9466238,
@@ -1712,7 +1710,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 30801119, 2164795,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 15995086, 3199873, 13672555, 13712240, -19378835, -4647646, -13081610, -15496269,
                 -13492807, 1268052,
@@ -1726,7 +1724,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -27162222, -14030531,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -13161890, 15508588, 16663704, -8156150, -28349942, 9019123, -29183421, -3769423,
                 2244111, -14001979,
@@ -1740,7 +1738,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 14476989, -12767431,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 10292079, 9984945, 6481436, 8279905, -7251514, 7032743, 27282937, -1644259,
                 -27912810, 12651324,
@@ -1754,7 +1752,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 13216206, 14842320,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -15815640, -10601066, -6538952, -7258995, -6984659, -6581778, -31500847, 13765824,
                 -27434397, 9900184,
@@ -1768,7 +1766,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 9524356, -7018878,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 12274201, -13175547, 32627641, -1785326, 6736625, 13267305, 5237659, -5109483,
                 15663516, 4035784,
@@ -1784,7 +1782,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -8858980, -2219056, 28571666, -10155518, -474467, -10105698, -3801496, 278095,
                 23440562, -290208,
@@ -1798,7 +1796,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -3646624, 3898661,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 7749907, -969567, -16339731, -16464, -25018111, 15122143, -1573531, 7152530,
                 21831162, 1245233,
@@ -1812,7 +1810,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -22338025, 13987525,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -24349909, 7778775, 21116000, 15572597, -4833266, -5357778, -4300898, -5124639,
                 -7469781, -2858068,
@@ -1826,7 +1824,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 29077877, -14741988,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 5269168, -6859726, -13230211, -8020715, 25932563, 1763552, -5606110, -5505881,
                 -20017847, 2357889,
@@ -1840,7 +1838,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -25888931, -14884697,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 20513500, 5557931, -15604613, 7829531, 26413943, -2019404, -21378968, 7471781,
                 13913677, -5137875,
@@ -1854,7 +1852,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 5568676, -3127656,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 11630004, 12144454, 2116339, 13606037, 27378885, 15676917, -17408753, -13504373,
                 -14395196, 8070818,
@@ -1868,7 +1866,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -27493162, 15431203,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 20525145, 10892566, -12742472, 12779443, -29493034, 16150075, -28240519, 14943142,
                 -15056790, -7935931,
@@ -1882,7 +1880,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 13352335, -10977084,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -1931799, -5407458, 3304649, -12884869, 17015806, -4877091, -29783850, -7752482,
                 -13215537, -319204,
@@ -1898,7 +1896,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 11374242, 12660715, 17861383, -12540833, 10935568, 1099227, -13886076, -9091740,
                 -27727044, 11358504,
@@ -1912,7 +1910,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -19414307, -15621255,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 6490081, 11940286, 25495923, -7726360, 8668373, -8751316, 3367603, 6970005,
                 -1691065, -9004790,
@@ -1926,7 +1924,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -99853, -10237333,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 17747465, 10039260, 19368299, -4050591, -20630635, -16041286, 31992683, -15857976,
                 -29260363, -5511971,
@@ -1940,7 +1938,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -5190932, -4162409,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 12501286, 4044383, -8612957, -13392385, -32430052, 5136599, -19230378, -3529697,
                 330070, -3659409,
@@ -1954,7 +1952,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -5159697, 3829363,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 28425966, -5835433, -577090, -4697198, -14217555, 6870930, 7921550, -6567787,
                 26333140, 14267664,
@@ -1968,7 +1966,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -26491501, -16408940,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 13537262, -7759490, -20604840, 10961927, -5922820, -13218065, -13156584, 6217254,
                 -15943699, 13814990,
@@ -1982,7 +1980,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -18685978, 4578290,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 24579768, 3711570, 1342322, -11180126, -27005135, 14124956, -22544529, 14074919,
                 21964432, 8235257,
@@ -1996,7 +1994,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 1141648, -12796236,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -12863944, -13219986, -8318266, -11018091, -6810145, -4843894, 13475066, -3133972,
                 32674895, 13715045,
@@ -2012,7 +2010,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -28970898, 5271447, -1266009, -9736989, -12455236, 16732599, -4862407, -4906449,
                 27193557, 6245191,
@@ -2026,7 +2024,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -29571492, -3635906,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 3877321, -9572739, 32416692, 5405324, -11004407, -13656635, 3759769, 11935320,
                 5611860, 8164018,
@@ -2040,7 +2038,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 31632953, 190926,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -24593607, -16138885, -8423991, 13378746, 14162407, 6901328, -8288749, 4508564,
                 -25341555, -3627528,
@@ -2054,7 +2052,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -24878478, 1541286,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 2901347, -1117687, 3880376, -10059388, -17620940, -3612781, -21802117, -3567481,
                 20456845, -1885033,
@@ -2068,7 +2066,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 7779328, 109896,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 30279744, 14648750, -8044871, 6425558, 13639621, -743509, 28698390, 12180118,
                 23177719, -554075,
@@ -2082,7 +2080,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -17717757, -5461437,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -5056483, 16566551, 15953661, 3767752, -10436499, 15627060, -820954, 2177225,
                 8550082, -15114165,
@@ -2096,7 +2094,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -21902570, 1494193,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -19562091, -14087393, -25583872, -9299552, 13127842, 759709, 21923482, 16529112,
                 8742704, 12967017,
@@ -2110,7 +2108,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 19375923, -12647961,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 8832269, -14495485, 13253511, 5137575, 5037871, 4078777, 24880818, -6222716,
                 2862653, 9455043,
@@ -2126,7 +2124,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -33256173, 4144782, -4476029, -6579123, 10770039, -7155542, -6650416, -12936300,
                 -18319198, 10212860,
@@ -2140,7 +2138,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -2499677, -16710063,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -26432803, 6148329, -17184412, -14474154, 18782929, -275997, -22561534, 211300,
                 2719757, 4940997,
@@ -2154,7 +2152,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -15452774, 7159369,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 9987780, -3404759, 17507962, 9505530, 9731535, -2165514, 22356009, 8312176,
                 22477218, -8403385,
@@ -2168,7 +2166,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -22587149, 536906,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 4377756, 8115836, 24567078, 15495314, 11625074, 13064599, 7390551, 10589625,
                 10838060, -15420424,
@@ -2182,7 +2180,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -5045064, -13373962,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -7737563, -5869402, -14566319, -7406919, 11385654, 13201616, 31730678, -10962840,
                 -3918636, -9669325,
@@ -2196,7 +2194,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 19236243, 12477404,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -11229439, 11243796, -17054270, -8040865, -788228, -8167967, -3897669, 11180504,
                 -23169516, 7733644,
@@ -2210,7 +2208,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -24449242, 10890804,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -31365647, 10271363, -12660625, -6267268, 16690207, -13062544, -14982212, 16484931,
                 25180797, -5334884,
@@ -2224,7 +2222,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 30696930, -3712849,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 32988917, -9603412, 12499366, 7910787, -10617257, -11931514, -7342816, -9985397,
                 -32349517, 7392473,
@@ -2240,7 +2238,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -11225584, 2320285, -9584280, 10149187, -33444663, 5808648, -14876251, -1729667,
                 31234590, 6090599,
@@ -2254,7 +2252,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 20650474, 1804084,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -27589786, 15456424, 8972517, 8469608, 15640622, 4439847, 3121995, -10329713,
                 27842616, -202328,
@@ -2268,7 +2266,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -19733229, 12796920,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 12076899, -14301286, -8785001, -11848922, -25012791, 16400684, -17591495,
                 -12899438, 3480665, -15182815,
@@ -2282,7 +2280,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -24552282, 15673397,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -20184622, 2338216, 19788685, -9620956, -4001265, -8740893, -20271184, 4733254,
                 3727144, -12934448,
@@ -2296,7 +2294,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -16432438, 9648165,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 32705432, -1550977, 30705658, 7451065, -11805606, 9631813, 3305266, 5248604,
                 -26008332, -11377501,
@@ -2310,7 +2308,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 32247248, -14389861,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 14312628, 1221556, 17395390, -8700143, -4945741, -8684635, -28197744, -9637817,
                 -16027623, -13378845,
@@ -2324,7 +2322,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 3059833, -11782870,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 10141598, 6082907, 17829293, -1947643, 9830092, 13613136, -25556636, -5544586,
                 -33502212, 3592096,
@@ -2338,7 +2336,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 26353178, 693168,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 30374239, 1595580, -16884039, 13186931, 4600344, 406904, 9585294, -400668,
                 31375464, 14369965,
@@ -2354,7 +2352,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 5975908, -5243188, -19459362, -9681747, -11541277, 14015782, -23665757, 1228319,
                 17544096, -10593782,
@@ -2368,7 +2366,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -10632534, -585479,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -12675304, 694026, -5076145, 13300344, 14015258, -14451394, -9698672, -11329050,
                 30944593, 1130208,
@@ -2382,7 +2380,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -408818, -137719,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 16091085, -16253926, 18599252, 7340678, 2137637, -1221657, -3364161, 14550936,
                 3260525, -7166271,
@@ -2396,7 +2394,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 11329923, 1862132,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 14763076, -15903608, -30918270, 3689867, 3511892, 10313526, -21951088, 12219231,
                 -9037963, -940300,
@@ -2410,7 +2408,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -13489462, -4363670,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -2538306, 7682793, 32759013, 263109, -29984731, -7955452, -22332124, -10188635,
                 977108, 699994,
@@ -2424,7 +2422,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 12493932, -5409317,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -25680606, 5260744, -19235809, -6284470, -3695942, 16566087, 27218280, 2607121,
                 29375955, 6024730,
@@ -2438,7 +2436,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 12121869, 16648078,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -15218652, 14667096, -13336229, 2013717, 30598287, -464137, -31504922, -7882064,
                 20237806, 2838411,
@@ -2452,7 +2450,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 12521378, 4845654,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -28198521, 10744108, -2958380, 10199664, 7759311, -13088600, 3409348, -873400,
                 -6482306, -12885870,
@@ -2468,7 +2466,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 14741879, -14946887, 22177208, -11721237, 1279741, 8058600, 11758140, 789443,
                 32195181, 3895677,
@@ -2482,7 +2480,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 18047436, -15281743,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -25173001, -11307165, 29759956, 11776784, -22262383, -15820455, 10993114,
                 -12850837, -17620701, -9408468,
@@ -2496,7 +2494,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -7874389, -13920155,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 6028182, 6263078, -31011806, -11301710, -818919, 2461772, -31841174, -5468042,
                 -1721788, -2776725,
@@ -2510,7 +2508,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -10339570, 5067943,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -30505967, -3821767, 12074681, 13582412, -19877972, 2443951, -19719286, 12746132,
                 5331210, -10105944,
@@ -2524,7 +2522,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 22611444, -12715406,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 22190590, 1118029, 22736441, 15130463, -30460692, -5991321, 19189625, -4648942,
                 4854859, 6622139,
@@ -2538,7 +2536,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -15405155, 11020693,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 1866042, -7949489, -7898649, -10301010, 12483315, 13477547, 3175636, -12424163,
                 28761762, 1406734,
@@ -2552,7 +2550,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -9368926, 4745410,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -9141284, 6049714, -19531061, -4341411, -31260798, 9944276, -15462008, -11311852,
                 10931924, -11931931,
@@ -2566,7 +2564,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 28445307, -5364710,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 29875063, 12493613, 2795536, -3786330, 1710620, 15181182, -10195717, -8788675,
                 9074234, 1167180,
@@ -2582,7 +2580,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 22092954, -13191123, -2042793, -11968512, 32186753, -11517388, -6574341, 2470660,
                 -27417366, 16625501,
@@ -2596,7 +2594,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 27108877, -1180880,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -8586597, -7170966, 13241782, 10960156, -32991015, -13794596, 33547976, -11058889,
                 -27148451, 981874,
@@ -2610,7 +2608,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -15933690, 3797899,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 21721356, -4212746, -12206123, 9310182, -3882239, -13653110, 23740224, -2709232,
                 20491983, -8042152,
@@ -2624,7 +2622,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 17649998, -250080,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -9301088, -14193827, 30609526, -3049543, -25175069, -1283752, -15241566, -9525724,
                 -2233253, 7662146,
@@ -2638,7 +2636,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 4862400, 1133,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -32856209, -7873957, -5422389, 14860950, -16319031, 7956142, 7258061, 311861,
                 -30594991, -7379421,
@@ -2652,7 +2650,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -21875062, 13626197,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 2281448, -13487055, -10915418, -2609910, 1879358, 16164207, -10783882, 3953792,
                 13340839, 15928663,
@@ -2666,7 +2664,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 2538215, -7570755,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -9433605, 6123113, 11159803, -2156608, 30016280, 14966241, -20474983, 1485421,
                 -629256, -15958862,
@@ -2680,7 +2678,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 33100372, -1306171,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 15121113, -5201871, -10389905, 15427821, -27509937, -15992507, 21670947, 4486675,
                 -5931810, -14466380,
@@ -2696,7 +2694,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -817581, 6763912, 11803561, 1585585, 10958447, -2671165, 23855391, 4598332,
                 -6159431, -14117438,
@@ -2710,7 +2708,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -19773211, -10713562,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 30464590, -11262872, -4127476, -12734478, 19835327, -7105613, -24396175, 2075773,
                 -17020157, 992471,
@@ -2724,7 +2722,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 26224780, 16452269,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -30223925, 5145196, 5944548, 16385966, 3976735, 2009897, -11377804, -7618186,
                 -20533829, 3698650,
@@ -2738,7 +2736,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -13259127, -3402461,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 30860103, 12735208, -1888245, -4699734, -16974906, 2256940, -8166013, 12298312,
                 -8550524, -10393462,
@@ -2752,7 +2750,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 9768698, -2533218,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -24719459, 1894651, -287698, -4704085, 15348719, -8156530, 32767513, 12765450,
                 4940095, 10678226,
@@ -2766,7 +2764,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -11003761, 7989037,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 31490452, 5568061, -2412803, 2182383, -32336847, 4531686, -32078269, 6200206,
                 -19686113, -14800171,
@@ -2780,7 +2778,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 1155602, 5988841,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 21890435, -13272907, -12624011, 12154349, -7831873, 15300496, 23148983, -4470481,
                 24618407, 8283181,
@@ -2794,7 +2792,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -32164649, -15327040,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 3960823, -14267803, -28026090, -15918051, -19404858, 13146868, 15567327, 951507,
                 -3260321, -573935,
@@ -2810,7 +2808,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 793299, -9230478, 8836302, -6235707, -27360908, -2369593, 33152843, -4885251,
                 -9906200, -621852,
@@ -2824,7 +2822,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -1558923, -9863646,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 10896332, -7719704, 824275, 472601, -19460308, 3009587, 25248958, 14783338,
                 -30581476, -15757844,
@@ -2838,7 +2836,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 13958495, -5732453,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -23481610, 4867226, -27247128, 3900521, 29838369, -8212291, -31889399, -10041781,
                 7340521, -15410068,
@@ -2852,7 +2850,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -8843694, 3849921,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -9064912, 2103172, 25561640, -15125738, -5239824, 9582958, 32477045, -9017955,
                 5002294, -15550259,
@@ -2866,7 +2864,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 28834118, -7646072,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -17335748, -9107057, -24531279, 9434953, -8472084, -583362, -13090771, 455841,
                 20461858, 5491305,
@@ -2880,7 +2878,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 29867745, -8795943,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -16207023, 13517196, -27799630, -13697798, 24009064, -6373891, -6367600, -13175392,
                 22853429, -4012011,
@@ -2894,7 +2892,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 16031844, 3723494,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -28632773, 12763728, -20446446, 7577504, 33001348, -13017745, 17558842, -7872890,
                 23896954, -4314245,
@@ -2908,7 +2906,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -18051778, -2082915,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 16000882, -344896, 3493092, -11447198, -29504595, -13159789, 12577740, 16041268,
                 -19715240, 7847707,
@@ -2924,7 +2922,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -25499735, -4378794, -15222908, -6901211, 16615731, 2051784, 3303702, 15490,
                 -27548796, 12314391,
@@ -2938,7 +2936,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -29815713, -9841101,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 23190676, 2384583, -32714340, 3462154, -29903655, -1529132, -11266856, 8911517,
                 -25205859, 2739713,
@@ -2952,7 +2950,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -30076310, 10117930,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -29501170, -10744872, -26163768, 13051539, -25625564, 5089643, -6325503, 6704079,
                 12890019, 15728940,
@@ -2966,7 +2964,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 1888765, -5435404,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -25817338, -3107312, -13494599, -3182506, 30896459, -13921729, -32251644,
                 -12707869, -19464434, -3340243,
@@ -2980,7 +2978,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -16866484, 16176525,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -23583256, 6564961, 20063689, 3798228, -4740178, 7359225, 2006182, -10363426,
                 -28746253, -10197509,
@@ -2994,7 +2992,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 2051441, -15225865,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -3362323, -7239372, 7517890, 9824992, 23555850, 295369, 5148398, -14154188,
                 -22686354, 16633660,
@@ -3008,7 +3006,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 17983010, 9967138,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -25762494, 6524722, 26585488, 9969270, 24709298, 1220360, -1677990, 7806337,
                 17507396, 3651560,
@@ -3022,7 +3020,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -5605463, -7621941,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -4839289, -3535444, 9744961, 2871048, 25113978, 3187018, -25110813, -849066,
                 17258084, -7977739,
@@ -3038,7 +3036,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -6898905, 9824394, -12304779, -4401089, -31397141, -6276835, 32574489, 12532905,
                 -7503072, -8675347,
@@ -3052,7 +3050,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -3556191, -7913075,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 16544754, 13250366, -16804428, 15546242, -4583003, 12757258, -2462308, -8680336,
                 -18907032, -9662799,
@@ -3066,7 +3064,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -6432418, -1644817,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -23104652, 6253476, 16964147, -3768872, -25113972, -12296437, -27457225, -16344658,
                 6335692, 7249989,
@@ -3080,7 +3078,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 31820368, 15075278,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 31879134, -8918693, 17258761, 90626, -8041836, -4917709, 24162788, -9650886,
                 -17970238, 12833045,
@@ -3094,7 +3092,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 27628530, -7555480,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 17597607, 8340603, 19355617, 552187, 26198470, -3176583, 4593324, -9157582,
                 -14110875, 15297016,
@@ -3108,7 +3106,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 4674690, 13890525,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 13609624, 13069022, -27372361, -13055908, 24360586, 9592974, 14977157, 9835105,
                 4389687, 288396,
@@ -3122,7 +3120,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -14754271, -10812892,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 15961858, 14150409, 26716931, -665832, -22794328, 13603569, 11829573, 7467844,
                 -28822128, 929275,
@@ -3136,7 +3134,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 2463391, -4622140,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -16358878, -12663911, -12065183, 4996454, -1256422, 1073572, 9583558, 12851107,
                 4003896, 12673717,
@@ -3152,7 +3150,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -12622226, -6204820, 30718825, 2591312, -10617028, 12192840, 18873298, -7297090,
                 -32297756, 15221632,
@@ -3166,7 +3164,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 30958054, 8292160,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 31429822, -13959116, 29173532, 15632448, 12174511, -2760094, 32808831, 3977186,
                 26143136, -3148876,
@@ -3180,7 +3178,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -16664475, 8194478,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 27338066, -7507420, -7414224, 10140405, -19026427, -6589889, 27277191, 8855376,
                 28572286, 3005164,
@@ -3194,7 +3192,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 32208683, -1198248,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -16657702, 2817643, -10286362, 14811298, 6024667, 13349505, -27315504, -10497842,
                 -27672585, -11539858,
@@ -3208,7 +3206,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -27505566, 15087184,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -18357243, -2156491, 24524913, -16677868, 15520427, -6360776, -15502406, 11461896,
                 16788528, -5868942,
@@ -3222,7 +3220,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 13040862, -12112948,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 11293895, 12478086, -27136401, 15083750, -29307421, 14748872, 14555558, -13417103,
                 1613711, 4896935,
@@ -3236,7 +3234,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -23753030, -8436416,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -7091295, 12556208, -20191352, 9025187, -17072479, 4333801, 4378436, 2432030,
                 23097949, -566018,
@@ -3250,7 +3248,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -3642553, 12412659,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -24001791, 7690286, 14929416, -168257, -32210835, -13412986, 24162697, -15326504,
                 -3141501, 11179385,
@@ -3266,7 +3264,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 20678546, -8375738, -32671898, 8849123, -5009758, 14574752, 31186971, -3973730,
                 9014762, -8579056,
@@ -3280,7 +3278,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -24568481, 11788948,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -3118155, -11395194, -13802089, 14797441, 9652448, -6845904, -20037437, 10410733,
                 -24568470, -1458691,
@@ -3294,7 +3292,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 33313881, -8370517,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -20186973, -4967935, 22367356, 5271547, -1097117, -4788838, -24805667, -10236854,
                 -8940735, -5818269,
@@ -3308,7 +3306,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -5351664, 5596589,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -28236598, -3390048, 12312896, 6213178, 3117142, 16078565, 29266239, 2557221,
                 1768301, 15373193,
@@ -3322,7 +3320,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -18585478, 13365930,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -7877390, -1499958, 8324673, 4690079, 6261860, 890446, 24538107, -8570186,
                 -9689599, -3031667,
@@ -3336,7 +3334,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 519526, -1235876,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 22258397, -16332233, -7869817, 14613016, -22520255, -2950923, -20353881, 7315967,
                 16648397, 7605640,
@@ -3350,7 +3348,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -11356529, 728112,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 26047220, -11751471, -6900323, -16521798, 24092068, 9158119, -4273545, -12555558,
                 -29365436, -5498272,
@@ -3364,7 +3362,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 3424691, 7540221,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 30322361, -6964110, 11361005, -4143317, 7433304, 4989748, -7071422, -16317219,
                 -9244265, 15258046,
@@ -3380,7 +3378,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 19852034, 7027924, 23669353, 10020366, 8586503, -6657907, 394197, -6101885,
                 18638003, -11174937,
@@ -3394,7 +3392,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -32294889, -6456008,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -2444496, -149937, 29348902, 8186665, 1873760, 12489863, -30934579, -7839692,
                 -7852844, -8138429,
@@ -3408,7 +3406,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 31809243, 7347066,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -9606723, -11874240, 20414459, 13033986, 13716524, -11691881, 19797970, -12211255,
                 15192876, -2087490,
@@ -3422,7 +3420,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -6135662, 14480053,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 31308717, -5619998, 31030840, -1897099, 15674547, -6582883, 5496208, 13685227,
                 27595050, 8737275,
@@ -3436,7 +3434,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -13327787, -7515095,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -28017847, 9834845, 18617207, -2681312, -3401956, -13307506, 8205540, 13585437,
                 -17127465, 15115439,
@@ -3450,7 +3448,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 6708380, -6222424,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 2101391, -4930054, 19702731, 2367575, -15427167, 1047675, 5301017, 9328700,
                 29955601, -11678310,
@@ -3464,7 +3462,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -26767480, 7525079,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -23066649, -13985623, 16133487, -7896178, -3389565, 778788, -910336, -2782495,
                 -19386633, 11994101,
@@ -3478,7 +3476,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 28535282, 15779576,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 30098053, 3089662, -9234387, 16662135, -21306940, 11308411, -14068454, 12021730,
                 9955285, -16303356,
@@ -3494,7 +3492,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -26016874, -219943, 21339191, -41388, 19745256, -2878700, -29637280, 2227040,
                 21612326, -545728,
@@ -3508,7 +3506,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 33514190, 2333242,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -21433588, -12421821, 8119782, 7219913, -21830522, -9016134, -6679750, -12670638,
                 24350578, -13450001,
@@ -3522,7 +3520,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 20712163, 6719373,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 26656208, 6075253, -7858556, 1886072, -28344043, 4262326, 11117530, -3763210,
                 26224235, -3297458,
@@ -3536,7 +3534,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -30701573, -16479657,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -23860538, -11233159, 26961357, 1640861, -32413112, -16737940, 12248509, -5240639,
                 13735342, 1934062,
@@ -3550,7 +3548,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 29111212, -5451014,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 24244947, -15050407, -26262976, 2791540, -14997599, 16666678, 24367466, 6388839,
                 -10295587, 452383,
@@ -3564,7 +3562,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -8067909, 2276718,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 30157918, 12924066, -17712050, 9245753, 19895028, 3368142, -23827587, 5096219,
                 22740376, -7303417,
@@ -3578,7 +3576,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -4451357, -14669444,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -20045281, 5454097, -14346548, 6447146, 28862071, 1883651, -2469266, -4141880,
                 7770569, 9620597,
@@ -3592,7 +3590,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 30494170, -11440799,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -5037580, -13028295, -2970559, -3061767, 15640974, -6701666, -26739026, 926050,
                 -1684339, -13333647,
@@ -3608,7 +3606,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
         },
     ],
     [
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 9661027, 705443, 11980065, -5370154, -1628543, 14661173, -6346142, 2625015,
                 28431036, -16771834,
@@ -3622,7 +3620,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 11465739, 8317062,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -25493081, -6962928, 32500200, -9419051, -23038724, -2302222, 14898637, 3848455,
                 20969334, -5157516,
@@ -3636,7 +3634,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -28487508, 9930240,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -17751622, -2097826, 16544300, -13009300, -15914807, -14949081, 18345767,
                 -13403753, 16291481, -5314038,
@@ -3650,7 +3648,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 16250552, -11111103,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -19765507, 2390526, -16551031, 14161980, 1905286, 6414907, 4689584, 10604807,
                 -30190403, 4782747,
@@ -3664,7 +3662,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -30633590, -14097016,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -14467279, -683715, -33374107, 7448552, 19294360, 14334329, -19690631, 2355319,
                 -19284671, -6114373,
@@ -3678,7 +3676,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 22761615, -10134141,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 16918416, 11729663, -18083579, 3022987, -31015732, -13339659, -28741185, -12227393,
                 32851222, 11717399,
@@ -3692,7 +3690,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 -19985279, -3948376,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -32460596, 11266712, -11197107, -7899103, 31703694, 3855903, -8537131, -12833048,
                 -30772034, -15486313,
@@ -3706,7 +3704,7 @@ pub const BASE: [[preComputedGroupElement; 8]; 32] = [
                 18008031, 10258577,
             ],
         },
-        preComputedGroupElement {
+        PreComputedGroupElement {
             yPlusX: [
                 -22448644, 15655569, 7018479, -4410003, -30314266, -1201591, -1853465, 1367120,
                 25127874, 6671743,

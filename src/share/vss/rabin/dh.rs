@@ -52,10 +52,10 @@ where
     SCALAR: Scalar,
 {
     let mut h = suite.xof(Some("vss-dealer".as_bytes()));
-    dealer.MarshalTo(&mut h).unwrap();
+    dealer.marshal_to(&mut h).unwrap();
     h.write("vss-verifiers".as_bytes()).unwrap();
     for v in verifiers {
-        v.MarshalTo(&mut h).unwrap();
+        v.marshal_to(&mut h).unwrap();
     }
     let mut sum = [0 as u8; KEY_SIZE]; //make([]byte, keySize);
     h.read(&mut sum).unwrap();

@@ -1,4 +1,4 @@
-use super::ge::extendedGroupElement;
+use super::ge::ExtendedGroupElement;
 
 // geScalarMultVartime computes h = a*B, where
 //   a = a[0]+256*a[1]+...+256^31 a[31]
@@ -7,9 +7,9 @@ use super::ge::extendedGroupElement;
 // Preconditions:
 //   a[31] <= 127
 pub fn geScalarMultVartime(
-    _h: &mut extendedGroupElement,
+    _h: &mut ExtendedGroupElement,
     _a: &mut [u8; 32],
-    _A: &mut extendedGroupElement,
+    _A: &mut ExtendedGroupElement,
 ) {
     // var aSlide [256]int8
     // var Ai [8]cachedGroupElement // A,3A,5A,7A,9A,11A,13A,15A
