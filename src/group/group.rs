@@ -1,39 +1,43 @@
 use anyhow::Result;
+use digest::DynDigest;
 
 use crate::cipher::cipher::Stream;
 use crate::encoding::Marshaling;
 use std::fmt::Debug;
-use std::ops::Add;
+use std::io::Write;
+use std::ops::{Add, Mul};
 
 /// scalar represents a scalar value by which
 /// a Point (group element) may be encrypted to produce another Point.
 /// This is an exponent in DSA-style groups,
 /// in which security is based on the Discrete Logarithm assumption,
 /// and a scalar multiplier in elliptic curve groups.
-pub trait Scalar: Marshaling + Clone + PartialEq + Debug + ToString {
+pub trait Scalar:
+    Marshaling
+    + Clone
+    + PartialEq
+    + Debug
+    + ToString
+    + Add<Self, Output = Self>
+    + Mul<Self, Output = Self>
+{
     //// Set sets the receiver equal to another scalar a.
-    fn set(&mut self, a: &Self) -> &mut Self;
+    fn set(self, a: &Self) -> Self;
 
     /// set_int64 sets the receiver to a small integer value.
-    fn set_int64(&mut self, v: i64) -> &mut Self;
+    fn set_int64(self, v: i64) -> Self;
 
     /// Set to the additive identity (0).
-    fn zero(&mut self) -> &mut Self;
-
-    /// Set to the modular sum of scalars a and b.
-    fn add(&mut self, a: &Self, b: &Self) -> &mut Self;
+    fn zero(self) -> Self;
 
     // Set to the modular difference a - b.
-    fn sub(&mut self, a: &Self, b: &Self) -> &mut Self;
+    fn sub(self, a: &Self, b: &Self) -> Self;
 
     // // Set to the modular negation of scalar a.
     // Neg(a scalar) scalar
     //
     // // Set to the multiplicative identity (1).
     // One() scalar
-
-    /// Set to the modular product of scalars a and b.
-    fn mul(&mut self, a: &Self, b: &Self) -> &mut Self;
 
     // // Set to the modular division of scalar a by scalar b.
     // Div(a, b scalar) scalar
@@ -48,7 +52,7 @@ pub trait Scalar: Marshaling + Clone + PartialEq + Debug + ToString {
     /// reducing if necessary to the appropriate modulus.
     /// The endianess of the byte-slice is determined by the
     /// implementation.
-    fn set_bytes(&mut self, bytes: &[u8]) -> Self;
+    fn set_bytes(self, bytes: &[u8]) -> Self;
 }
 
 /// Point represents an element of a public-key cryptographic Group.
@@ -87,7 +91,7 @@ pub trait Point<SCALAR: Scalar>: Marshaling + Clone {
     fn data(&self) -> Result<Vec<u8>>;
 
     /// Add points so that their scalars add homomorphically.
-    fn add(&mut self, a: &Self, b: &Self) -> &mut Self;
+    fn add(self, a: &Self, b: &Self) -> Self;
 
     /// Subtract points so that their scalars subtract homomorphically.
     fn sub(&mut self, a: &Self, b: &Self) -> &mut Self;
@@ -142,7 +146,7 @@ pub trait AllowsVarTime {
 /// Any implementation is also expected to satisfy
 /// the standard homomorphism properties that Diffie-Hellman
 /// and the associated body of public-key cryptography are based on.
-pub trait Group<SCALAR, POINT>
+pub trait Group<SCALAR, POINT>: Clone
 where
     SCALAR: Scalar,
     POINT: Point<SCALAR>,
@@ -163,6 +167,15 @@ where
 }
 
 /// A HashFactory is an interface that can be mixed in to local suite definitions.
-trait HashFactory {
-    // fn hash() -> hash.Hash
+pub trait HashFactory {
+    fn hash(&self) -> Box<dyn Hasher>;
+}
+
+pub trait Hasher: DynDigest + Write {}
+
+impl<T> Hasher for T
+where
+    T: DynDigest,
+    T: Write,
+{
 }

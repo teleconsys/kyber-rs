@@ -19,12 +19,11 @@ fn bench_scalar_add<T: Scalar>(bench: &mut Bencher, new: fn() -> T) {
     let mut seed = t_suite().xof(Some("hello world".as_ref()));
     let mut s1 = new();
     let mut s2 = new();
-    let mut s3 = new();
-    s1.pick(&mut seed);
-    s2.pick(&mut seed);
+    s1 = s1.pick(&mut seed);
+    s2 = s2.pick(&mut seed);
 
     bench.iter(|| {
-        s3.add(&s1, &s2);
+        let _ = s1.clone() + s2.clone();
     });
 }
 
@@ -41,12 +40,11 @@ fn bench_scalar_mul<T: Scalar>(bench: &mut Bencher, new: fn() -> T) {
     let mut seed = t_suite().xof(Some("hello world".as_bytes()));
     let mut s1 = new();
     let mut s2 = new();
-    let mut s3 = new();
-    s1.pick(&mut seed);
-    s2.pick(&mut seed);
+    s1 = s1.pick(&mut seed);
+    s2 = s2.pick(&mut seed);
 
-    bench.iter(|| {
-        s3.mul(&s1, &s2);
+    bench.iter(move || {
+        let _ = s1.clone() * s2.clone();
     });
 }
 
@@ -54,12 +52,12 @@ fn bench_scalar_sub<T: Scalar>(bench: &mut Bencher, new: fn() -> T) {
     let mut seed = t_suite().xof(Some("hello world".as_bytes()));
     let mut s1 = new();
     let mut s2 = new();
-    let mut s3 = new();
-    s1.pick(&mut seed);
-    s2.pick(&mut seed);
+    let s3 = new();
+    s1 = s1.pick(&mut seed);
+    s2 = s2.pick(&mut seed);
 
     bench.iter(|| {
-        s3.sub(&s1, &s2);
+        s3.clone().sub(&s1, &s2);
     });
 }
 

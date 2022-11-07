@@ -8,8 +8,11 @@ use crate::{
 };
 
 use super::{
-    constants::{COFACTOR_SCALAR, NULL_POINT, PRIME_ORDER_SCALAR},
-    ge::{extendedGroupElement, geScalarMult, geScalarMultBase},
+    constants::{BASEEXT, COFACTOR_SCALAR, NULL_POINT, PRIME_ORDER_SCALAR},
+    ge::{
+        cachedGroupElement, completedGroupElement, extendedGroupElement, geScalarMult,
+        geScalarMultBase,
+    },
     ge_mult_vartime::geScalarMultVartime,
     Scalar,
 };
@@ -69,8 +72,10 @@ impl group::Point<Scalar> for Point {
         self
     }
 
-    fn base(self) -> Self {
-        todo!()
+    /// Set to the standard base point for this curve
+    fn base(mut self) -> Self {
+        self.ge = BASEEXT;
+        self
     }
 
     fn pick<S: crate::cipher::Stream>(self, rand: &mut S) -> Self {
@@ -153,8 +158,15 @@ impl group::Point<Scalar> for Point {
         todo!()
     }
 
-    fn add(&mut self, a: &Self, b: &Self) -> &mut Self {
-        todo!()
+    fn add(mut self, p1: &Self, p2: &Self) -> Self {
+        let mut t2 = cachedGroupElement::default();
+        let mut r = completedGroupElement::default();
+
+        p2.ge.ToCached(&mut t2);
+        r.Add(&p1.ge, &t2);
+        r.ToExtended(&mut self.ge);
+
+        self
     }
 
     fn sub(&mut self, a: &Self, b: &Self) -> &mut Self {
@@ -234,12 +246,6 @@ impl Point {
     // 	return &point{ge: P.ge}
     // }
 
-    // // Set to the standard base point for this curve
-    // func (P *point) Base() kyber.Point {
-    // 	P.ge = baseext
-    // 	return P
-    // }
-
     // func (P *point) EmbedLen() int {
     // 	// Reserve the most-significant 8 bits for pseudo-randomness.
     // 	// Reserve the least-significant 8 bits for embedded data length.
@@ -311,20 +317,6 @@ impl Point {
     // 		return nil, errors.New("invalid embedded data length")
     // 	}
     // 	return b[1 : 1+dl], nil
-    // }
-
-    // func (P *point) Add(P1, P2 kyber.Point) kyber.Point {
-    // 	E1 := P1.(*point)
-    // 	E2 := P2.(*point)
-
-    // 	var t2 cachedGroupElement
-    // 	var r completedGroupElement
-
-    // 	E2.ge.ToCached(&t2)
-    // 	r.Add(&E1.ge, &t2)
-    // 	r.ToExtended(&P.ge)
-
-    // 	return P
     // }
 
     // func (P *point) Sub(P1, P2 kyber.Point) kyber.Point {

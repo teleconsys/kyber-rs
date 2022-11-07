@@ -1,4 +1,5 @@
 use std::cmp::Ordering::{Equal, Greater};
+use std::ops::{Add, Mul};
 
 use anyhow::{bail, Result};
 use num_bigint::BigInt;
@@ -289,39 +290,47 @@ impl ToString for Int {
     }
 }
 
+impl Mul for Int {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self {
+        todo!()
+    }
+}
+
+impl Add for Int {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+
 impl Scalar for Int {
-    fn set(&mut self, _a: &Self) -> &mut Self {
+    fn set(self, _a: &Self) -> Self {
         todo!()
     }
 
     /// set_int64 sets the Int to an arbitrary 64-bit "small integer" value.
     /// The modulus must already be initialized.
-    fn set_int64(&mut self, _v: i64) -> &mut Int {
+    fn set_int64(self, _v: i64) -> Self {
         // i.V.SetInt64(v).Mod(&i.V, i.M)
         // return i
         todo!()
     }
 
-    fn zero(&mut self) -> &mut Self {
-        todo!()
-    }
-
-    fn add(&mut self, _a: &Self, _b: &Self) -> &mut Self {
+    fn zero(self) -> Self {
         todo!()
     }
 
     /// Sub sets the target to a - b mod m.
     /// Target receives a's modulus.
-    fn sub(&mut self, a: &Self, b: &Self) -> &mut Self {
+    fn sub(mut self, a: &Self, b: &Self) -> Self {
         self.m = a.m.clone();
         let sub = &a.v - &b.v;
         self.v = ((sub % &self.m) + &self.m) % &self.m;
         // i.V.Sub(&ai.V, &bi.V).Mod(&i.V, i.M)
         self
-    }
-
-    fn mul(&mut self, _a: &Self, _b: &Self) -> &mut Self {
-        todo!()
     }
 
     fn pick(self, _rand: &mut impl Stream) -> Self {
@@ -331,7 +340,7 @@ impl Scalar for Int {
     /// set_bytes set the value value to a number represented
     /// by a byte string.
     /// Endianness depends on the endianess set in i.
-    fn set_bytes(&mut self, a: &[u8]) -> Self {
+    fn set_bytes(self, a: &[u8]) -> Self {
         let mut buff = a.clone().to_vec();
         if self.bo == LittleEndian {
             buff = reverse(vec![0; buff.len()].as_ref(), &a.to_vec());

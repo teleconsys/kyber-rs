@@ -657,16 +657,16 @@ fn genAll() -> (
 ) {
     let test_data = default_test_data();
     let dealer = genDealer();
-    let mut verifiers = Vec::with_capacity(test_data.nb_verifiers);
+    let mut verifiers = vec![];
     for i in 0..NB_VERIFIERS {
         let v = NewVerifier(
             test_data.suite,
-            test_data.verifiers_sec[i],
+            test_data.verifiers_sec[i].clone(),
             test_data.dealer_pub,
             test_data.verifiers_pub.clone(),
         )
         .unwrap();
-        verifiers[i] = v;
+        verifiers.push(v);
     }
     (dealer, verifiers)
 }

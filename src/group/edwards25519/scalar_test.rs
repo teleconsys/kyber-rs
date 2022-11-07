@@ -9,8 +9,8 @@ use super::test_scalars::SimpleCTScalar;
 fn test_string() {
     // Create a scalar that would trigger #262.
     let mut s = EdScalar::default();
-    s.set_int64(0x100);
-    s.add(&s.clone(), &ONE);
+    s = s.set_int64(0x100);
+    s = s + ONE.clone();
     let _z = s.string();
     assert_eq!(
         s.string(),
@@ -30,7 +30,7 @@ fn test_scalar_marshal() {
 #[test]
 fn test_set_bytes_le() {
     let mut s = EdScalar::default();
-    s.set_bytes(&[0, 1, 2, 3]);
+    s = s.set_bytes(&[0, 1, 2, 3]);
     assert_eq!(
         s.string(),
         "0001020300000000000000000000000000000000000000000000000000000000",
@@ -42,15 +42,12 @@ fn test_set_bytes_le() {
 fn test_simple<T: Scalar>(new: fn() -> T) {
     let mut s1 = new();
     let mut s2 = new();
-    let mut s3 = new();
-    s1.set_int64(2);
-    let mut r = random::Randstream::default();
-    s2 = s2.pick(&mut r);
+    s1 = s1.set_int64(2);
+    s2 = s2.pick(&mut random::Randstream::default());
 
-    let mut tmp = new();
-    let s22 = tmp.add(&s2, &s2);
+    let s22 = s2.clone() + s2.clone();
 
-    assert_eq!(s3.mul(&s1, &s2), s22);
+    assert_eq!(s1 * s2, s22);
 }
 
 #[test]

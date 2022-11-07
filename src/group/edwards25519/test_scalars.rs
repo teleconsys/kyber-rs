@@ -1,3 +1,5 @@
+use std::ops::{Add, DerefMut, Mul};
+
 use anyhow::Result;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -11,8 +13,8 @@ use crate::{
 use super::scalar::{sc_mul_add, Scalar as EdScalar};
 
 lazy_static! {
-    pub static ref ONE: EdScalar = *EdScalar::default().set_int64(1);
-    pub static ref ZERO: EdScalar = *EdScalar::default().zero();
+    pub static ref ONE: EdScalar = EdScalar::default().set_int64(1);
+    pub static ref ZERO: EdScalar = EdScalar::default().zero();
 }
 
 /// SimpleCTScalar implements the scalar operations only using `ScMulAdd` by
@@ -27,6 +29,17 @@ impl Default for SimpleCTScalar {
         SimpleCTScalar {
             s: EdScalar::default(),
         }
+    }
+}
+
+impl Add for SimpleCTScalar {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        // a * b + c = a * 1 + c
+        let mut v = [0u8; 32];
+        sc_mul_add(&mut v, &self.s.v, &ONE.v, &rhs.s.v);
+        SimpleCTScalar { s: EdScalar { v } }
     }
 }
 
@@ -60,48 +73,58 @@ impl ToString for SimpleCTScalar {
     }
 }
 
-impl Scalar for SimpleCTScalar {
-    fn set(&mut self, _a: &Self) -> &mut Self {
-        todo!()
-    }
+impl Mul for SimpleCTScalar {
+    type Output = Self;
 
-    fn set_int64(&mut self, v: i64) -> &mut Self {
-        self.s.set_int64(v);
-        self
-    }
-
-    fn zero(&mut self) -> &mut Self {
-        todo!()
-    }
-
-    fn pick(self, rand: &mut impl Stream) -> Self {
-        self.s.pick(rand);
-        self
-    }
-
-    fn set_bytes(&mut self, _bytes: &[u8]) -> Self {
-        todo!()
-    }
-
-    fn add(&mut self, s1: &Self, s2: &Self) -> &mut Self {
-        // sc1 := s1.(*SimpleCTScalar)
-        // sc2 := s2.(*SimpleCTScalar)
-
-        // a * b + c = a * 1 + c
-        sc_mul_add(&mut self.s.v, &s1.s.v, &ONE.v, &s2.s.v);
-        self
-    }
-
-    fn mul(&mut self, s1: &Self, s2: &Self) -> &mut Self {
-        // sc1 := s1.(*SimpleCTScalar)
-        // sc2 := s2.(*SimpleCTScalar)
-
+    fn mul(self, rhs: Self) -> Self {
         // // a * b + c = a * b + 0
-        sc_mul_add(&mut self.s.v, &s1.s.v, &s2.s.v, &ZERO.v);
+        let mut v = [0u8; 32];
+        sc_mul_add(&mut v, &self.s.v, &rhs.s.v, &ZERO.v);
+        SimpleCTScalar { s: EdScalar { v } }
+    }
+}
+
+use std::ops::Deref;
+impl Deref for SimpleCTScalar {
+    type Target = EdScalar;
+
+    fn deref(&self) -> &Self::Target {
+        &self.s
+    }
+}
+
+impl DerefMut for SimpleCTScalar {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.s
+    }
+}
+
+impl Scalar for SimpleCTScalar {
+    fn set(mut self, a: &Self) -> Self {
+        self.s = self.s.set(a);
         self
     }
 
-    fn sub(&mut self, _s1: &Self, _s2: &Self) -> &mut Self {
+    fn set_int64(mut self, v: i64) -> Self {
+        self.s = self.s.set_int64(v);
+        self
+    }
+
+    fn zero(mut self) -> Self {
+        self.s = self.s.zero();
+        self
+    }
+
+    fn pick(mut self, rand: &mut impl Stream) -> Self {
+        self.s = self.s.pick(rand);
+        self
+    }
+
+    fn set_bytes(mut self, bytes: &[u8]) -> Self {
+        self.s = self.s.set_bytes(bytes);
+        self
+    }
+    fn sub(self, _s1: &Self, _s2: &Self) -> Self {
         // sc1 := s1.(*SimpleCTScalar)
         // sc2 := s2.(*SimpleCTScalar)
 

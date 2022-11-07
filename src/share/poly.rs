@@ -8,11 +8,12 @@
 // Both schemes of this package are core building blocks for more advanced
 // secret sharing techniques.
 
+use anyhow::bail;
 use anyhow::Result;
 
-// // Some error definitions
-// var errorGroups = errors.New("non-matching groups")
-// var errorCoeffs = errors.New("different number of coefficients")
+// Some error definitions
+const ERROR_GROUPS: &str = "non-matching groups";
+const ERROR_COEFFS: &str = "different number of coefficients";
 
 /// PriShare represents a private share.
 pub struct PriShare<SCALAR>
@@ -63,7 +64,7 @@ pub fn NewPriPoly<SCALAR, POINT, GROUP, STREAM>(
     group: GROUP,
     t: usize,
     s: Option<SCALAR>,
-    rand: STREAM,
+    mut rand: STREAM,
 ) -> PriPoly<SCALAR, POINT, GROUP>
 where
     SCALAR: Scalar,
@@ -71,16 +72,19 @@ where
     GROUP: Group<SCALAR, POINT>,
     STREAM: Stream,
 {
-    // coeffs := make([]kyber.Scalar, t)
-    // coeffs[0] = s
-    // if coeffs[0] == nil {
-    // 	coeffs[0] = group.Scalar().Pick(rand)
-    // }
-    // for i := 1; i < t; i++ {
-    // 	coeffs[i] = group.Scalar().Pick(rand)
-    // }
-    // return &PriPoly{g: group, coeffs: coeffs}
-    todo!()
+    let mut coeffs: Vec<SCALAR> = vec![];
+    coeffs.push(match s {
+        Some(v) => v,
+        None => group.scalar().pick(&mut rand),
+    });
+    for _ in 1..t {
+        coeffs.push(group.scalar().pick(&mut rand));
+    }
+    PriPoly {
+        g: group,
+        coeffs: coeffs,
+        _phantom: PhantomData,
+    }
 }
 
 // // CoefficientsToPriPoly returns a PriPoly based on the given coefficients
@@ -96,8 +100,7 @@ where
 {
     /// Threshold returns the secret sharing threshold.
     pub fn Threshold(&self) -> usize {
-        // return len(p.coeffs)
-        todo!()
+        self.coeffs.len()
     }
 
     /// Secret returns the shared secret p(0), i.e., the constant term of the polynomial.
@@ -108,14 +111,13 @@ where
 
     /// Eval computes the private share v = p(i).
     pub fn Eval(&self, i: usize) -> PriShare<SCALAR> {
-        // xi := p.g.Scalar().SetInt64(1 + int64(i))
-        // v := p.g.Scalar().Zero()
-        // for j := p.Threshold() - 1; j >= 0; j-- {
-        // 	v.Mul(v, xi)
-        // 	v.Add(v, p.coeffs[j])
-        // }
-        // return &PriShare{i, v}
-        todo!()
+        let xi = self.g.scalar().set_int64(1 + i as i64);
+        let mut v = self.g.scalar().zero();
+        for j in (0..self.Threshold()).rev() {
+            v = v * xi.clone();
+            v = v + self.coeffs[j].clone();
+        }
+        PriShare { i, v }
     }
 
     // // Shares creates a list of n private shares p(1),...,p(n).
@@ -166,12 +168,17 @@ where
     /// Commit creates a public commitment polynomial for the given base point b or
     /// the standard base if b == nil.
     pub fn Commit(&self, b: POINT) -> PubPoly<SCALAR, POINT, GROUP> {
-        // commits := make([]kyber.Point, p.Threshold())
-        // for i := range commits {
-        // 	commits[i] = p.g.Point().Mul(p.coeffs[i], b)
-        // }
-        // return &PubPoly{p.g, b, commits}
-        todo!()
+        let mut commits = vec![];
+        for i in 0..self.Threshold() {
+            commits.push(self.g.point().mul(&self.coeffs[i], Some(&b)));
+        }
+
+        PubPoly {
+            g: self.g.clone(),
+            b,
+            commits,
+            _phantom: PhantomData,
+        }
     }
 
     // // Mul multiples p and q together. The result is a polynomial of the sum of
@@ -364,10 +371,10 @@ where
         (self.b.clone(), self.commits.clone())
     }
 
-    // // Threshold returns the secret sharing threshold.
-    // func (p *PubPoly) Threshold() int {
-    // 	return len(p.commits)
-    // }
+    /// threshold returns the secret sharing threshold.
+    pub fn threshold(&self) -> usize {
+        self.commits.len()
+    }
 
     // // Commit returns the secret commitment p(0), i.e., the constant term of the polynomial.
     // func (p *PubPoly) Commit() kyber.Point {
@@ -401,21 +408,25 @@ where
     /// p.b as a default value which of course does not correspond to the correct
     /// base point and thus should not be used in further computations.
     pub fn Add(self, q: &Self) -> Result<Self> {
-        // if self.g.String() != q.g.String() {
-        // 	return nil, errorGroups
-        // }
+        if self.g.string() != q.g.string() {
+            bail!(ERROR_GROUPS);
+        }
 
-        // if self.Threshold() != q.Threshold() {
-        // 	return nil, errorCoeffs
-        // }
+        if self.threshold() != q.threshold() {
+            bail!(ERROR_COEFFS);
+        }
 
-        // commits := make([]kyber.Point, self.Threshold())
-        // for i := range commits {
-        // 	commits[i] = self.g.Point().Add(self.commits[i], q.commits[i])
-        // }
+        let mut commits = vec![];
+        for i in 0..self.threshold() {
+            commits.push(self.g.point().add(&self.commits[i], &q.commits[i]));
+        }
 
-        // return &PubPoly{self.g, self.b, commits}, nil
-        todo!()
+        Ok(PubPoly {
+            g: self.g,
+            b: self.b,
+            commits,
+            _phantom: PhantomData,
+        })
     }
 
     // // Equal checks equality of two public commitment polynomials p and q. If p and

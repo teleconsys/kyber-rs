@@ -10,7 +10,10 @@ use crate::{
     Point,
 };
 
-use super::{fe::FieldElement, ge::preComputedGroupElement};
+use super::{
+    fe::FieldElement,
+    ge::{extendedGroupElement, preComputedGroupElement},
+};
 
 lazy_static! {
     /// prime modulus of underlying field = 2^255 - 19
@@ -50,6 +53,25 @@ pub const D2: FieldElement = [
     -21827239, -5839606, -30745221, 13898782, 229458, 15978800, -12551817, -6495438, 29715968,
     9444199,
 ];
+
+pub const BASEEXT: extendedGroupElement = extendedGroupElement {
+    X: [
+        25485296, 5318399, 8791791, -8299916, -14349720, 6939349, -3324311, -7717049, 7287234,
+        -6577708,
+    ],
+    Y: [
+        -758052, -1832720, 13046421, -4857925, 6576754, 14371947, -13139572, 6845540, -2198883,
+        -4003719,
+    ],
+    Z: [
+        -947565, 6097708, -469190, 10704810, -8556274, -15589498, -16424464, -16608899, 14028613,
+        -5004649,
+    ],
+    T: [
+        6966464, -2456167, 7033433, 6781840, 28785542, 12262365, -2659449, 13959020, -21013759,
+        -5262166,
+    ],
+};
 
 pub const BASE: [[preComputedGroupElement; 8]; 32] = [
     [

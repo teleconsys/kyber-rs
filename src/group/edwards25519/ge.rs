@@ -15,7 +15,7 @@ use super::{
     },
 };
 
-struct projectiveGroupElement {
+pub struct projectiveGroupElement {
     X: FieldElement,
     Y: FieldElement,
     Z: FieldElement,
@@ -77,10 +77,10 @@ fn test_from_bytes() {
 
 #[derive(Clone, Copy)]
 pub struct extendedGroupElement {
-    X: FieldElement,
-    Y: FieldElement,
-    Z: FieldElement,
-    T: FieldElement,
+    pub X: FieldElement,
+    pub Y: FieldElement,
+    pub Z: FieldElement,
+    pub T: FieldElement,
 }
 
 impl extendedGroupElement {
@@ -97,7 +97,7 @@ impl extendedGroupElement {
         q.Double(r);
     }
 
-    fn ToCached(&self, r: &mut cachedGroupElement) {
+    pub fn ToCached(&self, r: &mut cachedGroupElement) {
         feAdd(&mut r.yPlusX, &self.Y, &self.X);
         feSub(&mut r.yMinusX, &self.Y, &self.X);
         feCopy(&mut r.Z, &self.Z);
@@ -207,7 +207,7 @@ impl Default for extendedGroupElement {
     }
 }
 
-struct completedGroupElement {
+pub struct completedGroupElement {
     X: FieldElement,
     Y: FieldElement,
     Z: FieldElement,
@@ -215,13 +215,13 @@ struct completedGroupElement {
 }
 
 impl completedGroupElement {
-    fn ToProjective(&self, r: &mut projectiveGroupElement) {
+    pub fn ToProjective(&self, r: &mut projectiveGroupElement) {
         feMul(&mut r.X, &self.X, &self.T);
         feMul(&mut r.Y, &self.Y, &self.Z);
         feMul(&mut r.Z, &self.Z, &self.T);
     }
 
-    fn Add(&mut self, p: &extendedGroupElement, q: &cachedGroupElement) {
+    pub fn Add(&mut self, p: &extendedGroupElement, q: &cachedGroupElement) {
         let mut t0 = FieldElement::default();
 
         feAdd(&mut self.X, &p.Y, &p.X);
@@ -271,7 +271,7 @@ impl completedGroupElement {
     // 	feAdd(&c.T, &t0, &c.T)
     // }
 
-    fn MixedAdd(&mut self, p: &mut extendedGroupElement, q: &mut preComputedGroupElement) {
+    pub fn MixedAdd(&mut self, p: &mut extendedGroupElement, q: &mut preComputedGroupElement) {
         let mut t0 = FieldElement::default();
 
         feAdd(&mut self.X, &p.Y, &p.X);
@@ -289,7 +289,7 @@ impl completedGroupElement {
         feSub(&mut self.T, &t0, &self_t);
     }
 
-    fn ToExtended(&self, r: &mut extendedGroupElement) {
+    pub fn ToExtended(&self, r: &mut extendedGroupElement) {
         feMul(&mut r.X, &self.X, &self.T);
         feMul(&mut r.Y, &self.Y, &self.Z);
         feMul(&mut r.Z, &self.Z, &self.T);
@@ -347,7 +347,7 @@ impl Default for preComputedGroupElement {
 }
 
 #[derive(Clone, Copy)]
-struct cachedGroupElement {
+pub struct cachedGroupElement {
     yPlusX: FieldElement,
     yMinusX: FieldElement,
     Z: FieldElement,

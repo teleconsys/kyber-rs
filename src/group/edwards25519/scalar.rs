@@ -1,3 +1,5 @@
+use std::ops::{Add, Mul};
+
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
 use crate::group::{group, integer_field};
 use crate::util::random;
@@ -18,7 +20,7 @@ const MARSHAL_SCALAR_ID: [u8; 8] = [
     'e' as u8, 'd' as u8, '.' as u8, 's' as u8, 'c' as u8, 'a' as u8, 'l' as u8, 'a' as u8,
 ];
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Scalar {
     pub(crate) v: [u8; 32],
 }
@@ -43,7 +45,7 @@ impl Scalar {
         return hex::encode(b);
     }
 
-    fn set_int(&mut self, i: &Int) -> &mut Self {
+    fn set_int(mut self, i: &Int) -> Self {
         let b = i.little_endian(32, 32);
         self.v.as_mut_slice()[0..b.len()].copy_from_slice(b.as_ref());
         self
@@ -80,49 +82,52 @@ impl ToString for Scalar {
     }
 }
 
+use std::ops;
+impl_op_ex!(*|a: &Scalar, b: &Scalar| -> Scalar {
+    let mut v = [0 as u8; 32];
+    sc_mul(&mut v, &a.v, &b.v);
+    Scalar { v }
+});
+
+impl_op_ex!(+|a: &Scalar, b: &Scalar| -> Scalar {
+        let mut v = [0u8; 32];
+        sc_add(&mut v, &a.v, &b.v);
+        Scalar { v }
+});
+
 impl group::Scalar for Scalar {
     /// Set equal to another scalar a
-    fn set(&mut self, a: &Self) -> &mut Self {
+    fn set(mut self, a: &Self) -> Self {
         self.v = a.v.clone();
         self
     }
 
     /// set_int64 sets the scalar to a small integer value.
-    fn set_int64(&mut self, v: i64) -> &mut Self {
+    fn set_int64(self, v: i64) -> Self {
         self.set_int(&Int::new_int64(v, constants::PRIME_ORDER.clone()))
     }
 
-    fn zero(&mut self) -> &mut Self {
+    fn zero(mut self) -> Self {
         self.v = [0; 32];
         self
     }
 
-    fn add(&mut self, a: &Self, b: &Self) -> &mut Self {
-        sc_add(&mut self.v, &a.v, &b.v);
-        self
-    }
-
     // Set to the modular difference a - b
-    fn sub(&mut self, a: &Self, b: &Self) -> &mut Self {
+    fn sub(mut self, a: &Self, b: &Self) -> Self {
         sc_sub(&mut self.v, &a.v, &b.v);
         self
     }
 
-    fn mul(&mut self, a: &Self, b: &Self) -> &mut Self {
-        sc_mul(&mut self.v, &a.v, &b.v);
-        self
-    }
-
-    fn pick(mut self, rand: &mut impl Stream) -> Self {
+    fn pick(self, rand: &mut impl Stream) -> Self {
         let i = integer_field::integer_field::Int::new_int(
             random::random_int(&PRIME_ORDER, rand),
             PRIME_ORDER.clone(),
         );
-        *self.set_int(&i)
+        self.set_int(&i)
     }
 
-    fn set_bytes(&mut self, bytes: &[u8]) -> Self {
-        *self.set_int(&Int::new_int_bytes(bytes, &PRIME_ORDER, LittleEndian))
+    fn set_bytes(self, bytes: &[u8]) -> Self {
+        self.set_int(&Int::new_int_bytes(bytes, &PRIME_ORDER, LittleEndian))
     }
 }
 
@@ -1928,6 +1933,5 @@ fn sc_mul(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32]) {
 
 pub(crate) fn newScalarInt(i: BigInt) -> Scalar {
     let mut s = Scalar::default();
-    s.set_int(&Int::new_int(i, FULL_ORDER.clone()));
-    s
+    s.set_int(&Int::new_int(i, FULL_ORDER.clone()))
 }

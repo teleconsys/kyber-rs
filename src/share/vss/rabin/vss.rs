@@ -28,27 +28,31 @@
 //   secret.
 
 use std::collections::HashMap;
-use std::iter::Map;
 use std::marker::PhantomData;
 
+use crate::group::HashFactory;
 use crate::share::poly::{NewPriPoly, PriShare};
+use crate::sign::schnorr;
 use crate::Scalar;
 use crate::{cipher::Stream, Group, Point, Random, XOFFactory};
 
 use crate::group::edwards25519::{scalar::Scalar as EdScalar, Point as EdPoint, SuiteEd25519};
 
-use anyhow::{bail, Ok, Result};
+use anyhow::{bail, Error, Ok, Result};
+use byteorder::{LittleEndian, WriteBytesExt};
+use digest::DynDigest;
 use std::ops::{Deref, DerefMut};
 
-use super::dh::context;
+use super::dh::{context, dhExchange};
 
 /// Suite defines the capabilities required by the vss package.
-pub trait Suite<SCALAR, POINT>: Group<SCALAR, POINT> + /* HashFactory + */ XOFFactory + Random
-+ Clone + Copy
+pub trait Suite<SCALAR, POINT>:
+    Group<SCALAR, POINT> + HashFactory + XOFFactory + Random + Clone + Copy
 where
-SCALAR: Scalar,
-POINT: Point<SCALAR>,
-{}
+    SCALAR: Scalar,
+    POINT: Point<SCALAR>,
+{
+}
 
 /// Dealer encapsulates for creating and distributing the shares and for
 /// replying to any Responses.
@@ -220,18 +224,18 @@ where
         &session_id,
     );
     // C = F + G
-    let mut d_deals = Vec::with_capacity(verifiers.len());
+    let mut d_deals = vec![];
     for i in 0..verifiers.len() {
         let fi = f.Eval(i);
         let gi = g.Eval(i);
-        d_deals[i] = Deal {
+        d_deals.push(Deal {
             session_id: session_id.clone(),
             sec_share: fi,
             rnd_share: gi,
             commitments: commitments.clone(),
             t: t,
             _phantom: PhantomData,
-        }
+        });
     }
 
     Ok(Dealer {
@@ -263,62 +267,57 @@ where
     POINT: Point<SCALAR>,
     SUITE: Suite<SCALAR, POINT>,
 {
-    // // EncryptedDeal returns the encryption of the deal that must be given to the
-    // // verifier at index i.
-    // // The dealer first generates a temporary Diffie Hellman key, signs it using its
-    // // longterm key, and computes the shared key depending on its longterm and
-    // // ephemeral key and the verifier's public key.
-    // // This shared key is then fed into a HKDF whose output is the key to a AEAD
-    // // (AES256-GCM) scheme to encrypt the deal.
-    // func (d *Dealer) EncryptedDeal(i int) (*EncryptedDeal, error) {
-    // 	vPub, ok := findPub(d.verifiers, uint32(i))
-    // 	if !ok {
-    // 		return nil, errors.New("dealer: wrong index to generate encrypted deal")
-    // 	}
-    // 	// gen ephemeral key
-    // 	dhSecret := d.suite.Scalar().Pick(d.suite.RandomStream())
-    // 	dhPublic := d.suite.Point().Mul(dhSecret, nil)
-    // 	// signs the public key
-    // 	dhPublicBuff, _ := dhPublic.MarshalBinary()
-    // 	signature, err := schnorr.Sign(d.suite, d.long, dhPublicBuff)
-    // 	if err != nil {
-    // 		return nil, err
-    // 	}
-    // 	// AES128-GCM
-    // 	pre := dhExchange(d.suite, dhSecret, vPub)
-    // 	gcm, err := newAEAD(d.suite.Hash, pre, d.hkdfContext)
-    // 	if err != nil {
-    // 		return nil, err
-    // 	}
+    /// EncryptedDeal returns the encryption of the deal that must be given to the
+    /// verifier at index i.
+    /// The dealer first generates a temporary Diffie Hellman key, signs it using its
+    /// longterm key, and computes the shared key depending on its longterm and
+    /// ephemeral key and the verifier's public key.
+    /// This shared key is then fed into a HKDF whose output is the key to a AEAD
+    /// (AES256-GCM) scheme to encrypt the deal.
+    fn EncryptedDeal(&self, i: usize) -> Result<EncryptedDeal<POINT, SCALAR>> {
+        let vPub = findPub(self.verifiers.clone(), i)
+            .ok_or(Error::msg("dealer: wrong index to generate encrypted deal"))?;
+        // gen ephemeral key
+        let dhSecret = self.suite.scalar().pick(&mut self.suite.RandomStream());
+        let dhPublic = self.suite.point().mul(&dhSecret, None);
+        // signs the public key
+        let dhPublicBuff = dhPublic.marshal_binary()?;
+        let signature = schnorr::Sign(self.suite, self.long.clone(), &dhPublicBuff)?;
 
-    // 	nonce := make([]byte, gcm.NonceSize())
-    // 	dealBuff, err := protobuf.Encode(d.deals[i])
-    // 	if err != nil {
-    // 		return nil, err
-    // 	}
-    // 	encrypted := gcm.Seal(nil, nonce, dealBuff, d.hkdfContext)
-    // 	return &EncryptedDeal{
-    // 		DHKey:     dhPublic,
-    // 		Signature: signature,
-    // 		Nonce:     nonce,
-    // 		Cipher:    encrypted,
-    // 	}, nil
-    // }
+        // AES128-GCM
+        let pre = dhExchange(self.suite, dhSecret, vPub);
+        // gcm, err := newAEAD(self.suite.Hash, pre, self.hkdfContext)
+        // if err != nil {
+        // 	return nil, err
+        // }
+
+        // nonce := make([]byte, gcm.NonceSize())
+        // dealBuff, err := protobuf.Encode(self.deals[i])
+        // if err != nil {
+        // 	return nil, err
+        // }
+        // encrypted := gcm.Seal(nil, nonce, dealBuff, self.hkdfContext)
+        // return &EncryptedDeal{
+        // 	DHKey:     dhPublic,
+        // 	Signature: signature,
+        // 	Nonce:     nonce,
+        // 	Cipher:    encrypted,
+        // }, nil
+        todo!();
+    }
 
     /// encrypted_deals calls `EncryptedDeal` for each index of the verifier and
     /// returns the list of encrypted deals. Each index in the returned slice
     /// corresponds to the index in the list of verifiers.
     pub fn encrypted_deals(&self) -> Result<Vec<EncryptedDeal<POINT, SCALAR>>> {
-        todo!()
-        // deals := make([]*EncryptedDeal, len(d.verifiers))
+        // deals := make([]*EncryptedDeal, len(d.verifiers));
+        let mut deals = vec![];
         // var err error
-        // for i := range d.verifiers {
-        // 	deals[i], err = d.EncryptedDeal(i)
-        // 	if err != nil {
-        // 		return nil, err
-        // 	}
-        // }
-        // return deals, nil
+        for i in 0..self.verifiers.len() {
+            let deal = self.EncryptedDeal(i)?;
+            deals.push(deal);
+        }
+        Ok(deals)
     }
 
     /// process_response analyzes the given Response. If it's a valid complaint, then
@@ -407,7 +406,7 @@ where
     index: usize,
     verifiers: Vec<POINT>,
     hkdfContext: Vec<u8>,
-    aggregator: Aggregator<SUITE, POINT, SCALAR>,
+    aggregator: Option<Aggregator<SUITE, POINT, SCALAR>>,
 }
 
 /// NewVerifier returns a Verifier out of:
@@ -452,7 +451,7 @@ where
         pubb,
         index,
         hkdfContext: Vec::from(c),
-        aggregator: todo!(),
+        aggregator: None,
     })
 }
 
@@ -465,7 +464,7 @@ where
     type Target = Aggregator<SUITE, POINT, SCALAR>;
 
     fn deref(&self) -> &Self::Target {
-        &self.aggregator
+        self.aggregator.as_ref().unwrap()
     }
 }
 
@@ -476,7 +475,7 @@ where
     SUITE: Suite<SCALAR, POINT>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.aggregator
+        self.aggregator.as_mut().unwrap()
     }
 }
 
@@ -859,13 +858,12 @@ where
     base
 }
 
-// func findPub(verifiers []kyber.Point, idx uint32) (kyber.Point, bool) {
-// 	iidx := int(idx)
-// 	if iidx >= len(verifiers) {
-// 		return nil, false
-// 	}
-// 	return verifiers[iidx], true
-// }
+fn findPub<SCALAR: Scalar, POINT: Point<SCALAR>>(
+    verifiers: Vec<POINT>,
+    idx: usize,
+) -> Option<POINT> {
+    verifiers.get(idx).map(|x| x.clone())
+}
 
 fn sessionID<SCALAR, POINT, SUITE>(
     suite: &SUITE,
@@ -879,20 +877,20 @@ where
     POINT: Point<SCALAR>,
     SUITE: Suite<SCALAR, POINT>,
 {
-    // h := suite.Hash()
-    // _, _ = dealer.MarshalTo(h)
+    let mut h = suite.hash();
+    dealer.MarshalTo(&mut h)?;
 
-    // for _, v := range verifiers {
-    // 	_, _ = v.MarshalTo(h)
-    // }
+    for v in verifiers {
+        v.MarshalTo(&mut h)?;
+    }
 
-    // for _, c := range commitments {
-    // 	_, _ = c.MarshalTo(h)
-    // }
-    // _ = binary.Write(h, binary.LittleEndian, uint32(t))
+    for c in commitments {
+        c.MarshalTo(&mut h)?;
+    }
 
-    // return h.Sum(nil), nil
-    todo!()
+    h.write_u32::<LittleEndian>(t as u32)?;
+
+    Ok(h.finalize().to_vec())
 }
 
 // // Hash returns the Hash representation of the Response

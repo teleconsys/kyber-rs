@@ -1,14 +1,22 @@
-// // dhExchange computes the shared key from a private key and a public key
-// func dhExchange(suite Suite, ownPrivate kyber.Scalar, remotePublic kyber.Point) kyber.Point {
-// 	sk := suite.Point()
-// 	sk.Mul(ownPrivate, remotePublic)
-// 	return sk
-// }
+/// dhExchange computes the shared key from a private key and a public key
+pub fn dhExchange<SCALAR, POINT, SUITE>(
+    suite: SUITE,
+    ownPrivate: SCALAR,
+    remotePublic: POINT,
+) -> POINT
+where
+    SCALAR: Scalar,
+    POINT: Point<SCALAR>,
+    SUITE: Suite<SCALAR, POINT>,
+{
+    let sk = suite.point();
+    sk.mul(&ownPrivate, Some(&remotePublic))
+}
 
 // var sharedKeyLength = 32
 
 // // newAEAD returns the AEAD cipher to be use to encrypt a share
-// func newAEAD(fn func() hash.Hash, preSharedKey kyber.Point, context []byte) (cipher.AEAD, error) {
+// fn newAEAD(fn func() hash.Hash, preSharedKey kyber.Point, context []byte) (cipher.AEAD, error) {
 // 	preBuff, _ := preSharedKey.MarshalBinary()
 // 	reader := hkdf.New(fn, preBuff, nil, context)
 

@@ -1,7 +1,10 @@
+use sha2::{Digest, Sha256};
+
 use crate::cipher::Stream;
 use crate::group::edwards25519::curve::Curve;
 use crate::group::edwards25519::scalar::Scalar;
-use crate::group::group::Group;
+use crate::group::group::{Group, Hasher};
+use crate::group::HashFactory;
 use crate::util::random;
 use crate::{xof, Random, Suite, XOFFactory};
 
@@ -92,6 +95,12 @@ impl XOFFactory for SuiteEd25519 {
     /// xof returns an XOF which is implemented via the Blake2b hash.
     fn xof(&self, key: Option<&[u8]>) -> Box<dyn crate::XOF> {
         Box::new(xof::blake::XOF::new(key))
+    }
+}
+
+impl HashFactory for SuiteEd25519 {
+    fn hash(&self) -> Box<dyn Hasher> {
+        Box::new(Sha256::new())
     }
 }
 
