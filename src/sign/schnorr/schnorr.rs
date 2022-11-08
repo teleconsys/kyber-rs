@@ -1,6 +1,8 @@
+use std::io::{Read, Write};
 
 use crate::{Group, Point, Random, Scalar};
 use anyhow::Result;
+use sha2::{Digest, Sha512};
 
 /// Suite represents the set of functionalities needed by the package schnorr.
 pub trait Suite<SCALAR, POINT>: Group<SCALAR, POINT> + Random
@@ -23,36 +25,28 @@ where
 /// signature can be verified with VerifySchnorr. It's also a valid EdDSA
 /// signature when using the edwards25519 Group.
 pub fn Sign<SUITE: Suite<SCALAR, POINT>, SCALAR: Scalar, POINT: Point<SCALAR>>(
-    _s: SUITE,
-    _private: SCALAR,
-    _msg: &[u8],
+    s: SUITE,
+    private: SCALAR,
+    msg: &[u8],
 ) -> Result<Vec<u8>> {
     // var g kyber.Group = s
-    // // create random secret k and public point commitment R
-    // k := g.Scalar().Pick(s.RandomStream())
-    // R := g.Point().Mul(k, nil)
+    // create random secret k and public point commitment R
+    let k = s.scalar().pick(&mut s.random_stream());
+    let R = s.point().mul(&k, None);
 
-    // // create hash(public || R || message)
-    // public := g.Point().Mul(private, nil)
-    // h, err := hash(g, public, R, msg)
-    // if err != nil {
-    // 	return nil, err
-    // }
+    // create hash(public || R || message)
+    let public = s.point().mul(&private, None);
+    let h = hash(s, public, R.clone(), msg)?;
 
-    // // compute response s = k + x*h
-    // xh := g.Scalar().Mul(private, h)
-    // S := g.Scalar().Add(k, xh)
+    // compute response s = k + x*h
+    let xh = private * h;
+    let S = k + xh;
 
-    // // return R || s
-    // var b bytes.Buffer
-    // if _, err := R.MarshalTo(&b); err != nil {
-    // 	return nil, err
-    // }
-    // if _, err := S.MarshalTo(&b); err != nil {
-    // 	return nil, err
-    // }
-    // return b.Bytes(), nil
-    todo!()
+    // return R || s
+    let mut b = vec![];
+    R.marshal_to(&mut b)?;
+    S.marshal_to(&mut b)?;
+    Ok(b)
 }
 
 // // VerifyWithChecks uses a public key buffer, a message and a signature.
@@ -139,16 +133,17 @@ pub fn Sign<SUITE: Suite<SCALAR, POINT>, SCALAR: Scalar, POINT: Point<SCALAR>>(
 // 	return VerifyWithChecks(g, PBuf, msg, sig)
 // }
 
-// func hash(g kyber.Group, public, r kyber.Point, msg []byte) (kyber.Scalar, error) {
-// 	h := sha512.New()
-// 	if _, err := r.MarshalTo(h); err != nil {
-// 		return nil, err
-// 	}
-// 	if _, err := public.MarshalTo(h); err != nil {
-// 		return nil, err
-// 	}
-// 	if _, err := h.Write(msg); err != nil {
-// 		return nil, err
-// 	}
-// 	return g.Scalar().SetBytes(h.Sum(nil)), nil
-// }
+fn hash<SCALAR, POINT, GROUP>(g: GROUP, public: POINT, r: POINT, msg: &[u8]) -> Result<SCALAR>
+where
+    SCALAR: Scalar,
+    POINT: Point<SCALAR>,
+    GROUP: Group<SCALAR, POINT>,
+{
+    // h := sha512.New()
+    let mut h = Sha512::new();
+    r.marshal_to(&mut h)?;
+    public.marshal_to(&mut h)?;
+    h.write_all(msg)?;
+    let b = h.finalize();
+    Ok(g.scalar().set_bytes(b.as_slice()))
+}

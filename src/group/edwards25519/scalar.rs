@@ -1,4 +1,5 @@
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
+use crate::group::internal::marshalling;
 use crate::group::{group, integer_field};
 use crate::util::random;
 use num_bigint::BigInt;
@@ -64,7 +65,7 @@ impl PartialEq for Scalar {
 
 impl BinaryMarshaler for Scalar {
     fn marshal_binary(&self) -> anyhow::Result<Vec<u8>> {
-        todo!()
+        self.to_int().marshal_binary()
     }
 }
 
@@ -130,8 +131,8 @@ impl group::Scalar for Scalar {
 }
 
 impl Marshaling for Scalar {
-    fn marshal_to(&self, _w: &mut impl std::io::Write) -> anyhow::Result<()> {
-        todo!()
+    fn marshal_to(&self, w: &mut impl std::io::Write) -> anyhow::Result<()> {
+        marshalling::scalar_marshal_to(self, w)
     }
 }
 
