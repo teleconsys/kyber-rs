@@ -1,5 +1,5 @@
 // var marshalPointID = [8]byte{'e', 'd', '.', 'p', 'o', 'i', 'n', 't'}
-use anyhow::Result;
+use anyhow::{Error, Result};
 
 use crate::{
     cipher::Stream,
@@ -40,8 +40,11 @@ impl BinaryMarshaler for Point {
     }
 }
 impl BinaryUnmarshaler for Point {
-    fn unmarshal_binary(&mut self, _data: &[u8]) -> Result<()> {
-        todo!()
+    fn unmarshal_binary(&mut self, data: &[u8]) -> Result<()> {
+        if !self.ge.FromBytes(data) {
+            return Err(Error::msg("invalid Ed25519 curve point"));
+        }
+        Ok(())
     }
 }
 

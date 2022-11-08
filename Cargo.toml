@@ -28,6 +28,7 @@ sha2 = "0.10.6"
 byteorder = "1.4.3"
 impl_ops = "0.1.1"
 aes-gcm = "0.10.1"
+hkdf = "0.12.3"
 
 
 [[bench]]
