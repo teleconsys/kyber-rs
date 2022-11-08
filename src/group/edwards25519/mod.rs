@@ -1,7 +1,5 @@
 mod constants;
 mod curve;
-#[cfg(test)]
-mod curve_test;
 mod fe;
 mod ge;
 mod ge_mult_vartime;

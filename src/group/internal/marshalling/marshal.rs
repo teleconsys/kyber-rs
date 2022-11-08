@@ -10,3 +10,11 @@ pub fn point_marshal_to<P: Point<S>, S: Scalar>(p: P, w: &mut impl Write) -> Res
     w.write_all(&buf)?;
     Ok(())
 }
+
+// ScalarMarshalTo provides a generic implementation of Scalar.EncodeTo
+// based on Scalar.Encode.
+pub fn scalar_marshal_to(s: &impl Scalar, w: &mut impl Write) -> Result<()> {
+    let buf = s.marshal_binary()?;
+    w.write_all(buf.as_slice())?;
+    Ok(())
+}

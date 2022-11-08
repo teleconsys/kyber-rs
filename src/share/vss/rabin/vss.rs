@@ -197,8 +197,8 @@ where
     }
 
     let H = deriveH(suite, &verifiers);
-    let f = NewPriPoly(suite, t, Some(secret.clone()), suite.RandomStream());
-    let g = NewPriPoly(suite, t, None, suite.RandomStream());
+    let f = NewPriPoly(suite, t, Some(secret.clone()), suite.random_stream());
+    let g = NewPriPoly(suite, t, None, suite.random_stream());
     let d_pubb = suite.point().mul(&longterm, None);
 
     let hkdf_context = context(&suite, &d_pubb, &verifiers).to_vec();
@@ -276,7 +276,7 @@ where
         let vPub = findPub(self.verifiers.clone(), i)
             .ok_or(Error::msg("dealer: wrong index to generate encrypted deal"))?;
         // gen ephemeral key
-        let dhSecret = self.suite.scalar().pick(&mut self.suite.RandomStream());
+        let dhSecret = self.suite.scalar().pick(&mut self.suite.random_stream());
         let dhPublic = self.suite.point().mul(&dhSecret, None);
         // signs the public key
         let dhPublicBuff = dhPublic.marshal_binary()?;

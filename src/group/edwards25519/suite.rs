@@ -83,7 +83,7 @@ impl Default for SuiteEd25519 {
 impl Random for SuiteEd25519 {
     /// RandomStream returns a cipher.Stream that returns a key stream
     /// from crypto/rand.
-    fn RandomStream(&self) -> Box<dyn Stream> {
+    fn random_stream(&self) -> Box<dyn Stream> {
         // if self.r != nil {
         //     return s.r;
         // }
