@@ -134,6 +134,10 @@ impl Marshaling for Scalar {
     fn marshal_to(&self, w: &mut impl std::io::Write) -> anyhow::Result<()> {
         marshalling::scalar_marshal_to(self, w)
     }
+
+    fn marshal_size(&self) -> usize {
+        todo!()
+    }
 }
 
 // Input:

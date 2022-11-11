@@ -1,3 +1,7 @@
+use rand::{Rng, RngCore};
+
+use crate::random;
+use crate::share::vss::rabin::vss::Response;
 use crate::{group::edwards25519::SuiteEd25519, Group, Point, Random, Scalar};
 
 use super::vss::{minimum_t, Dealer, NewDealer, NewVerifier, RecoverSecret, Verifier};
@@ -74,7 +78,7 @@ fn default_test_data() -> TestData<EdPoint, EdScalar> {
 fn test_vss_whole() {
     let test_data = default_test_data();
 
-    let (dealer, verifiers) = genAll();
+    let (dealer, mut verifiers) = genAll();
 
     // 1. dispatch deal
     let mut resps = Vec::with_capacity(test_data.nb_verifiers); //make([]*Response, nbVerifiers)
@@ -121,58 +125,103 @@ fn test_vss_whole() {
     assert_eq!(dealer.secret.to_string(), sec.to_string());
 }
 
-// func TestVSSDealerNew(t *testing.T) {
-// 	goodT := MinimumT(nbVerifiers)
-// 	_, err := NewDealer(suite, dealerSec, secret, verifiersPub, goodT)
-// 	assert.NoError(t, err)
+#[test]
+fn TestVSSDealerNew() {
+    let test_data = default_test_data();
+    let goodT = minimum_t(test_data.nb_verifiers);
+    NewDealer(
+        test_data.suite,
+        test_data.dealer_sec.clone(),
+        test_data.secret.clone(),
+        test_data.verifiers_pub.clone(),
+        goodT,
+    )
+    .unwrap();
 
-// 	for _, badT := range []int{0, 1, -4} {
-// 		_, err = NewDealer(suite, dealerSec, secret, verifiersPub, badT)
-// 		assert.Error(t, err)
-// 	}
-// }
+    for badT in [0i32, 1, -4] {
+        assert!(
+            NewDealer(
+                test_data.suite,
+                test_data.dealer_sec.clone(),
+                test_data.secret.clone(),
+                test_data.verifiers_pub.clone(),
+                badT as usize,
+            )
+            .is_err(),
+            "threshold {} should result in error",
+            badT
+        );
+    }
+}
 
-// func TestVSSVerifierNew(t *testing.T) {
-// 	randIdx := rand.Int() % len(verifiersPub)
-// 	v, err := NewVerifier(suite, verifiersSec[randIdx], dealerPub, verifiersPub)
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, randIdx, v.index)
+#[test]
+fn TestVSSVerifierNew() {
+    let test_data = default_test_data();
+    let rand_idx = rand::thread_rng().gen::<usize>() % test_data.verifiers_pub.len();
+    let v = NewVerifier(
+        test_data.suite,
+        test_data.verifiers_sec[rand_idx].clone(),
+        test_data.dealer_pub,
+        test_data.verifiers_pub.clone(),
+    )
+    .unwrap();
+    assert_eq!(rand_idx, v.index);
 
-// 	wrongKey := suite.Scalar().Pick(suite.RandomStream())
-// 	_, err = NewVerifier(suite, wrongKey, dealerPub, verifiersPub)
-// 	assert.Error(t, err)
-// }
+    let wrong_key = test_data
+        .suite
+        .scalar()
+        .pick(&mut test_data.suite.random_stream());
+    assert!(NewVerifier(
+        test_data.suite,
+        wrong_key,
+        test_data.dealer_pub,
+        test_data.verifiers_pub
+    )
+    .is_err());
+}
 
-// func TestVSSShare(t *testing.T) {
-// 	dealer, verifiers := genAll()
-// 	ver := verifiers[0]
-// 	deal, err := dealer.EncryptedDeal(0)
-// 	require.Nil(t, err)
+#[test]
+fn TestVSSShare() {
+    let (dealer, mut verifiers) = genAll();
+    let ver = &mut verifiers[0];
+    let deal = dealer.EncryptedDeal(0).unwrap();
 
-// 	resp, err := ver.ProcessEncryptedDeal(deal)
-// 	require.NotNil(t, resp)
-// 	require.Equal(t, true, resp.Approved)
-// 	require.Nil(t, err)
+    let resp = ver.process_encrypted_deal(&deal).unwrap();
+    assert!(resp.approved);
 
-// 	aggr := ver.aggregator
+    let aggr = ver.aggregator.as_mut().unwrap();
 
-// 	for i := 1; i < aggr.t-1; i++ {
-// 		aggr.responses[uint32(i)] = &Response{Approved: true}
-// 	}
+    for i in 1..aggr.t - 1 {
+        ver.aggregator.as_mut().unwrap().responses.insert(
+            i as u32,
+            Response {
+                approved: true,
+                ..Response::default()
+            },
+        );
+    }
 
-// 	ver.SetTimeout()
+    ver.SetTimeout();
 
-// 	// not enough approvals
-// 	assert.Nil(t, ver.Deal())
-// 	aggr.responses[uint32(aggr.t)] = &Response{Approved: true}
-// 	// deal not certified
-// 	aggr.badDealer = true
-// 	assert.Nil(t, ver.Deal())
-// 	aggr.badDealer = false
+    // not enough approvals
+    assert!(ver.deal().is_none());
+    let aggr = ver.aggregator.as_mut().unwrap();
+    let idx = aggr.t;
+    aggr.responses.insert(
+        idx as u32,
+        Response {
+            approved: true,
+            ..Response::default()
+        },
+    );
+    // deal not certified
+    aggr.bad_dealer = true;
+    assert!(ver.deal().is_none());
+    let aggr = ver.aggregator.as_mut().unwrap();
+    aggr.bad_dealer = false;
 
-// 	assert.NotNil(t, ver.Deal())
-
-// }
+    assert!(ver.deal().is_some());
+}
 
 // func TestVSSAggregatorEnoughApprovals(t *testing.T) {
 // 	dealer := genDealer()

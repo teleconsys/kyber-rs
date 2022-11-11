@@ -282,6 +282,10 @@ impl Marshaling for Int {
     fn marshal_to(&self, _w: &mut impl std::io::Write) -> Result<()> {
         todo!()
     }
+
+    fn marshal_size(&self) -> usize {
+        todo!()
+    }
 }
 
 impl ToString for Int {

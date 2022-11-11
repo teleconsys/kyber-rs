@@ -65,14 +65,14 @@ where
 pub const AES_NONCE_LENGTH: usize = 12;
 
 pub fn aes_encrypt(
-    key: &[u8],
-    nonce: &[u8],
+    key: &[u8; 32],
+    nonce: &[u8; AES_NONCE_LENGTH],
     data: &[u8],
     additional_data: Option<&[u8]>,
 ) -> Result<Vec<u8>> {
     let key = GenericArray::from_slice(key);
     let aead = Aes256Gcm::new(key);
-    let nonce = GenericArray::from_slice(&nonce);
+    let nonce = GenericArray::from_slice(nonce);
 
     let payload: Payload = match additional_data {
         None => data.into(),
@@ -90,8 +90,8 @@ pub fn aes_encrypt(
 }
 
 pub fn aes_decrypt(
-    key: &[u8],
-    nonce: &[u8],
+    key: &[u8; 32],
+    nonce: &[u8; AES_NONCE_LENGTH],
     ciphertext: &[u8],
     additional_data: Option<&[u8]>,
 ) -> Result<Vec<u8>> {
@@ -117,7 +117,7 @@ pub fn aes_decrypt(
 pub fn aead_encrypt<S, POINT>(
     pre_key: POINT,
     info: &[u8],
-    nonce: &[u8],
+    nonce: &[u8; AES_NONCE_LENGTH],
     data: &[u8],
 ) -> Result<Vec<u8>>
 where
@@ -134,7 +134,7 @@ where
 pub fn aead_decrypt<S, POINT>(
     pre_key: POINT,
     info: &[u8],
-    nonce: &[u8],
+    nonce: &[u8; AES_NONCE_LENGTH],
     cipher: &[u8],
 ) -> Result<Vec<u8>>
 where
@@ -146,4 +146,63 @@ where
     let decrypted = aes_decrypt(&key, nonce, cipher, Some(info))?;
 
     Ok(decrypted)
+}
+
+pub struct AEAD {
+    key: [u8; 32],
+}
+
+impl AEAD {
+    pub fn new<SCALAR, POINT>(pre: POINT, hkfd_context: &Vec<u8>) -> Result<Self>
+    where
+        SCALAR: Scalar,
+        POINT: Point<SCALAR>,
+    {
+        let pre_buff = pre.marshal_binary()?;
+        let key = hkdf::<Sha256, Hmac<Sha256>>(&pre_buff, &hkfd_context)?;
+        Ok(AEAD { key })
+    }
+
+    /// Seal encrypts and authenticates plaintext, authenticates the
+    /// additional data and appends the result to dst, returning the updated
+    /// slice. The nonce must be NonceSize() bytes long and unique for all
+    /// time, for a given key.
+    ///
+    /// To reuse plaintext's storage for the encrypted output, use plaintext[:0]
+    /// as dst. Otherwise, the remaining capacity of dst must not overlap plaintext.
+    pub fn seal(
+        &self,
+        dst: Option<&mut [u8]>,
+        nonce: &[u8; AES_NONCE_LENGTH],
+        plaintext: &[u8],
+        additional_data: Option<&[u8]>,
+    ) -> Result<Vec<u8>> {
+        let encrypted = aes_encrypt(&self.key, nonce, plaintext, additional_data)?;
+        Ok(encrypted)
+    }
+
+    /// Open decrypts and authenticates ciphertext, authenticates the
+    /// additional data and, if successful, appends the resulting plaintext
+    /// to dst, returning the updated slice. The nonce must be NonceSize()
+    /// bytes long and both it and the additional data must match the
+    /// value passed to Seal.
+    ///
+    /// To reuse ciphertext's storage for the decrypted output, use ciphertext[:0]
+    /// as dst. Otherwise, the remaining capacity of dst must not overlap plaintext.
+    ///
+    /// Even if the function fails, the contents of dst, up to its capacity,
+    /// may be overwritten.
+    pub fn open(
+        &self,
+        dst: Option<&[u8]>,
+        nonce: &[u8; AES_NONCE_LENGTH],
+        ciphertext: &[u8],
+        additional_data: Option<&[u8]>,
+    ) -> Result<Vec<u8>> {
+        aes_decrypt(&self.key, nonce, ciphertext, additional_data)
+    }
+
+    pub fn nonce_size(&self) -> usize {
+        AES_NONCE_LENGTH
+    }
 }

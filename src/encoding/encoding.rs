@@ -12,8 +12,8 @@ pub trait Marshaling: BinaryMarshaler + BinaryUnmarshaler {
     // String returns the human readable string representation of the object.
     // String() string
 
-    // Encoded length of this object in bytes.
-    // MarshalSize() int
+    /// Encoded length of this object in bytes.
+    fn marshal_size(&self) -> usize;
 
     /// Encode the contents of this object and write it to an io.Writer.
     fn marshal_to(&self, w: &mut impl io::Write) -> Result<()>;

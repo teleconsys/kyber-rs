@@ -53,6 +53,10 @@ impl Marshaling for SimpleCTScalar {
     fn marshal_to(&self, _w: &mut impl std::io::Write) -> Result<()> {
         todo!()
     }
+
+    fn marshal_size(&self) -> usize {
+        todo!()
+    }
 }
 
 impl BinaryMarshaler for SimpleCTScalar {

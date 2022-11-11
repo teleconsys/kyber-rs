@@ -52,6 +52,10 @@ impl Marshaling for Point {
     fn marshal_to(&self, w: &mut impl std::io::Write) -> Result<()> {
         marshalling::point_marshal_to(*self, w)
     }
+
+    fn marshal_size(&self) -> usize {
+        todo!()
+    }
 }
 
 impl group::Point<Scalar> for Point {

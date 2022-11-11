@@ -27,15 +27,18 @@
 //   any t out of n verifiers can reveal their shares to reconstruct the shared
 //   secret.
 
+use core::fmt;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use crate::group::HashFactory;
 use crate::share::poly::{NewPriPoly, PriShare};
+use crate::share::vss::rabin::dh::AEAD;
 use crate::sign::schnorr;
 use crate::Scalar;
 use crate::{Group, Point, Random, XOFFactory};
 
+use anyhow::__private::kind::TraitKind;
 use anyhow::{bail, Error, Ok, Result};
 use byteorder::{LittleEndian, WriteBytesExt};
 use digest::DynDigest;
@@ -74,7 +77,7 @@ where
     // sessionID is a unique identifier for the whole session of the scheme
     session_id: Vec<u8>,
     // list of deals this Dealer has generated
-    // deals: []*Deal,
+    deals: Vec<Deal<SCALAR, POINT, SUITE>>,
     aggregator: Aggregator<SUITE, POINT, SCALAR>,
 }
 
@@ -103,12 +106,12 @@ where
 }
 
 /// Deal encapsulates the verifiable secret share and is sent by the dealer to a verifier.
-pub struct Deal<SCALAR, POINT>
+pub struct Deal<SCALAR, POINT, SUITE>
 where
     SCALAR: Scalar,
     POINT: Point<SCALAR>,
 {
-    _phantom: PhantomData<SCALAR>,
+    _phantom: PhantomData<(SCALAR, SUITE)>,
 
     /// Unique session identifier for this protocol run
     session_id: Vec<u8>,
@@ -120,6 +123,23 @@ where
     t: usize,
     // Commitments are the coefficients used to verify the shares against
     commitments: Vec<POINT>,
+}
+
+impl<SCALAR, POINT, SUITE> Deal<SCALAR, POINT, SUITE>
+where
+    SCALAR: Scalar,
+    POINT: Point<SCALAR>,
+    SUITE: Suite<SCALAR, POINT>,
+{
+    fn decode(s: SUITE, buff: &[u8]) -> Result<Deal<SCALAR, POINT, SUITE>> {
+        // constructors := make(protobuf.Constructors)
+        // var point kyber.Point
+        // var secret kyber.Scalar
+        // constructors[reflect.TypeOf(&point).Elem()] = func() interface{} { return s.Point() }
+        // constructors[reflect.TypeOf(&secret).Elem()] = func() interface{} { return s.Scalar() }
+        // return protobuf.DecodeWithConstructors(buff, d, constructors)
+        todo!()
+    }
 }
 
 /// EncryptedDeal contains the deal in a encrypted form only decipherable by the
@@ -144,6 +164,7 @@ where
 
 /// Response is sent by the verifiers to all participants and holds each
 /// individual validation or refusal of a Deal.
+#[derive(Clone, Debug)]
 pub struct Response {
     /// SessionID related to this run of the protocol
     pub session_id: Vec<u8>,
@@ -155,20 +176,50 @@ pub struct Response {
     pub signature: Vec<u8>,
 }
 
+impl Default for Response {
+    fn default() -> Self {
+        Self {
+            session_id: Default::default(),
+            index: Default::default(),
+            approved: Default::default(),
+            signature: Default::default(),
+        }
+    }
+}
+
+impl Response {
+    /// Hash returns the Hash representation of the Response
+    fn hash<SCALAR, POINT, SUITE>(&self, s: SUITE) -> Result<Vec<u8>>
+    where
+        SCALAR: Scalar,
+        POINT: Point<SCALAR>,
+        SUITE: Suite<SCALAR, POINT>,
+    {
+        let mut h = s.hash();
+        h.write("response".as_bytes());
+        h.write(&self.session_id);
+        // binary.Write(h, binary.LittleEndian, self.index);
+        // binary.Write(h, binary.LittleEndian, self.approved);
+        // return h.Sum(nil)
+        todo!()
+    }
+}
+
 /// Justification is a message that is broadcasted by the Dealer in response to
 /// a Complaint. It contains the original Complaint as well as the shares
 /// distributed to the complainer.
-pub struct Justification<SCALAR, POINT>
+pub struct Justification<SCALAR, POINT, SUITE>
 where
     SCALAR: Scalar,
     POINT: Point<SCALAR>,
+    SUITE: Suite<SCALAR, POINT>,
 {
     /// SessionID related to the current run of the protocol
     session_id: Vec<u8>,
     /// Index of the verifier who issued the Complaint,i.e. index of this Deal
     index: u32,
     /// Deal in cleartext
-    deal: Deal<SCALAR, POINT>,
+    deal: Deal<SCALAR, POINT, SUITE>,
     /// Signature over the whole packet
     signature: Vec<u8>,
 }
@@ -222,7 +273,7 @@ where
         &session_id,
     );
     // C = F + G
-    let mut d_deals = vec![];
+    let mut d_deals: Vec<Deal<SCALAR, POINT, SUITE>> = vec![];
     for i in 0..verifiers.len() {
         let fi = f.Eval(i);
         let gi = g.Eval(i);
@@ -247,6 +298,7 @@ where
         t,
         session_id,
         aggregator,
+        deals: vec![],
     })
 }
 
@@ -272,36 +324,37 @@ where
     /// ephemeral key and the verifier's public key.
     /// This shared key is then fed into a HKDF whose output is the key to a AEAD
     /// (AES256-GCM) scheme to encrypt the deal.
-    fn EncryptedDeal(&self, i: usize) -> Result<EncryptedDeal<POINT, SCALAR>> {
-        let vPub = findPub(self.verifiers.clone(), i)
+    pub fn EncryptedDeal(&self, i: usize) -> Result<EncryptedDeal<POINT, SCALAR>> {
+        let vPub = findPub(&self.verifiers, i)
             .ok_or(Error::msg("dealer: wrong index to generate encrypted deal"))?;
         // gen ephemeral key
         let dhSecret = self.suite.scalar().pick(&mut self.suite.random_stream());
         let dhPublic = self.suite.point().mul(&dhSecret, None);
         // signs the public key
         let dhPublicBuff = dhPublic.marshal_binary()?;
-        let _signature = schnorr::Sign(self.suite, self.long.clone(), &dhPublicBuff)?;
+        let signature = schnorr::Sign(self.suite, self.long.clone(), &dhPublicBuff)?;
 
         // AES128-GCM
-        let _pre = dhExchange(self.suite, dhSecret, vPub);
-        // gcm, err := newAEAD(self.suite.Hash, pre, self.hkdfContext)
-        // if err != nil {
-        // 	return nil, err
-        // }
+        let pre = dhExchange(self.suite, dhSecret, vPub);
+        let gcm = AEAD::new(pre, &self.hkdf_context)?;
 
-        // nonce := make([]byte, gcm.NonceSize())
-        // dealBuff, err := protobuf.Encode(self.deals[i])
-        // if err != nil {
-        // 	return nil, err
-        // }
-        // encrypted := gcm.Seal(nil, nonce, dealBuff, self.hkdfContext)
-        // return &EncryptedDeal{
-        // 	DHKey:     dhPublic,
-        // 	Signature: signature,
-        // 	Nonce:     nonce,
-        // 	Cipher:    encrypted,
-        // }, nil
-        todo!();
+        let nonce = vec![0u8; gcm.nonce_size()];
+        // dealBuff, err := protobuf.Encode(self.deals[i])?
+        // let deal_buf = self.deals[i]
+        let deal_buf = [1, 2, 3];
+        let encrypted = gcm.seal(
+            None,
+            &nonce.clone().try_into().unwrap(),
+            &deal_buf,
+            Some(&self.hkdf_context),
+        )?;
+        return Ok(EncryptedDeal {
+            dhkey: dhPublic,
+            signature,
+            nonce: nonce.try_into().unwrap(),
+            cipher: encrypted,
+            _phantom: PhantomData,
+        });
     }
 
     /// encrypted_deals calls `EncryptedDeal` for each index of the verifier and
@@ -322,7 +375,10 @@ where
     /// it returns a Justification. This Justification must be broadcasted to every
     /// participants. If it's an invalid complaint, it returns an error about the
     /// complaint. The verifiers will also ignore an invalid Complaint.
-    pub fn process_response(&self, _r: &Response) -> Result<Option<Justification<SCALAR, POINT>>> {
+    pub fn process_response(
+        &self,
+        _r: &Response,
+    ) -> Result<Option<Justification<SCALAR, POINT, SUITE>>> {
         // if err := d.verifyResponse(r); err != nil {
         // 	return nil, err
         // }
@@ -401,10 +457,10 @@ where
     longterm: SCALAR,
     pubb: POINT,
     dealer: POINT,
-    index: usize,
+    pub(crate) index: usize,
     verifiers: Vec<POINT>,
     hkdfContext: Vec<u8>,
-    aggregator: Option<Aggregator<SUITE, POINT, SCALAR>>,
+    pub(crate) aggregator: Option<Aggregator<SUITE, POINT, SCALAR>>,
 }
 
 /// NewVerifier returns a Verifier out of:
@@ -492,74 +548,79 @@ where
     // broadcasted to every other participants including the dealer.
     // If the deal has already been received, or the signature generation of the
     // response failed, it returns an error without any responses.
-    pub fn process_encrypted_deal(&self, _e: &EncryptedDeal<POINT, SCALAR>) -> Result<Response> {
-        // d, err := v.decryptDeal(e)
-        // if err != nil {
-        // 	return nil, err
-        // }
-        // if d.SecShare.I != v.index {
-        // 	return nil, errors.New("vss: verifier got wrong index from deal")
-        // }
+    pub fn process_encrypted_deal(&mut self, e: &EncryptedDeal<POINT, SCALAR>) -> Result<Response> {
+        let d = self.decryptDeal(e)?;
+        if d.sec_share.i != self.index {
+            bail!("vss: verifier got wrong index from deal");
+        }
 
-        // t := int(d.T)
+        let t = d.t;
 
-        // sid, err := sessionID(v.suite, v.dealer, v.verifiers, d.Commitments, t)
-        // if err != nil {
-        // 	return nil, err
-        // }
+        let sid = sessionID(
+            &self.suite,
+            &self.dealer,
+            &self.verifiers,
+            &d.commitments,
+            t,
+        )?;
 
-        // if v.aggregator == nil {
-        // 	v.aggregator = newAggregator(v.suite, v.dealer, v.verifiers, d.Commitments, t, d.SessionID)
-        // }
+        if self.aggregator.is_none() {
+            self.aggregator = Some(newAggregator(
+                self.suite,
+                self.dealer.clone(),
+                self.verifiers.clone(),
+                d.commitments.clone(),
+                t,
+                &d.session_id,
+            ));
+        }
 
-        // r := &Response{
-        // 	SessionID: sid,
-        // 	Index:     uint32(v.index),
-        // 	Approved:  true,
-        // }
-        // if err = v.VerifyDeal(d, true); err != nil {
-        // 	r.Approved = false
-        // }
+        let mut r = Response {
+            session_id: sid,
+            index: self.index as u32,
+            approved: true,
+            ..Default::default()
+        };
+        let result = self.verify_deal(&d, true);
 
-        // if err == errDealAlreadyProcessed {
-        // 	return nil, err
-        // }
+        if let Err(err) = result {
+            r.approved = false;
+            match err {
+                VerifyDealError::DealAlreadyProcessedError => bail!(err),
+            }
+        }
 
-        // if r.Signature, err = schnorr.Sign(v.suite, v.longterm, r.Hash(v.suite)); err != nil {
-        // 	return nil, err
-        // }
+        r.signature = schnorr::Sign(
+            self.suite,
+            self.longterm.clone(),
+            r.hash(self.suite)?.as_slice(),
+        )?;
 
-        // if err = v.aggregator.addResponse(r); err != nil {
-        // 	return nil, err
-        // }
-        // return r, nil
-        todo!()
+        self.aggregator.as_mut().unwrap().add_response(r.clone())?;
+        Ok(r)
     }
 
-    // func (v *Verifier) decryptDeal(e *EncryptedDeal) (*Deal, error) {
-    // 	ephBuff, err := e.DHKey.MarshalBinary()
-    // 	if err != nil {
-    // 		return nil, err
-    // 	}
-    // 	// verify signature
-    // 	if err := schnorr.Verify(v.suite, v.dealer, ephBuff, e.Signature); err != nil {
-    // 		return nil, err
-    // 	}
+    fn decryptDeal(&self, e: &EncryptedDeal<POINT, SCALAR>) -> Result<Deal<SCALAR, POINT, SUITE>> {
+        let ephBuff = e.dhkey.marshal_binary()?;
+        // verify signature
+        schnorr::Verify(
+            self.suite,
+            self.dealer.clone(),
+            ephBuff.as_slice(),
+            &e.signature,
+        )?;
 
-    // 	// compute shared key and AES526-GCM cipher
-    // 	pre := dhExchange(v.suite, v.longterm, e.DHKey)
-    // 	gcm, err := newAEAD(v.suite.Hash, pre, v.hkdfContext)
-    // 	if err != nil {
-    // 		return nil, err
-    // 	}
-    // 	decrypted, err := gcm.Open(nil, e.Nonce, e.Cipher, v.hkdfContext)
-    // 	if err != nil {
-    // 		return nil, err
-    // 	}
-    // 	deal := &Deal{}
-    // 	err = deal.decode(v.suite, decrypted)
-    // 	return deal, err
-    // }
+        // compute shared key and AES526-GCM cipher
+        let pre = dhExchange(self.suite, self.longterm.clone(), e.dhkey.clone());
+        let gcm = AEAD::new(pre, &self.hkdfContext)?;
+        let decrypted = gcm.open(
+            None,
+            e.nonce.as_slice().try_into().unwrap(),
+            &e.cipher,
+            Some(self.hkdfContext.as_slice()),
+        )?;
+        Deal::decode(self.suite, &decrypted)
+    }
 
     /// ProcessResponse analyzes the given response. If it's a valid complaint, the
     /// verifier should expect to see a Justification from the Dealer. It returns an
@@ -572,7 +633,7 @@ where
 
     /// deal returns the Deal that this verifier has received. It returns
     /// nil if the deal is not certified or there is not enough approvals.
-    pub fn deal(&self) -> Option<Deal<SCALAR, POINT>> {
+    pub fn deal(&self) -> Option<Deal<SCALAR, POINT, SUITE>> {
         todo!()
         // if !v.EnoughApprovals() || !v.DealCertified() {
         //     return nil;
@@ -606,12 +667,13 @@ where
     // 	return v.sid
     // }
 
-    // // SetTimeout tells this verifier to consider this moment the maximum time limit.
-    // // it calls cleanVerifiers which will take care of all Verifiers who have not
-    // // responded until now.
-    // func (v *Verifier) SetTimeout() {
-    // 	v.aggregator.cleanVerifiers()
-    // }
+    /// SetTimeout tells this verifier to consider this moment the maximum time limit.
+    /// it calls cleanVerifiers which will take care of all Verifiers who have not
+    /// responded until now.
+    pub fn SetTimeout(&self) {
+        // self.aggregator.cleanVerifiers()
+        todo!()
+    }
 }
 
 /// Aggregator is used to collect all deals, and responses for one protocol run.
@@ -628,11 +690,11 @@ where
     verifiers: Vec<POINT>,
     commits: Vec<POINT>,
 
-    responses: HashMap<u32, Response>,
+    pub(crate) responses: HashMap<u32, Response>,
     sid: Vec<u8>,
-    deal: Option<Deal<SCALAR, POINT>>,
-    t: i32,
-    bad_dealer: bool,
+    deal: Option<Deal<SCALAR, POINT, SUITE>>,
+    pub(crate) t: usize,
+    pub(crate) bad_dealer: bool,
 }
 
 fn newAggregator<SCALAR, POINT, SUITE>(
@@ -653,7 +715,7 @@ where
         dealer: dealer,
         verifiers: verifiers,
         commits: commitments,
-        t: t as i32,
+        t,
         sid: sid.clone().to_vec(),
         responses: HashMap::new(),
         deal: None,
@@ -662,7 +724,29 @@ where
     }
 }
 
-// var errDealAlreadyProcessed = errors.New("vss: verifier already received a deal")
+#[derive(Debug, Clone)]
+enum VerifyDealError {
+    DealAlreadyProcessedError,
+}
+
+impl fmt::Display for VerifyDealError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VerifyDealError::DealAlreadyProcessedError => write!(f, "{}", self),
+        }
+    }
+}
+
+impl std::error::Error for VerifyDealError {}
+
+#[derive(Debug, Clone)]
+struct DealAlreadyProcessedError;
+
+impl fmt::Display for DealAlreadyProcessedError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "vss: verifier already received a deal")
+    }
+}
 
 impl<SUITE, POINT, SCALAR> Aggregator<SUITE, POINT, SCALAR>
 where
@@ -670,64 +754,73 @@ where
     POINT: Point<SCALAR>,
     SUITE: Suite<SCALAR, POINT>,
 {
-    // // VerifyDeal analyzes the deal and returns an error if it's incorrect. If
-    // // inclusion is true, it also returns an error if it the second time this struct
-    // // analyzes a Deal.
-    // func (a *aggregator) VerifyDeal(d *Deal, inclusion bool) error {
-    // 	if a.deal != nil && inclusion {
-    // 		return errDealAlreadyProcessed
+    /// verify_deal analyzes the deal and returns an error if it's incorrect. If
+    /// inclusion is true, it also returns an error if it the second time this struct
+    /// analyzes a Deal.
+    fn verify_deal(
+        &self,
+        d: &Deal<SCALAR, POINT, SUITE>,
+        inclusion: bool,
+    ) -> Result<(), VerifyDealError> {
+        // if a.deal != nil && inclusion {
+        // 	return errDealAlreadyProcessed
 
-    // 	}
-    // 	if a.deal == nil {
-    // 		a.commits = d.Commitments
-    // 		a.sid = d.SessionID
-    // 		a.deal = d
-    // 	}
+        // }
+        // if a.deal == nil {
+        // 	a.commits = d.Commitments
+        // 	a.sid = d.SessionID
+        // 	a.deal = d
+        // }
 
-    // 	if !validT(int(d.T), a.verifiers) {
-    // 		return errors.New("vss: invalid t received in Deal")
-    // 	}
+        // if !validT(int(d.T), a.verifiers) {
+        // 	return errors.New("vss: invalid t received in Deal")
+        // }
 
-    // 	if !bytes.Equal(a.sid, d.SessionID) {
-    // 		return errors.New("vss: find different sessionIDs from Deal")
-    // 	}
+        // if !bytes.Equal(a.sid, d.SessionID) {
+        // 	return errors.New("vss: find different sessionIDs from Deal")
+        // }
 
-    // 	fi := d.SecShare
-    // 	gi := d.RndShare
-    // 	if fi.I != gi.I {
-    // 		return errors.New("vss: not the same index for f and g share in Deal")
-    // 	}
-    // 	if fi.I < 0 || fi.I >= len(a.verifiers) {
-    // 		return errors.New("vss: index out of bounds in Deal")
-    // 	}
-    // 	// compute fi * G + gi * H
-    // 	fig := a.suite.Point().Base().Mul(fi.V, nil)
-    // 	H := deriveH(a.suite, a.verifiers)
-    // 	gih := a.suite.Point().Mul(gi.V, H)
-    // 	ci := a.suite.Point().Add(fig, gih)
+        // fi := d.SecShare
+        // gi := d.RndShare
+        // if fi.I != gi.I {
+        // 	return errors.New("vss: not the same index for f and g share in Deal")
+        // }
+        // if fi.I < 0 || fi.I >= len(a.verifiers) {
+        // 	return errors.New("vss: index out of bounds in Deal")
+        // }
+        // // compute fi * G + gi * H
+        // fig := a.suite.Point().Base().Mul(fi.V, nil)
+        // H := deriveH(a.suite, a.verifiers)
+        // gih := a.suite.Point().Mul(gi.V, H)
+        // ci := a.suite.Point().Add(fig, gih)
 
-    // 	commitPoly := share.NewPubPoly(a.suite, nil, d.Commitments)
+        // commitPoly := share.NewPubPoly(a.suite, nil, d.Commitments)
 
-    // 	pubShare := commitPoly.Eval(fi.I)
-    // 	if !ci.Equal(pubShare.V) {
-    // 		return errors.New("vss: share does not verify against commitments in Deal")
-    // 	}
-    // 	return nil
-    // }
+        // pubShare := commitPoly.Eval(fi.I)
+        // if !ci.Equal(pubShare.V) {
+        // 	return errors.New("vss: share does not verify against commitments in Deal")
+        // }
+        // return nil
+        todo!()
+    }
 
-    // // cleanVerifiers checks the aggregator's response array and creates a StatusComplaint
-    // // response for all verifiers who have no response in the array.
-    // func (a *aggregator) cleanVerifiers() {
-    // 	for i := range a.verifiers {
-    // 		if _, ok := a.responses[uint32(i)]; !ok {
-    // 			a.responses[uint32(i)] = &Response{
-    // 				SessionID: a.sid,
-    // 				Index:     uint32(i),
-    // 				Approved:  false,
-    // 			}
-    // 		}
-    // 	}
-    // }
+    /// cleanVerifiers checks the aggregator's response array and creates a StatusComplaint
+    /// response for all verifiers who have no response in the array.
+    fn cleanVerifiers(&mut self) {
+        for i in 0..self.verifiers.len() {
+            if self.responses.contains_key(&(i as u32)) {
+                self.responses.insert(
+                    i as u32,
+                    Response {
+                        session_id: self.sid.clone(),
+                        index: i as u32,
+                        approved: false,
+                        ..Response::default()
+                    },
+                );
+            }
+        }
+    }
 
     // func (a *aggregator) verifyResponse(r *Response) error {
     // 	if !bytes.Equal(r.SessionID, a.sid) {
@@ -767,16 +860,16 @@ where
     // 	return nil
     // }
 
-    // func (a *aggregator) addResponse(r *Response) error {
-    // 	if _, ok := findPub(a.verifiers, r.Index); !ok {
-    // 		return errors.New("vss: index out of bounds in Complaint")
-    // 	}
-    // 	if _, ok := a.responses[r.Index]; ok {
-    // 		return errors.New("vss: already existing response from same origin")
-    // 	}
-    // 	a.responses[r.Index] = r
-    // 	return nil
-    // }
+    pub fn add_response(&mut self, r: Response) -> Result<()> {
+        if findPub(&self.verifiers, r.index as usize).is_none() {
+            bail!("vss: index out of bounds in Complaint");
+        }
+        if self.responses.get(&(r.index as u32)).is_some() {
+            bail!("vss: already existing response from same origin")
+        }
+        self.responses.insert(r.index, r);
+        Ok(())
+    }
 
     // // EnoughApprovals returns true if enough verifiers have sent their approval for
     // // the deal they received.
@@ -857,7 +950,7 @@ where
 }
 
 fn findPub<SCALAR: Scalar, POINT: Point<SCALAR>>(
-    verifiers: Vec<POINT>,
+    verifiers: &Vec<POINT>,
     idx: usize,
 ) -> Option<POINT> {
     verifiers.get(idx).map(|x| x.clone())
@@ -891,25 +984,6 @@ where
     Ok(h.finalize().to_vec())
 }
 
-// // Hash returns the Hash representation of the Response
-// func (r *Response) Hash(s Suite) []byte {
-// 	h := s.Hash()
-// 	_, _ = h.Write([]byte("response"))
-// 	_, _ = h.Write(r.SessionID)
-// 	_ = binary.Write(h, binary.LittleEndian, r.Index)
-// 	_ = binary.Write(h, binary.LittleEndian, r.Approved)
-// 	return h.Sum(nil)
-// }
-
-// func (d *Deal) decode(s Suite, buff []byte) error {
-// 	constructors := make(protobuf.Constructors)
-// 	var point kyber.Point
-// 	var secret kyber.Scalar
-// 	constructors[reflect.TypeOf(&point).Elem()] = func() interface{} { return s.Point() }
-// 	constructors[reflect.TypeOf(&secret).Elem()] = func() interface{} { return s.Scalar() }
-// 	return protobuf.DecodeWithConstructors(buff, d, constructors)
-// }
-
 // // Hash returns the hash of a Justification.
 // func (j *Justification) Hash(s Suite) []byte {
 // 	h := s.Hash()
@@ -926,7 +1000,7 @@ where
 /// if all Deals don't have the same SessionID.
 pub fn RecoverSecret<SCALAR, POINT, SUITE>(
     _suite: SUITE,
-    _deals: Vec<Deal<SCALAR, POINT>>,
+    _deals: Vec<Deal<SCALAR, POINT, SUITE>>,
     _n: usize,
     _t: usize,
 ) -> Result<SCALAR>

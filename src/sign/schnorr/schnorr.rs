@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 
 use crate::{Group, Point, Random, Scalar};
-use anyhow::Result;
+use anyhow::{bail, Error, Result};
 use sha2::{Digest, Sha512};
 
 /// Suite represents the set of functionalities needed by the package schnorr.
@@ -49,89 +49,105 @@ pub fn Sign<SUITE: Suite<SCALAR, POINT>, SCALAR: Scalar, POINT: Point<SCALAR>>(
     Ok(b)
 }
 
-// // VerifyWithChecks uses a public key buffer, a message and a signature.
-// // It will return nil if sig is a valid signature for msg created by
-// // key public, or an error otherwise. Compared to `Verify`, it performs
-// // additional checks around the canonicality and ensures the public key
-// // does not have a small order when using `edwards25519` group.
-// func VerifyWithChecks(g kyber.Group, pub, msg, sig []byte) error {
-// 	type scalarCanCheckCanonical interface {
-// 		IsCanonical(b []byte) bool
-// 	}
+/// VerifyWithChecks uses a public key buffer, a message and a signature.
+/// It will return nil if sig is a valid signature for msg created by
+/// key public, or an error otherwise. Compared to `Verify`, it performs
+/// additional checks around the canonicality and ensures the public key
+/// does not have a small order when using `edwards25519` group.
+fn VerifyWithChecks<SCALAR, POINT, GROUP>(
+    g: GROUP,
+    public: &[u8],
+    msg: &[u8],
+    sig: &[u8],
+) -> Result<()>
+where
+    SCALAR: Scalar,
+    POINT: Point<SCALAR>,
+    GROUP: Group<SCALAR, POINT>,
+{
+    // type scalarCanCheckCanonical interface {
+    // 	IsCanonical(b []byte) bool
+    // }
 
-// 	type pointCanCheckCanonicalAndSmallOrder interface {
-// 		HasSmallOrder() bool
-// 		IsCanonical(b []byte) bool
-// 	}
+    // type pointCanCheckCanonicalAndSmallOrder interface {
+    // 	HasSmallOrder() bool
+    // 	IsCanonical(b []byte) bool
+    // }
 
-// 	R := g.Point()
-// 	s := g.Scalar()
-// 	pointSize := R.MarshalSize()
-// 	scalarSize := s.MarshalSize()
-// 	sigSize := scalarSize + pointSize
-// 	if len(sig) != sigSize {
-// 		return fmt.Errorf("schnorr: signature of invalid length %d instead of %d", len(sig), sigSize)
-// 	}
-// 	if err := R.UnmarshalBinary(sig[:pointSize]); err != nil {
-// 		return err
-// 	}
-// 	if p, ok := R.(pointCanCheckCanonicalAndSmallOrder); ok {
-// 		if !p.IsCanonical(sig[:pointSize]) {
-// 			return fmt.Errorf("R is not canonical")
-// 		}
-// 		if p.HasSmallOrder() {
-// 			return fmt.Errorf("R has small order")
-// 		}
-// 	}
-// 	if s, ok := g.Scalar().(scalarCanCheckCanonical); ok && !s.IsCanonical(sig[pointSize:]) {
-// 		return fmt.Errorf("signature is not canonical")
-// 	}
-// 	if err := s.UnmarshalBinary(sig[pointSize:]); err != nil {
-// 		return err
-// 	}
+    let mut R = g.point();
+    let s = g.scalar();
+    let pointSize = R.marshal_size();
+    let scalarSize = s.marshal_size();
+    let sigSize = scalarSize + pointSize;
+    if sig.len() != sigSize {
+        bail!(
+            "schnorr: signature of invalid length {} instead of {}",
+            sig.len(),
+            sigSize
+        );
+    }
+    R.unmarshal_binary(&sig[..pointSize])?;
+    // if p, ok := R.(pointCanCheckCanonicalAndSmallOrder); ok {
+    // 	if !p.IsCanonical(sig[:pointSize]) {
+    // 		return fmt.Errorf("R is not canonical")
+    // 	}
+    // 	if p.HasSmallOrder() {
+    // 		return fmt.Errorf("R has small order")
+    // 	}
+    // }
+    // if s, ok := g.Scalar().(scalarCanCheckCanonical); ok && !s.IsCanonical(sig[pointSize:]) {
+    // 	return fmt.Errorf("signature is not canonical")
+    // }
+    // if err := s.UnmarshalBinary(sig[pointSize:]); err != nil {
+    // 	return err
+    // }
 
-// 	public := g.Point()
-// 	err := public.UnmarshalBinary(pub)
-// 	if err != nil {
-// 		return fmt.Errorf("schnorr: error unmarshalling public key")
-// 	}
-// 	if p, ok := public.(pointCanCheckCanonicalAndSmallOrder); ok {
-// 		if !p.IsCanonical(pub) {
-// 			return fmt.Errorf("public key is not canonical")
-// 		}
-// 		if p.HasSmallOrder() {
-// 			return fmt.Errorf("public key has small order")
-// 		}
-// 	}
-// 	// recompute hash(public || R || msg)
-// 	h, err := hash(g, public, R, msg)
-// 	if err != nil {
-// 		return err
-// 	}
+    // public := g.Point()
+    // err := public.UnmarshalBinary(pub)
+    // if err != nil {
+    // 	return fmt.Errorf("schnorr: error unmarshalling public key")
+    // }
+    // if p, ok := public.(pointCanCheckCanonicalAndSmallOrder); ok {
+    // 	if !p.IsCanonical(pub) {
+    // 		return fmt.Errorf("public key is not canonical")
+    // 	}
+    // 	if p.HasSmallOrder() {
+    // 		return fmt.Errorf("public key has small order")
+    // 	}
+    // }
+    // // recompute hash(public || R || msg)
+    // h, err := hash(g, public, R, msg)
+    // if err != nil {
+    // 	return err
+    // }
 
-// 	// compute S = g^s
-// 	S := g.Point().Mul(s, nil)
-// 	// compute RAh = R + A^h
-// 	Ah := g.Point().Mul(h, public)
-// 	RAs := g.Point().Add(R, Ah)
+    // // compute S = g^s
+    // S := g.Point().Mul(s, nil)
+    // // compute RAh = R + A^h
+    // Ah := g.Point().Mul(h, public)
+    // RAs := g.Point().Add(R, Ah)
 
-// 	if !S.Equal(RAs) {
-// 		return errors.New("schnorr: invalid signature")
-// 	}
+    // if !S.Equal(RAs) {
+    // 	return errors.New("schnorr: invalid signature")
+    // }
 
-// 	return nil
+    // return nil
+    todo!()
+}
 
-// }
-
-// // Verify verifies a given Schnorr signature. It returns nil iff the
-// // given signature is valid.
-// func Verify(g kyber.Group, public kyber.Point, msg, sig []byte) error {
-// 	PBuf, err := public.MarshalBinary()
-// 	if err != nil {
-// 		return fmt.Errorf("error unmarshalling public key: %s", err)
-// 	}
-// 	return VerifyWithChecks(g, PBuf, msg, sig)
-// }
+/// Verify verifies a given Schnorr signature. It returns nil iff the
+/// given signature is valid.
+pub fn Verify<SCALAR, POINT, GROUP>(g: GROUP, public: POINT, msg: &[u8], sig: &[u8]) -> Result<()>
+where
+    SCALAR: Scalar,
+    POINT: Point<SCALAR>,
+    GROUP: Group<SCALAR, POINT>,
+{
+    let p_buf = public
+        .marshal_binary()
+        .map_err(|op| Error::msg(format!("error unmarshalling public key: {}", op)))?;
+    return VerifyWithChecks(g, &p_buf, msg, sig);
+}
 
 fn hash<SCALAR, POINT, GROUP>(g: GROUP, public: POINT, r: POINT, msg: &[u8]) -> Result<SCALAR>
 where
