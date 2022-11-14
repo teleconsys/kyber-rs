@@ -118,15 +118,15 @@ impl EdDSA<EdPoint, EdScalar> {
 
         // deterministic random secret and its commit
         let r = group.scalar().set_bytes(&hash.finalize_reset());
-        let R = group.point().mul(&r, None);
+        let r_point = group.point().mul(&r, None);
 
         // challenge
         // H( R || Public || Msg)
-        let R_buff = R.marshal_binary()?;
-        let A_buff = self.public.marshal_binary()?;
+        let r_buff = r_point.marshal_binary()?;
+        let a_buff = self.public.marshal_binary()?;
 
-        hash.update(R_buff.clone());
-        hash.update(A_buff);
+        hash.update(r_buff.clone());
+        hash.update(a_buff);
         hash.update(msg);
 
         let h = group.scalar().set_bytes(&hash.finalize());
@@ -139,7 +139,7 @@ impl EdDSA<EdPoint, EdScalar> {
 
         // return R || s
         let mut sig = [0u8; 64];
-        sig[..32].copy_from_slice(&R_buff);
+        sig[..32].copy_from_slice(&r_buff);
         sig[32..].copy_from_slice(&s_buff);
 
         Ok(sig)
@@ -174,16 +174,16 @@ pub fn verify_with_checks(public_key: &[u8], msg: &[u8], sig: &[u8]) -> Result<(
 	// 	IsCanonical(b []byte) bool
 	// }
 
-	let mut R = group.point();
-	if !R.is_canonical(&sig[..32]) {
+	let mut r = group.point();
+	if !r.is_canonical(&sig[..32]) {
 		bail!("R is not canonical")
 	}
-    R.unmarshal_binary(&sig[..32])?;
+    r.unmarshal_binary(&sig[..32])?;
 	// if err := R.UnmarshalBinary(sig[:32]); err != nil {
 	// 	return fmt.Errorf("got R invalid point: %s", err)
 	// }
 
-	if R.has_small_order()? {
+	if r.has_small_order()? {
 		bail!("R has small order")
 	}
 
@@ -213,11 +213,11 @@ pub fn verify_with_checks(public_key: &[u8], msg: &[u8], sig: &[u8]) -> Result<(
 
 	let h = group.scalar().set_bytes(&hash.finalize());
 	// reconstruct S == k*A + R
-	let S = group.point().mul(&s, None);
-	let hA = group.point().mul(&h, Some(&public));
-	let RhA = group.point().add(&R, &hA);
+	let s = group.point().mul(&s, None);
+	let ha = group.point().mul(&h, Some(&public));
+	let rha = group.point().add(&r, &ha);
 
-	if !RhA.equal(&S) {
+	if !rha.equal(&s) {
 		bail!("reconstructed S is not equal to signature")
 	}
 	Ok(())
@@ -226,11 +226,11 @@ pub fn verify_with_checks(public_key: &[u8], msg: &[u8], sig: &[u8]) -> Result<(
 /// Verify uses a public key, a message and a signature. It will return nil if
 /// sig is a valid signature for msg created by key public, or an error otherwise.
 pub fn verify(public: &EdPoint, msg: &[u8], sig: &[u8]) -> Result<()> {
-	let PBuf = public.marshal_binary()?;
+	let p_buf = public.marshal_binary()?;
 	// if err != nil {
 	// 	return fmt.Errorf("error unmarshalling public key: %s", err)
 	// }
-	return verify_with_checks(&PBuf, msg, sig)
+	return verify_with_checks(&p_buf, msg, sig)
 }
 
 
@@ -244,11 +244,11 @@ impl EdScalar {
             return true
         }
     
-        let (_, mut L) = PRIME_ORDER.to_bytes_be();
+        let (_, mut l) = PRIME_ORDER.to_bytes_be();
         let mut j = 31;
         let mut i = 0;
         while i<j {
-            (L[i], L[j]) = (L[j], L[i]);
+            (l[i], l[j]) = (l[j], l[i]);
             (i, j) = (i+1, j-1);
         }
     
@@ -258,8 +258,8 @@ impl EdScalar {
         for i in (0..32).into_iter().rev() {
             // subtraction might lead to an underflow which needs
             // to be accounted for in the right shift
-            c |= (((sb[i] as u16)-(L[i] as u16))>>8) as u8 & n;
-            n &= (((sb[i] as u16) ^ (L[i] as u16) - 1 ) >> 8) as u8;
+            c |= (((sb[i] as u16)-(l[i] as u16))>>8) as u8 & n;
+            n &= (((sb[i] as u16) ^ (l[i] as u16) - 1 ) >> 8) as u8;
         }
     
         return c != 0
