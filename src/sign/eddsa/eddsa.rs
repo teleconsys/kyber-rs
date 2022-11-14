@@ -1,28 +1,14 @@
 // // Package eddsa implements the EdDSA signature algorithm according to
 // // RFC8032.
-// package eddsa
-
-// import (
-// 	"crypto/cipher"
-// 	"crypto/sha512"
-// 	"errors"
-// 	"fmt"
-
-// 	"go.dedis.ch/kyber/v3"
-// 	"go.dedis.ch/kyber/v3/group/edwards25519"
-// )
-
-// var group = new(edwards25519.Curve)
-
-
 
 use anyhow::{Result, bail};
 use blake2::Digest;
 use sha2::Sha512;
 
-use crate::encoding::BinaryMarshaler;
+use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler};
 use crate::{Group, Point, Scalar, group::edwards25519::Curve};
 use crate::group::edwards25519::{Point as EdPoint, Scalar as EdScalar};
+use crate::group::edwards25519::constants::{PRIME_ORDER, WEAK_KEYS};
 
 fn new_group() -> Curve {
     Curve::default()
@@ -121,7 +107,7 @@ impl EdDSA<EdPoint, EdScalar> {
         Ok(())
     }
 
-    // Sign will return a EdDSA signature of the message msg using Ed25519.
+    /// Sign will return a EdDSA signature of the message msg using Ed25519.
     pub fn sign(&self, msg: &[u8]) -> Result<[u8;64]> {
         let group = new_group();
 
@@ -162,80 +148,163 @@ impl EdDSA<EdPoint, EdScalar> {
 }
 
 
-// // VerifyWithChecks uses a public key buffer, a message and a signature.
-// // It will return nil if sig is a valid signature for msg created by
-// // key public, or an error otherwise. Compared to `Verify`, it performs
-// // additional checks around the canonicality and ensures the public key
-// // does not have a small order.
-// func VerifyWithChecks(pub, msg, sig []byte) error {
-// 	if len(sig) != 64 {
-// 		return fmt.Errorf("signature length invalid, expect 64 but got %v", len(sig))
-// 	}
+/// verify_with_checks uses a public key buffer, a message and a signature.
+/// It will return nil if sig is a valid signature for msg created by
+/// key public, or an error otherwise. Compared to `Verify`, it performs
+/// additional checks around the canonicality and ensures the public key
+/// does not have a small order.
+pub fn verify_with_checks(public_key: &[u8], msg: &[u8], sig: &[u8]) -> Result<()> {
 
-// 	type scalarCanCheckCanonical interface {
-// 		IsCanonical(b []byte) bool
-// 	}
+	if sig.len() != 64 {
+		bail!("signature length invalid, expect 64 but got {}", sig.len())
+	}
 
-// 	if !group.Scalar().(scalarCanCheckCanonical).IsCanonical(sig[32:]) {
-// 		return fmt.Errorf("signature is not canonical")
-// 	}
+    let group = new_group();
 
-// 	type pointCanCheckCanonicalAndSmallOrder interface {
-// 		HasSmallOrder() bool
-// 		IsCanonical(b []byte) bool
-// 	}
+    // type scalarCanCheckCanonical interface {
+	// 	IsCanonical(b []byte) bool
+	// }
 
-// 	R := group.Point()
-// 	if !R.(pointCanCheckCanonicalAndSmallOrder).IsCanonical(sig[:32]) {
-// 		return fmt.Errorf("R is not canonical")
-// 	}
-// 	if err := R.UnmarshalBinary(sig[:32]); err != nil {
-// 		return fmt.Errorf("got R invalid point: %s", err)
-// 	}
-// 	if R.(pointCanCheckCanonicalAndSmallOrder).HasSmallOrder() {
-// 		return fmt.Errorf("R has small order")
-// 	}
+	if !group.scalar().is_canonical(&sig[32..]) {
+		bail!("signature is not canonical")
+	}
 
-// 	s := group.Scalar()
-// 	if err := s.UnmarshalBinary(sig[32:]); err != nil {
-// 		return fmt.Errorf("schnorr: s invalid scalar %s", err)
-// 	}
+	// type pointCanCheckCanonicalAndSmallOrder interface {
+	// 	HasSmallOrder() bool
+	// 	IsCanonical(b []byte) bool
+	// }
 
-// 	public := group.Point()
-// 	if !public.(pointCanCheckCanonicalAndSmallOrder).IsCanonical(pub) {
-// 		return fmt.Errorf("public key is not canonical")
-// 	}
-// 	if err := public.UnmarshalBinary(pub); err != nil {
-// 		return fmt.Errorf("invalid public key: %s", err)
-// 	}
-// 	if public.(pointCanCheckCanonicalAndSmallOrder).HasSmallOrder() {
-// 		return fmt.Errorf("public key has small order")
-// 	}
+	let mut R = group.point();
+	if !R.is_canonical(&sig[..32]) {
+		bail!("R is not canonical")
+	}
+    R.unmarshal_binary(&sig[..32])?;
+	// if err := R.UnmarshalBinary(sig[:32]); err != nil {
+	// 	return fmt.Errorf("got R invalid point: %s", err)
+	// }
 
-// 	// reconstruct h = H(R || Public || Msg)
-// 	hash := sha512.New()
-// 	_, _ = hash.Write(sig[:32])
-// 	_, _ = hash.Write(pub)
-// 	_, _ = hash.Write(msg)
+	if R.has_small_order()? {
+		bail!("R has small order")
+	}
 
-// 	h := group.Scalar().SetBytes(hash.Sum(nil))
-// 	// reconstruct S == k*A + R
-// 	S := group.Point().Mul(s, nil)
-// 	hA := group.Point().Mul(h, public)
-// 	RhA := group.Point().Add(R, hA)
+	let mut s = group.scalar();
+    s.unmarshal_binary(&sig[32..])?;
+	// if err := s.UnmarshalBinary(sig[32:]); err != nil {
+	// 	return fmt.Errorf("schnorr: s invalid scalar %s", err)
+	// }
 
-// 	if !RhA.Equal(S) {
-// 		return errors.New("reconstructed S is not equal to signature")
-// 	}
-// 	return nil
-// }
+	let mut public = group.point();
+	if !public.is_canonical(public_key) {
+		bail!("public key is not canonical")
+	}
+    public.unmarshal_binary(public_key)?;
+	// if err := public.UnmarshalBinary(public_key); err != nil {
+	// 	return fmt.Errorf("invalid public key: %s", err)
+	// }
+	if public.has_small_order()? {
+		bail!("public key has small order")
+	}
 
-// // Verify uses a public key, a message and a signature. It will return nil if
-// // sig is a valid signature for msg created by key public, or an error otherwise.
-// func Verify(public kyber.Point, msg, sig []byte) error {
-// 	PBuf, err := public.MarshalBinary()
-// 	if err != nil {
-// 		return fmt.Errorf("error unmarshalling public key: %s", err)
-// 	}
-// 	return VerifyWithChecks(PBuf, msg, sig)
-// }
+	// reconstruct h = H(R || Public || Msg)
+	let mut hash = Sha512::new();
+	hash.update(&sig[..32]);
+	hash.update(public_key);
+	hash.update(msg);
+
+	let h = group.scalar().set_bytes(&hash.finalize());
+	// reconstruct S == k*A + R
+	let S = group.point().mul(&s, None);
+	let hA = group.point().mul(&h, Some(&public));
+	let RhA = group.point().add(&R, &hA);
+
+	if !RhA.equal(&S) {
+		bail!("reconstructed S is not equal to signature")
+	}
+	Ok(())
+}
+
+/// Verify uses a public key, a message and a signature. It will return nil if
+/// sig is a valid signature for msg created by key public, or an error otherwise.
+pub fn verify(public: &EdPoint, msg: &[u8], sig: &[u8]) -> Result<()> {
+	let PBuf = public.marshal_binary()?;
+	// if err != nil {
+	// 	return fmt.Errorf("error unmarshalling public key: %s", err)
+	// }
+	return verify_with_checks(&PBuf, msg, sig)
+}
+
+
+impl EdScalar {
+    pub fn is_canonical(&self, sb: &[u8]) -> bool {
+        if sb.len() != 32 {
+            return false
+        }
+    
+        if sb[31]&0xf0 == 0 {
+            return true
+        }
+    
+        let (_, mut L) = PRIME_ORDER.to_bytes_be();
+        let mut j = 31;
+        let mut i = 0;
+        while i<j {
+            (L[i], L[j]) = (L[j], L[i]);
+            (i, j) = (i+1, j-1);
+        }
+    
+        let mut c = 0u8;
+        let mut n  = 1u8;
+    
+        for i in (0..32).into_iter().rev() {
+            // subtraction might lead to an underflow which needs
+            // to be accounted for in the right shift
+            c |= (((sb[i] as u16)-(L[i] as u16))>>8) as u8 & n;
+            n &= (((sb[i] as u16) ^ (L[i] as u16) - 1 ) >> 8) as u8;
+        }
+    
+        return c != 0
+    }
+}
+
+impl EdPoint {
+    pub fn is_canonical(&self, s: &[u8]) -> bool {
+        if s.len() != 32 {
+            return false
+        }
+    
+        let mut c = (s[31] & 0x7f) ^ 0x7f;
+        for i in (1..=30).into_iter().rev() {
+            c |= s[i] ^ 0xff;
+        }
+    
+        // subtraction might underflow
+        c = (((c as u16) - 1) >> 8) as u8;
+        let d = ((0xed - 1 - (s[0] as u16)) >> 8) as u8;
+    
+        return 1-(c&d&1) == 1
+    }
+
+    fn has_small_order(&self) -> Result<bool> {
+        let s = self.marshal_binary()?;
+    
+        let mut c = [0u8; 5];
+    
+        for j in 0..31 {
+            for i in 0..5 {
+                c[i] |= s[j] ^ WEAK_KEYS[i][j];
+            }
+        }
+        for i in 0..5 {
+            c[i] |= (s[31] & 0x7f) ^ WEAK_KEYS[i][31];
+        }
+    
+        // Constant time verification if one or more of the c's are zero
+        let mut k = 0u16;
+        for i in 0..5 {
+            k |= (c[i] as u16) - 1;
+        }
+    
+        Ok((k>>8)&1 > 0)
+    }
+}
+

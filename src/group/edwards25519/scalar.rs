@@ -2,6 +2,7 @@ use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
 use crate::group::internal::marshalling;
 use crate::group::{group, integer_field};
 use crate::util::random;
+use anyhow::bail;
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 
@@ -75,8 +76,12 @@ impl BinaryMarshaler for Scalar {
 }
 
 impl BinaryUnmarshaler for Scalar {
-    fn unmarshal_binary(&mut self, _data: &[u8]) -> anyhow::Result<()> {
-        todo!()
+    fn unmarshal_binary(&mut self, data: &[u8]) -> anyhow::Result<()> {
+        if data.len() != 32 {
+            bail!("wrong size buffer")
+        }
+        self.v.copy_from_slice(data);
+        Ok(())
     }
 }
 

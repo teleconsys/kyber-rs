@@ -2,7 +2,7 @@
 use anyhow::Result;
 use crate::{cipher::cipher, sign::eddsa::EdDSA, encoding::BinaryMarshaler};
 
-use super::new_eddsa;
+use super::{new_eddsa, verify};
 
 struct eddsa_test_vector<'a> {
     private: &'a str,
@@ -91,7 +91,8 @@ fn test_eddsa_signing() {
 		if hex::encode(sig) != vec.signature {
 			panic!("Test {}, signature wrong {} {}", i, hex::encode(sig), vec.signature)
 		}
-		//assert.Nil(t, Verify(ed.Public, msg, sig))
+
+		verify(&ed.public, &msg, &sig).unwrap();
 	}
 }
 

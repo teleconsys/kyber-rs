@@ -1,4 +1,4 @@
-mod constants;
+pub(crate) mod constants;
 mod curve;
 mod curve_test;
 mod fe;
@@ -15,3 +15,4 @@ pub use point::Point;
 pub use scalar::Scalar;
 pub use suite::SuiteEd25519;
 pub use curve::Curve;
+
