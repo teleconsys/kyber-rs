@@ -267,7 +267,7 @@ impl cipher::Stream for ConstantStream {
 // ConstantStream is a cipher.Stream which always returns
 // the same value.
 fn constant_stream(buff: Vec<u8>) -> Box<dyn cipher::Stream>{
-	return Box::new(ConstantStream{seed: buff})
+	return Box::new(ConstantStream{seed: buff[..32].to_vec()})
 }
 
 
@@ -276,70 +276,62 @@ fn constant_stream(buff: Vec<u8>) -> Box<dyn cipher::Stream>{
 fn test_golden() {
 	// sign.input.gz is a selection of test cases from
 	// https://ed25519.cr.yp.to/python/sign.input
-	let test_data_z = File::open("testdata/sign.input.gz").unwrap();
-
+	let test_data_z = File::open("src/sign/eddsa/testdata/sign.input.gz").unwrap();
     let mut gz_decoder = read::GzDecoder::new(test_data_z);
-    let mut scanner = Scanner::new(&mut gz_decoder);
-    println!("{:?}",scanner.next().unwrap())
+    let mut scanner = Scanner::new(&mut gz_decoder); 
 
-    // let mut buf: Vec<u8> = vec![];
-    // gz_decoder.read_to_end(&mut buf);
+	let mut line_no = 0;
 
-    // let reader = BufReader::bytes(self)
-    // let reader = BufReader::new(gz_decoder.read_buf(buf));
-	// let mut lineNo = 0;
+	const SIGNATURE_SIZE: usize = 64;
+	const PUBLIC_KEY_SIZE: usize = 32;
+	const PRIVATE_KEY_SIZE: usize = 32;
 
-	// const SIGNATURE_SIZE: i32 = 64;
-	// const PUBLIC_KEY_SIZE: i32 = 32;
-	// const PRIVATE_KEY_SIZE: i32 = 32;
+	loop {
+		let line = match scanner.next().unwrap() {
+			Some(text) => text,
+			None => break,
+		};
 
-	// for str in scanner.next() {
-	// 	lineNo += 1;
+		line_no += 1;
 
-	// 	let line = &str.unwrap();
-	// 	let parts = line.split(":");
+		let split: Split<&str> = line.split(":");
+		let parts: Vec<&str> = split.collect();
 
-    //     print!("{}", line);
+		if parts.len() != 5 {
+			panic!("bad number of parts on line {}", line_no)
+		}
 
-	// 	if len(parts) != 5 {
-	// 		t.Fatalf("bad number of parts on line %d", lineNo)
-	// 	}
+		let priv_bytes = hex::decode(parts[0]).unwrap();
+		let pub_key = hex::decode(parts[1]).unwrap();
+		let msg = hex::decode(parts[2]).unwrap();
+		let mut sig = hex::decode(parts[3]).unwrap();
+		// The signatures in the test vectors also include the message
+		// at the end, but we just want R and S.
+		sig = sig[..SIGNATURE_SIZE].to_vec();
 
-	// 	privBytes, _ := hex.DecodeString(parts[0])
-	// 	pubKey, _ := hex.DecodeString(parts[1])
-	// 	msg, _ := hex.DecodeString(parts[2])
-	// 	sig, _ := hex.DecodeString(parts[3])
-	// 	// The signatures in the test vectors also include the message
-	// 	// at the end, but we just want R and S.
-	// 	sig = sig[:SignatureSize]
+		if pub_key.len() != PUBLIC_KEY_SIZE {
+			panic!("bad public key length on line {}: got {} bytes", line_no, pub_key.len());
+		}
 
-	// 	if l := len(pubKey); l != PublicKeySize {
-	// 		t.Fatalf("bad public key length on line %d: got %d bytes", lineNo, l)
-	// 	}
+		let mut private = [0u8; PRIVATE_KEY_SIZE*2];
+		private.copy_from_slice(&priv_bytes);
+		private[32..].copy_from_slice(&pub_key);
 
-	// 	var priv [PrivateKeySize]byte
-	// 	copy(priv[:], privBytes)
-	// 	copy(priv[32:], pubKey)
+		let mut stream = constant_stream(priv_bytes);
+		let ed = new_eddsa(&mut stream).unwrap();
 
-	// 	stream := ConstantStream(privBytes)
-	// 	ed := NewEdDSA(stream)
+		let data = ed.public.marshal_binary().unwrap();
+		if data != pub_key {
+			panic!("Public not equal on line {}: {:?} vs {:?}", line_no, pub_key, data)
+		}
 
-	// 	data, _ := ed.Public.MarshalBinary()
-	// 	if !bytes.Equal(data, pubKey) {
-	// 		t.Error("Public not equal")
-	// 	}
+		let sig2 = ed.sign(&msg).unwrap();
 
-	// 	sig2, err := ed.Sign(msg)
-	// 	assert.Nil(t, err)
+		if sig != sig2 {
+			panic!("different signature result on line {}: {:?} vs {:?}", line_no, sig, sig2)
+		}
 
-	// 	if !bytes.Equal(sig, sig2[:]) {
-	// 		t.Errorf("different signature result on line %d: %x vs %x", lineNo, sig, sig2)
-	// 	}
+		verify(&ed.public, &msg, &sig2).unwrap();
 
-	// 	assert.Nil(t, Verify(ed.Public, msg, sig2))
-	//  }
-
-	// if err := scanner.Err(); err != nil {
-	// 	t.Fatalf("error reading test data: %s", err)
-	// }
-}
+ 	}
+ }
