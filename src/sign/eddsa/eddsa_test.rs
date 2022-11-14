@@ -1,6 +1,10 @@
 
+use std::{fs::File, io::{BufReader, Read}, str::Split};
+use flate2::{read, Compression};
+
 use anyhow::Result;
-use crate::{cipher::cipher, sign::eddsa::EdDSA, encoding::BinaryMarshaler};
+use scanner_rust::{ScannerAscii, ScannerU8Slice, Scanner};
+use crate::{cipher::cipher, sign::eddsa::{EdDSA, verify_with_checks}, encoding::{BinaryMarshaler, BinaryUnmarshaler}, group::edwards25519::{self, SuiteEd25519}, Random, util::random, Suite};
 
 use super::{new_eddsa, verify};
 
@@ -96,6 +100,159 @@ fn test_eddsa_signing() {
 	}
 }
 
+
+/// Test signature malleability
+#[test]
+fn test_eddsa_verify_malleability() {
+	/* l = 2^252+27742317777372353535851937790883648493, prime order of the base point */
+	let L: [u16; 32] = [0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7,
+		0xa2, 0xde, 0xf9, 0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10];
+	let mut c = 0u16;
+
+	let suite = SuiteEd25519::new_blake_sha256ed25519();
+	let mut random_stream = suite.random_stream();
+	let ed = new_eddsa(&mut random_stream).unwrap();
+
+	let msg = random::bits(256, true, &mut random_stream);
+
+	let mut sig = ed.sign(&msg).unwrap();
+
+	verify(&ed.public, &msg, &sig).unwrap();
+
+	// Add l to signature
+	for i in 0..32 {
+		c += (sig[32+i] as u16) + L[i];
+		sig[32+i] = c as u8;
+		c >>= 8
+	}
+
+    assert_eq!(verify(&ed.public, &msg, &sig).unwrap_err().to_string(), anyhow::Error::msg("signature is not canonical").to_string());
+
+	// Additional malleability test from golang/crypto
+	// https://github.com/golang/crypto/blob/master/ed25519/ed25519_test.go#L167
+	let msg2: Vec<u8> = vec![0x54, 0x65, 0x73, 0x74];
+	let sig2: [u8; 64] = [
+		0x7c, 0x38, 0xe0, 0x26, 0xf2, 0x9e, 0x14, 0xaa, 0xbd, 0x05, 0x9a,
+		0x0f, 0x2d, 0xb8, 0xb0, 0xcd, 0x78, 0x30, 0x40, 0x60, 0x9a, 0x8b,
+		0xe6, 0x84, 0xdb, 0x12, 0xf8, 0x2a, 0x27, 0x77, 0x4a, 0xb0, 0x67,
+		0x65, 0x4b, 0xce, 0x38, 0x32, 0xc2, 0xd7, 0x6f, 0x8f, 0x6f, 0x5d,
+		0xaf, 0xc0, 0x8d, 0x93, 0x39, 0xd4, 0xee, 0xf6, 0x76, 0x57, 0x33,
+		0x36, 0xa5, 0xc5, 0x1e, 0xb6, 0xf9, 0x46, 0xb3, 0x1d];
+	let public_key: [u8; 32] = [
+		0x7d, 0x4d, 0x0e, 0x7f, 0x61, 0x53, 0xa6, 0x9b, 0x62, 0x42, 0xb5,
+		0x22, 0xab, 0xbe, 0xe6, 0x85, 0xfd, 0xa4, 0x42, 0x0f, 0x88, 0x34,
+		0xb1, 0x08, 0xc3, 0xbd, 0xae, 0x36, 0x9e, 0xf5, 0x49, 0xfa];
+
+	assert_eq!(verify_with_checks(&public_key, &msg2, &sig2).unwrap_err().to_string(), anyhow::Error::msg("signature is not canonical").to_string());
+	
+}
+
+/// Test non-canonical R
+#[test]
+fn test_eddsa_verify_non_canonical_r() {
+	let non_canonical_r: [u8; 32] = [0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
+
+    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let mut random_stream = suite.random_stream();
+    let ed = new_eddsa(&mut random_stream).unwrap();
+
+    let msg = random::bits(256, true, &mut random_stream);
+
+    let mut sig = ed.sign(&msg).unwrap();
+	verify(&ed.public, &msg, &sig).unwrap();
+
+	for i in 0..32 {
+		sig[i] = non_canonical_r[i];
+	}
+
+	assert_eq!(verify(&ed.public, &msg, &sig).unwrap_err().to_string(), anyhow::Error::msg("R is not canonical").to_string())
+}
+
+/// Test non-canonical keys
+#[test]
+fn eddsa_verify_non_canonical_pk() {
+	let non_canonical_pk: [u8; 32] = [0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
+
+	let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let mut random_stream = suite.random_stream();
+    let ed = new_eddsa(&mut random_stream).unwrap();
+
+    let msg = random::bits(256, true, &mut random_stream);
+
+    let sig = ed.sign(&msg).unwrap();
+	verify(&ed.public, &msg, &sig).unwrap();
+
+    assert_eq!(verify_with_checks(&non_canonical_pk, &msg, &sig).unwrap_err().to_string(), anyhow::Error::msg("public key is not canonical").to_string());
+}
+
+/// Test for small order R
+#[test]
+fn test_eddsa_verify_small_order_r() {
+	let small_order_r: [u8;32] = [0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b,
+		0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a, 0x20, 0x53, 0xfa, 0x2c, 0x39,
+		0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0x7a];
+
+    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let mut random_stream = suite.random_stream();
+    let ed = new_eddsa(&mut random_stream).unwrap();
+
+    let msg = random::bits(256, true, &mut random_stream);
+
+    let mut sig = ed.sign(&msg).unwrap();
+    verify(&ed.public, &msg, &sig).unwrap();
+
+    for i in 0..32 {
+        sig[i] = small_order_r[i];
+    }
+
+	assert_eq!(verify(&ed.public, &msg, &sig).unwrap_err().to_string(), anyhow::Error::msg("R has small order").to_string())
+}
+
+/// Test for small order public key
+#[test]
+fn test_eddsa_verify_small_order_pk() {
+	let small_order_pk: [u8;32]  = [0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b,
+		0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a, 0x20, 0x53, 0xfa, 0x2c, 0x39,
+		0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0x7a];
+
+    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let mut random_stream = suite.random_stream();
+    let mut ed = new_eddsa(&mut random_stream).unwrap();
+
+    let msg = random::bits(256, true, &mut random_stream);
+
+    let sig = ed.sign(&msg).unwrap();
+    verify(&ed.public, &msg, &sig).unwrap();
+
+	ed.public.unmarshal_binary(&small_order_pk).unwrap();
+
+	assert_eq!(verify(&ed.public, &msg, &sig).unwrap_err().to_string(), anyhow::Error::msg("public key has small order").to_string())
+}
+
+/// Test the property of a EdDSA signature
+#[test]
+fn test_eddsa_signing_random() {
+	let suite = SuiteEd25519::new_blake_sha256ed25519();
+
+	for _ in 0..10000 {
+		let ed = new_eddsa(&mut suite.random_stream()).unwrap();
+
+        let mut msg = [0u8; 32];
+        random::bytes(&mut msg, &mut suite.random_stream()).unwrap();
+
+		let sig = ed.sign(&msg).unwrap();
+
+		// see https://tools.ietf.org/html/rfc8032#section-5.1.6 (item 6.)
+		assert_eq!(0u8, sig[63]&0xe0);
+		verify(&ed.public, &msg, &sig).unwrap();
+	}
+}
+
 pub struct ConstantStream {
 	pub seed: Vec<u8>
 }
@@ -113,277 +270,76 @@ fn constant_stream(buff: Vec<u8>) -> Box<dyn cipher::Stream>{
 	return Box::new(ConstantStream{seed: buff})
 }
 
-// // Comparing our implementation with the test vectors of the RFC
-// func TestEdDSASigning(t *testing.T) {
-// 	for i, vec := range EdDSATestVectors {
-// 		seed, err := hex.DecodeString(vec.private)
-// 		assert.Nil(t, err)
-// 		if len(vec.private) != 64 || len(seed) != 32 {
-// 			t.Fatal("len vec.private")
-// 		}
 
-// 		stream := ConstantStream(seed)
+/// Adapted from golang.org/x/crypto/ed25519.
+#[test]
+fn test_golden() {
+	// sign.input.gz is a selection of test cases from
+	// https://ed25519.cr.yp.to/python/sign.input
+	let test_data_z = File::open("testdata/sign.input.gz").unwrap();
 
-// 		ed := NewEdDSA(stream)
+    let mut gz_decoder = read::GzDecoder::new(test_data_z);
+    let mut scanner = Scanner::new(&mut gz_decoder);
+    println!("{:?}",scanner.next().unwrap())
 
-// 		data, _ := ed.Public.MarshalBinary()
-// 		if hex.EncodeToString(data) != vec.public {
-// 			t.Error("Public not equal")
-// 		}
-// 		if len(vec.public) != 64 {
-// 			t.Fatal("len vec.private")
-// 		}
+    // let mut buf: Vec<u8> = vec![];
+    // gz_decoder.read_to_end(&mut buf);
 
-// 		msg, _ := hex.DecodeString(vec.message)
+    // let reader = BufReader::bytes(self)
+    // let reader = BufReader::new(gz_decoder.read_buf(buf));
+	// let mut lineNo = 0;
 
-// 		sig, err := ed.Sign(msg)
-// 		assert.Nil(t, err)
+	// const SIGNATURE_SIZE: i32 = 64;
+	// const PUBLIC_KEY_SIZE: i32 = 32;
+	// const PRIVATE_KEY_SIZE: i32 = 32;
 
-// 		if hex.EncodeToString(sig) != vec.signature {
-// 			t.Error("Test", i, "Signature wrong", hex.EncodeToString(sig), vec.signature)
-// 		}
-// 		assert.Nil(t, Verify(ed.Public, msg, sig))
-// 	}
-// }
+	// for str in scanner.next() {
+	// 	lineNo += 1;
 
-// // Test signature malleability
-// func TestEdDSAVerifyMalleability(t *testing.T) {
-// 	/* l = 2^252+27742317777372353535851937790883648493, prime order of the base point */
-// 	var L []uint16 = []uint16{0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7,
-// 		0xa2, 0xde, 0xf9, 0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-// 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10}
-// 	var c uint16 = 0
+	// 	let line = &str.unwrap();
+	// 	let parts = line.split(":");
 
-// 	suite := edwards25519.NewBlakeSHA256Ed25519()
-// 	randomStream := suite.RandomStream()
-// 	ed := NewEdDSA(randomStream)
+    //     print!("{}", line);
 
-// 	msg := random.Bits(256, true, randomStream)
+	// 	if len(parts) != 5 {
+	// 		t.Fatalf("bad number of parts on line %d", lineNo)
+	// 	}
 
-// 	sig, err := ed.Sign(msg)
-// 	require.Nil(t, err)
-// 	require.Nil(t, Verify(ed.Public, msg, sig))
+	// 	privBytes, _ := hex.DecodeString(parts[0])
+	// 	pubKey, _ := hex.DecodeString(parts[1])
+	// 	msg, _ := hex.DecodeString(parts[2])
+	// 	sig, _ := hex.DecodeString(parts[3])
+	// 	// The signatures in the test vectors also include the message
+	// 	// at the end, but we just want R and S.
+	// 	sig = sig[:SignatureSize]
 
-// 	// Add l to signature
-// 	for i := 0; i < 32; i++ {
-// 		c += uint16(sig[32+i]) + L[i]
-// 		sig[32+i] = byte(c)
-// 		c >>= 8
-// 	}
+	// 	if l := len(pubKey); l != PublicKeySize {
+	// 		t.Fatalf("bad public key length on line %d: got %d bytes", lineNo, l)
+	// 	}
 
-// 	err = Verify(ed.Public, msg, sig)
-// 	require.EqualError(t, err, "signature is not canonical")
+	// 	var priv [PrivateKeySize]byte
+	// 	copy(priv[:], privBytes)
+	// 	copy(priv[32:], pubKey)
 
-// 	// Additional malleability test from golang/crypto
-// 	// https://github.com/golang/crypto/blob/master/ed25519/ed25519_test.go#L167
-// 	msg2 := []byte{0x54, 0x65, 0x73, 0x74}
-// 	sig2 := []byte{
-// 		0x7c, 0x38, 0xe0, 0x26, 0xf2, 0x9e, 0x14, 0xaa, 0xbd, 0x05, 0x9a,
-// 		0x0f, 0x2d, 0xb8, 0xb0, 0xcd, 0x78, 0x30, 0x40, 0x60, 0x9a, 0x8b,
-// 		0xe6, 0x84, 0xdb, 0x12, 0xf8, 0x2a, 0x27, 0x77, 0x4a, 0xb0, 0x67,
-// 		0x65, 0x4b, 0xce, 0x38, 0x32, 0xc2, 0xd7, 0x6f, 0x8f, 0x6f, 0x5d,
-// 		0xaf, 0xc0, 0x8d, 0x93, 0x39, 0xd4, 0xee, 0xf6, 0x76, 0x57, 0x33,
-// 		0x36, 0xa5, 0xc5, 0x1e, 0xb6, 0xf9, 0x46, 0xb3, 0x1d,
-// 	}
-// 	publicKey := []byte{
-// 		0x7d, 0x4d, 0x0e, 0x7f, 0x61, 0x53, 0xa6, 0x9b, 0x62, 0x42, 0xb5,
-// 		0x22, 0xab, 0xbe, 0xe6, 0x85, 0xfd, 0xa4, 0x42, 0x0f, 0x88, 0x34,
-// 		0xb1, 0x08, 0xc3, 0xbd, 0xae, 0x36, 0x9e, 0xf5, 0x49, 0xfa}
+	// 	stream := ConstantStream(privBytes)
+	// 	ed := NewEdDSA(stream)
 
-// 	err = VerifyWithChecks(publicKey, msg2, sig2)
-// 	require.EqualError(t, err, "signature is not canonical")
-// }
+	// 	data, _ := ed.Public.MarshalBinary()
+	// 	if !bytes.Equal(data, pubKey) {
+	// 		t.Error("Public not equal")
+	// 	}
 
-// // Test non-canonical R
-// func TestEdDSAVerifyNonCanonicalR(t *testing.T) {
-// 	var nonCanonicalR []byte = []byte{0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-// 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-// 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+	// 	sig2, err := ed.Sign(msg)
+	// 	assert.Nil(t, err)
 
-// 	suite := edwards25519.NewBlakeSHA256Ed25519()
-// 	randomStream := suite.RandomStream()
-// 	ed := NewEdDSA(randomStream)
+	// 	if !bytes.Equal(sig, sig2[:]) {
+	// 		t.Errorf("different signature result on line %d: %x vs %x", lineNo, sig, sig2)
+	// 	}
 
-// 	msg := random.Bits(256, true, randomStream)
+	// 	assert.Nil(t, Verify(ed.Public, msg, sig2))
+	//  }
 
-// 	sig, err := ed.Sign(msg)
-// 	require.Nil(t, err)
-// 	require.Nil(t, Verify(ed.Public, msg, sig))
-
-// 	for i := 0; i < 32; i++ {
-// 		sig[i] = nonCanonicalR[i]
-// 	}
-// 	err = Verify(ed.Public, msg, sig)
-// 	require.EqualError(t, err, "R is not canonical")
-// }
-
-// // Test non-canonical keys
-// func TestEdDSAVerifyNonCanonicalPK(t *testing.T) {
-// 	var nonCanonicalPk []byte = []byte{0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-// 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-// 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
-
-// 	suite := edwards25519.NewBlakeSHA256Ed25519()
-// 	randomStream := suite.RandomStream()
-// 	ed := NewEdDSA(randomStream)
-
-// 	msg := random.Bits(256, true, randomStream)
-
-// 	sig, err := ed.Sign(msg)
-// 	require.Nil(t, err)
-// 	require.Nil(t, Verify(ed.Public, msg, sig))
-
-// 	err = VerifyWithChecks(nonCanonicalPk, msg, sig)
-// 	require.EqualError(t, err, "public key is not canonical")
-// }
-
-// // Test for small order R
-// func TestEdDSAVerifySmallOrderR(t *testing.T) {
-// 	var smallOrderR []byte = []byte{0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b,
-// 		0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a, 0x20, 0x53, 0xfa, 0x2c, 0x39,
-// 		0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0x7a}
-
-// 	suite := edwards25519.NewBlakeSHA256Ed25519()
-// 	randomStream := suite.RandomStream()
-// 	ed := NewEdDSA(randomStream)
-
-// 	msg := random.Bits(256, true, randomStream)
-
-// 	sig, err := ed.Sign(msg)
-// 	require.Nil(t, err)
-// 	require.Nil(t, Verify(ed.Public, msg, sig))
-
-// 	for i := 0; i < 32; i++ {
-// 		sig[i] = smallOrderR[i]
-// 	}
-
-// 	err = Verify(ed.Public, msg, sig)
-// 	require.EqualError(t, err, "R has small order")
-// }
-
-// // Test for small order public key
-// func TestEdDSAVerifySmallOrderPK(t *testing.T) {
-// 	var smallOrderPk []byte = []byte{0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b,
-// 		0x76, 0x0d, 0x10, 0x67, 0x0f, 0x2a, 0x20, 0x53, 0xfa, 0x2c, 0x39,
-// 		0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac, 0x03, 0x7a}
-
-// 	suite := edwards25519.NewBlakeSHA256Ed25519()
-// 	randomStream := suite.RandomStream()
-// 	ed := NewEdDSA(randomStream)
-
-// 	msg := random.Bits(256, true, randomStream)
-
-// 	sig, err := ed.Sign(msg)
-// 	require.Nil(t, err)
-// 	require.Nil(t, Verify(ed.Public, msg, sig))
-
-// 	err = ed.Public.UnmarshalBinary(smallOrderPk)
-// 	require.Nil(t, err)
-
-// 	err = Verify(ed.Public, msg, sig)
-// 	require.EqualError(t, err, "public key has small order")
-// }
-
-// // Test the property of a EdDSA signature
-// func TestEdDSASigningRandom(t *testing.T) {
-// 	suite := edwards25519.NewBlakeSHA256Ed25519()
-
-// 	for i := 0.0; i < 10000; i++ {
-// 		ed := NewEdDSA(suite.RandomStream())
-
-// 		msg := make([]byte, 32)
-// 		_, err := rand.Read(msg)
-// 		assert.NoError(t, err)
-
-// 		sig, err := ed.Sign(msg)
-// 		assert.Nil(t, err)
-// 		// see https://tools.ietf.org/html/rfc8032#section-5.1.6 (item 6.)
-// 		assert.Equal(t, uint8(0), sig[63]&0xe0)
-// 		assert.Nil(t, Verify(ed.Public, msg, sig))
-// 	}
-// }
-
-// type constantStream struct {
-// 	seed []byte
-// }
-
-// // ConstantStream is a cipher.Stream which always returns
-// // the same value.
-// func ConstantStream(buff []byte) cipher.Stream {
-// 	return &constantStream{buff}
-// }
-
-// // XORKexStream implements the cipher.Stream interface
-// func (cs *constantStream) XORKeyStream(dst, src []byte) {
-// 	copy(dst, cs.seed)
-// }
-
-// // Adapted from golang.org/x/crypto/ed25519.
-// func TestGolden(t *testing.T) {
-// 	// sign.input.gz is a selection of test cases from
-// 	// https://ed25519.cr.yp.to/python/sign.input
-// 	testDataZ, err := os.Open("testdata/sign.input.gz")
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	defer testDataZ.Close()
-// 	testData, err := gzip.NewReader(testDataZ)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	defer testData.Close()
-
-// 	scanner := bufio.NewScanner(testData)
-// 	lineNo := 0
-
-// 	const SignatureSize = 64
-// 	const PublicKeySize = 32
-// 	const PrivateKeySize = 32
-
-// 	for scanner.Scan() {
-// 		lineNo++
-
-// 		line := scanner.Text()
-// 		parts := strings.Split(line, ":")
-// 		if len(parts) != 5 {
-// 			t.Fatalf("bad number of parts on line %d", lineNo)
-// 		}
-
-// 		privBytes, _ := hex.DecodeString(parts[0])
-// 		pubKey, _ := hex.DecodeString(parts[1])
-// 		msg, _ := hex.DecodeString(parts[2])
-// 		sig, _ := hex.DecodeString(parts[3])
-// 		// The signatures in the test vectors also include the message
-// 		// at the end, but we just want R and S.
-// 		sig = sig[:SignatureSize]
-
-// 		if l := len(pubKey); l != PublicKeySize {
-// 			t.Fatalf("bad public key length on line %d: got %d bytes", lineNo, l)
-// 		}
-
-// 		var priv [PrivateKeySize]byte
-// 		copy(priv[:], privBytes)
-// 		copy(priv[32:], pubKey)
-
-// 		stream := ConstantStream(privBytes)
-// 		ed := NewEdDSA(stream)
-
-// 		data, _ := ed.Public.MarshalBinary()
-// 		if !bytes.Equal(data, pubKey) {
-// 			t.Error("Public not equal")
-// 		}
-
-// 		sig2, err := ed.Sign(msg)
-// 		assert.Nil(t, err)
-
-// 		if !bytes.Equal(sig, sig2[:]) {
-// 			t.Errorf("different signature result on line %d: %x vs %x", lineNo, sig, sig2)
-// 		}
-
-// 		assert.Nil(t, Verify(ed.Public, msg, sig2))
-// 	}
-
-// 	if err := scanner.Err(); err != nil {
-// 		t.Fatalf("error reading test data: %s", err)
-// 	}
-// }
+	// if err := scanner.Err(); err != nil {
+	// 	t.Fatalf("error reading test data: %s", err)
+	// }
+}

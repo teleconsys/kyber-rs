@@ -1,6 +1,6 @@
 /// bits chooses a uniform random BigInt with a given maximum BitLen.
 /// If 'exact' is true, choose a BigInt with _exactly_ that BitLen, not less
-fn bits(bitlen: u64, exact: bool, rand: &mut impl Stream) -> Vec<u8> {
+pub fn bits(bitlen: u64, exact: bool, rand: &mut impl Stream) -> Vec<u8> {
     // let mut b: Vec<u8> = Vec::with_capacity(((bitlen + 7) / 8) as usize);
     let mut b: Vec<u8> = vec![0; ((bitlen + 7) / 8) as usize];
     let b_clone = b.clone();
