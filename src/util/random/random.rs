@@ -44,10 +44,12 @@ pub fn random_int(modulus: &BigInt, rand: &mut impl Stream) -> BigInt {
     }
 }
 
-// // Bytes fills a slice with random bytes from rand.
-// func Bytes(b []byte, rand cipher.Stream) {
-// 	rand.XORKeyStream(b, b)
-// }
+// Bytes fills a slice with random bytes from rand.
+pub fn bytes(b: &mut [u8], rand: &mut impl Stream) -> Result<()>{
+    let src_buff = vec![0u8; b.len()];
+	rand.xor_key_stream(b, &src_buff)?;
+    Ok(())
+}
 
 pub struct Randstream {
     readers: Vec<Box<dyn Read>>,

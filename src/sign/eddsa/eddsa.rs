@@ -16,99 +16,151 @@
 
 
 
+use anyhow::{Result, bail};
+use blake2::Digest;
+use sha2::Sha512;
 
-// // NewEdDSA will return a freshly generated key pair to use for generating
-// // EdDSA signatures.
-// func NewEdDSA(stream cipher.Stream) *EdDSA {
-// 	if stream == nil {
-// 		panic("stream is required")
-// 	}
+use crate::encoding::BinaryMarshaler;
+use crate::{Group, Point, Scalar, group::edwards25519::Curve};
+use crate::group::edwards25519::{Point as EdPoint, Scalar as EdScalar};
 
-// 	secret, buffer, prefix := group.NewKeyAndSeed(stream)
-// 	public := group.Point().Mul(secret, nil)
+fn new_group() -> Curve {
+    Curve::default()
+}
 
-// 	return &EdDSA{
-// 		seed:   buffer,
-// 		prefix: prefix,
-// 		Secret: secret,
-// 		Public: public,
-// 	}
-// }
+/// EdDSA is a structure holding the data necessary to make a series of
+/// EdDSA signatures.
+#[derive(Debug)]
+pub struct EdDSA<POINT, SCALAR>
+where
+    POINT: Point<SCALAR>,
+    SCALAR: Scalar,
+{
+    // Secret being already hashed + bit tweaked
+    pub secret: SCALAR,
+    // Public is the corresponding public key
+    pub public: POINT,
 
-// // MarshalBinary will return the representation used by the reference
-// // implementation of SUPERCOP ref10, which is "seed || Public".
-// func (e *EdDSA) MarshalBinary() ([]byte, error) {
-// 	pBuff, err := e.Public.MarshalBinary()
-// 	if err != nil {
-// 		return nil, err
-// 	}
+    pub seed: Vec<u8>,
+    pub prefix: Vec<u8>,
+}
 
-// 	eddsa := make([]byte, 64)
-// 	copy(eddsa, e.seed)
-// 	copy(eddsa[32:], pBuff)
-// 	return eddsa, nil
-// }
+/// NewEdDSA will return a freshly generated key pair to use for generating
+/// EdDSA signatures.
+pub fn new_eddsa<S: crate::cipher::Stream>(stream: &mut S) -> Result<EdDSA<EdPoint, EdScalar>> {
+    let group = new_group();
 
-// // UnmarshalBinary transforms a slice of bytes into a EdDSA signature.
-// func (e *EdDSA) UnmarshalBinary(buff []byte) error {
-// 	if len(buff) != 64 {
-// 		return errors.New("wrong length for decoding EdDSA private")
-// 	}
+    let (secret, buffer, prefix ) = group.new_key_and_seed(stream)?;
+	let public = group.point().mul(&secret, None);
 
-// 	secret, _, prefix := group.NewKeyAndSeedWithInput(buff[:32])
+	Ok(EdDSA::<EdPoint, EdScalar>{
+        seed:   buffer,
+		prefix: prefix,
+		secret: secret,
+		public: public,
+    })
+}
 
-// 	e.seed = buff[:32]
-// 	e.prefix = prefix
-// 	e.Secret = secret
-// 	e.Public = group.Point().Mul(e.Secret, nil)
-// 	return nil
-// }
+impl Default for EdDSA<EdPoint, EdScalar> {
+    fn default() -> Self {
+        EdDSA::<EdPoint, EdScalar>{
+            seed:   vec![],
+            prefix: vec![],
+            secret: EdScalar::default(),
+            public: EdPoint::default(),
+        }
+    }
 
-// // Sign will return a EdDSA signature of the message msg using Ed25519.
-// func (e *EdDSA) Sign(msg []byte) ([]byte, error) {
-// 	hash := sha512.New()
-// 	_, _ = hash.Write(e.prefix)
-// 	_, _ = hash.Write(msg)
+}
 
-// 	// deterministic random secret and its commit
-// 	r := group.Scalar().SetBytes(hash.Sum(nil))
-// 	R := group.Point().Mul(r, nil)
+impl PartialEq for EdDSA<EdPoint, EdScalar> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.seed != other.seed {
+            return false
+        }
+        if self.prefix != other.prefix {
+            return false
+        }
+        if self.secret != other.secret {
+            return false
+        }
+        if self.public != other.public {
+            return false
+        }
+        true
+    }
+}
 
-// 	// challenge
-// 	// H( R || Public || Msg)
-// 	hash.Reset()
-// 	Rbuff, err := R.MarshalBinary()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	Abuff, err := e.Public.MarshalBinary()
-// 	if err != nil {
-// 		return nil, err
-// 	}
+impl EdDSA<EdPoint, EdScalar> {
 
-// 	_, _ = hash.Write(Rbuff)
-// 	_, _ = hash.Write(Abuff)
-// 	_, _ = hash.Write(msg)
+    /// MarshalBinary will return the representation used by the reference
+    /// implementation of SUPERCOP ref10, which is "seed || Public".
+    pub fn marshal_binary(&self) -> Result<[u8; 64]> {
+        let p_buff = self.public.marshal_binary()?;
 
-// 	h := group.Scalar().SetBytes(hash.Sum(nil))
+        let mut eddsa = [0u8;64];
+        eddsa[..32].copy_from_slice(&self.seed);
+        eddsa[32..].copy_from_slice(&p_buff);
+        Ok(eddsa)
+    }
 
-// 	// response
-// 	// s = r + h * s
-// 	s := group.Scalar().Mul(e.Secret, h)
-// 	s.Add(r, s)
+    /// UnmarshalBinary transforms a slice of bytes into a EdDSA signature.
+    pub fn unmarshal_binary(&mut self, buff: &[u8]) -> Result<()> {
+        if buff.len() != 64 {
+            bail!("wrong length for decoding EdDSA private")
+        }
+        let group = new_group();
 
-// 	sBuff, err := s.MarshalBinary()
-// 	if err != nil {
-// 		return nil, err
-// 	}
+    	let (secret, _, prefix) = group.new_key_and_seed_with_input(&buff[..32]);
 
-// 	// return R || s
-// 	var sig [64]byte
-// 	copy(sig[:], Rbuff)
-// 	copy(sig[32:], sBuff)
+    	self.seed = buff[..32].to_vec();
+    	self.prefix = prefix;
+    	self.secret = secret;
+    	self.public = group.point().mul(&self.secret, None);
 
-// 	return sig[:], nil
-// }
+        Ok(())
+    }
+
+    // Sign will return a EdDSA signature of the message msg using Ed25519.
+    pub fn sign(&self, msg: &[u8]) -> Result<[u8;64]> {
+        let group = new_group();
+
+        let mut hash = Sha512::new();
+        hash.update(self.prefix.clone());
+        hash.update(msg.clone());
+
+
+        // deterministic random secret and its commit
+        let r = group.scalar().set_bytes(&hash.finalize_reset());
+        let R = group.point().mul(&r, None);
+
+        // challenge
+        // H( R || Public || Msg)
+        let R_buff = R.marshal_binary()?;
+        let A_buff = self.public.marshal_binary()?;
+
+        hash.update(R_buff.clone());
+        hash.update(A_buff);
+        hash.update(msg);
+
+        let h = group.scalar().set_bytes(&hash.finalize());
+
+        // response
+        // s = r + h * s
+        let s = r + self.secret.clone() * h; 
+
+        let s_buff = s.marshal_binary()?;
+
+        // return R || s
+        let mut sig = [0u8; 64];
+        sig[..32].copy_from_slice(&R_buff);
+        sig[32..].copy_from_slice(&s_buff);
+
+        Ok(sig)
+    }
+    
+}
+
 
 // // VerifyWithChecks uses a public key buffer, a message and a signature.
 // // It will return nil if sig is a valid signature for msg created by

@@ -65,7 +65,12 @@ impl PartialEq for Scalar {
 
 impl BinaryMarshaler for Scalar {
     fn marshal_binary(&self) -> anyhow::Result<Vec<u8>> {
-        self.to_int().marshal_binary()
+        let mut b = self.to_int().marshal_binary()?;
+        for _ in b.len()..32 {
+            b.push(0);
+        }
+
+        Ok(b)
     }
 }
 
