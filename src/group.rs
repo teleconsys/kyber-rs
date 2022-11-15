@@ -77,7 +77,7 @@ where
 /// this is a number modulo the prime P in a DSA-style Schnorr group,
 /// or an (x, y) point on an elliptic curve.
 /// A Point can contain a Diffie-Hellman public key, an ElGamal ciphertext, etc.
-pub trait Point<SCALAR: Scalar>: Marshaling + Clone {
+pub trait Point<SCALAR: Scalar>: Marshaling + Clone + PartialEq {
     /// Equality test for two Points derived from the same Group.
     fn equal(&self, s2: &Self) -> bool;
 

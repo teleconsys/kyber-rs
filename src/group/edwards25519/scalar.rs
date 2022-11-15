@@ -2,6 +2,7 @@ use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
 use crate::group::internal::marshalling;
 use crate::group::{self, integer_field, ScalarCanCheckCanonical};
 use crate::util::random;
+use anyhow::bail;
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 
@@ -98,13 +99,22 @@ impl PartialEq for Scalar {
 
 impl BinaryMarshaler for Scalar {
     fn marshal_binary(&self) -> anyhow::Result<Vec<u8>> {
-        self.to_int().marshal_binary()
+        let mut b = self.to_int().marshal_binary()?;
+        for _ in b.len()..32 {
+            b.push(0);
+        }
+
+        Ok(b)
     }
 }
 
 impl BinaryUnmarshaler for Scalar {
-    fn unmarshal_binary(&mut self, _data: &[u8]) -> anyhow::Result<()> {
-        todo!()
+    fn unmarshal_binary(&mut self, data: &[u8]) -> anyhow::Result<()> {
+        if data.len() != 32 {
+            bail!("wrong size buffer")
+        }
+        self.v.copy_from_slice(data);
+        Ok(())
     }
 }
 

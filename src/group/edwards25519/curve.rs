@@ -1,7 +1,9 @@
-use crate::group::edwards25519::scalar::Scalar;
 use crate::group::Group;
+use crate::{group::edwards25519::scalar::Scalar, util::random};
+use anyhow::Result;
 
 use super::Point;
+use sha2::{Digest, Sha512};
 
 /// Curve represents the Ed25519 group.
 /// There are no parameters and no initialization is required
@@ -29,52 +31,57 @@ impl Group<Scalar, Point> for Curve {
     }
 }
 
-// // ScalarLen returns 32, the size in bytes of an encoded scalar
-// // for the Ed25519 curve.
-// func (c *Curve) ScalarLen() int {
-// return 32
-// }
-//
-// // PointLen returns 32, the size in bytes of an encoded Point on the Ed25519 curve.
-// func (c *Curve) PointLen() int {
-// return 32
-// }
-//
-// // Point creates a new Point on the Ed25519 curve.
-// func (c *Curve) Point() kyber.Point {
-// P := new(point)
-// return P
-// }
-//
-// // NewKeyAndSeedWithInput returns a formatted Ed25519 key (avoid subgroup attack by
-// // requiring it to be a multiple of 8). It also returns the input and the digest used
-// // to generate the key.
-// func (c *Curve) NewKeyAndSeedWithInput(buffer []byte) (kyber.scalar, []byte, []byte) {
-// digest := sha512.Sum512(buffer[:])
-// digest[0] &= 0xf8
-// digest[31] &= 0x7f
-// digest[31] |= 0x40
-//
-// secret := c.scalar().(*scalar)
-// copy(secret.v[:], digest[:])
-// return secret, buffer, digest[32:]
-// }
-//
-// // NewKeyAndSeed returns a formatted Ed25519 key (avoid subgroup attack by requiring
-// // it to be a multiple of 8). It also returns the seed and the input used to generate
-// // the key.
-// func (c *Curve) NewKeyAndSeed(stream cipher.Stream) (kyber.scalar, []byte, []byte) {
-// var buffer [32]byte
-// random.Bytes(buffer[:], stream)
-// return c.NewKeyAndSeedWithInput(buffer[:])
-// }
-//
-// // NewKey returns a formatted Ed25519 key (avoiding subgroup attack by requiring
-// // it to be a multiple of 8). NewKey implements the kyber/util/key.Generator interface.
-// func (c *Curve) NewKey(stream cipher.Stream) kyber.scalar {
-// secret, _, _ := c.NewKeyAndSeed(stream)
-// return secret
-// }
+impl Curve {
+    /// ScalarLen returns 32, the size in bytes of an encoded scalar
+    /// for the Ed25519 curve.
+    fn scalar_len() -> usize {
+        return 32;
+    }
+
+    // PointLen returns 32, the size in bytes of an encoded Point on the Ed25519 curve.
+    fn point_len() -> usize {
+        return 32;
+    }
+
+    /// NewKeyAndSeedWithInput returns a formatted Ed25519 key (avoid subgroup attack by
+    /// requiring it to be a multiple of 8). It also returns the input and the digest used
+    /// to generate the key.
+    pub fn new_key_and_seed_with_input(self, buffer: &[u8]) -> (Scalar, &[u8], Vec<u8>) {
+        let mut hasher = Sha512::new();
+        hasher.update(buffer);
+
+        let mut digest = hasher.finalize();
+        digest[0] &= 0xf8;
+        digest[31] &= 0x7f;
+        digest[31] |= 0x40;
+
+        let mut secret = self.scalar();
+        secret.v.copy_from_slice(&digest[0..32]);
+
+        return (secret, buffer, digest.to_vec()[32..].to_vec());
+    }
+
+    /// NewKeyAndSeed returns a formatted Ed25519 key (avoid subgroup attack by requiring
+    /// it to be a multiple of 8). It also returns the seed and the input used to generate
+    /// the key.
+    pub fn new_key_and_seed<S: crate::cipher::Stream>(
+        self,
+        stream: &mut S,
+    ) -> Result<(Scalar, Vec<u8>, Vec<u8>)> {
+        let mut buffer = vec![0u8; 32];
+        random::bytes(&mut buffer, stream)?;
+        let (sc, buff, digest) = self.new_key_and_seed_with_input(&buffer);
+
+        Ok((sc, buff.to_vec(), digest))
+    }
+
+    /// NewKey returns a formatted Ed25519 key (avoiding subgroup attack by requiring
+    /// it to be a multiple of 8). NewKey implements the kyber/util/key.Generator interface.
+    pub fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> Result<Scalar> {
+        let (secret, _, _) = self.new_key_and_seed(stream)?;
+        Ok(secret)
+    }
+}
 
 impl Default for Curve {
     fn default() -> Self {

@@ -1,6 +1,6 @@
 /// bits chooses a uniform random BigInt with a given maximum BitLen.
 /// If 'exact' is true, choose a BigInt with _exactly_ that BitLen, not less
-fn bits(bitlen: u64, exact: bool, rand: &mut impl Stream) -> Vec<u8> {
+pub fn bits(bitlen: u64, exact: bool, rand: &mut impl Stream) -> Vec<u8> {
     // let mut b: Vec<u8> = Vec::with_capacity(((bitlen + 7) / 8) as usize);
     let mut b: Vec<u8> = vec![0; ((bitlen + 7) / 8) as usize];
     let b_clone = b.clone();
@@ -44,10 +44,12 @@ pub fn random_int(modulus: &BigInt, rand: &mut impl Stream) -> BigInt {
     }
 }
 
-// // Bytes fills a slice with random bytes from rand.
-// func Bytes(b []byte, rand cipher.Stream) {
-// 	rand.XORKeyStream(b, b)
-// }
+// Bytes fills a slice with random bytes from rand.
+pub fn bytes(b: &mut [u8], rand: &mut impl Stream) -> Result<()>{
+    let src_buff = vec![0u8; b.len()];
+	rand.xor_key_stream(b, &src_buff)?;
+    Ok(())
+}
 
 pub struct Randstream {
     readers: Vec<Box<dyn Read>>,

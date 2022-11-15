@@ -17,7 +17,7 @@ use super::{
     Scalar,
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Point {
     ge: ExtendedGroupElement,
     varTime: bool,
@@ -55,6 +55,22 @@ impl Marshaling for Point {
 
     fn marshal_size(&self) -> usize {
         32
+    }
+}
+
+impl PartialEq for Point {
+    /// Equality test for two Points on the same curve
+    fn eq(&self, other: &Self) -> bool {
+        let (mut b1, mut b2) = ([0u8;32],[0u8;32]);
+        self.ge.ToBytes(&mut b1);
+        other.ge.ToBytes(&mut b2);
+
+        for i in 0..b1.len() {
+            if b1[i] != b2[i] {
+                return false
+            }
+        }
+        true
     }
 }
 
@@ -269,11 +285,11 @@ impl PointCanCheckCanonicalAndSmallOrder<Scalar, Point> for Point {
 }
 
 impl Point {
-    // func (P *point) String() string {
-    // 	var b [32]byte
-    // 	P.ge.ToBytes(&b)
-    // 	return hex.EncodeToString(b[:])
-    // }
+    pub fn string(&self) -> String {
+    	let mut b = [0u8;32];
+    	self.ge.ToBytes(&mut b);
+    	return hex::encode(b)
+    }
 
     // func (P *point) MarshalBinary() ([]byte, error) {
     // 	var b [32]byte

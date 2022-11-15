@@ -75,7 +75,8 @@ fn test_from_bytes() {
     assert!(el.FromBytes(&arr));
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug
+)]
 pub struct ExtendedGroupElement {
     pub X: FieldElement,
     pub Y: FieldElement,
@@ -470,7 +471,7 @@ fn selectPreComputed(t: &mut PreComputedGroupElement, pos: usize, b: i32) {
 /// Preconditions:
 ///   a[31] <= 127
 pub fn geScalarMultBase(h: &mut ExtendedGroupElement, a: &mut [u8; 32]) {
-    let mut e = [0 as i8; 64];
+    let mut e = [0 as i8; 64];      
 
     for (i, v) in a.iter().enumerate() {
         e[2 * i] = (v & 15) as i8;
@@ -480,7 +481,7 @@ pub fn geScalarMultBase(h: &mut ExtendedGroupElement, a: &mut [u8; 32]) {
     // each e[i] is between 0 and 15 and e[63] is between 0 and 7.
 
     let mut carry = 0 as i8;
-    for i in 0..62 {
+    for i in 0..63 {
         e[i] += carry;
         carry = (e[i] + 8) >> 4;
         e[i] -= carry << 4;
@@ -508,7 +509,7 @@ pub fn geScalarMultBase(h: &mut ExtendedGroupElement, a: &mut [u8; 32]) {
     s.Double(&mut r);
     r.ToExtended(h);
 
-    for i in (0..64).filter(|x| x % 2 != 0) {
+    for i in (0..64).filter(|x| x % 2 == 0) {
         selectPreComputed(&mut t, i / 2, e[i as usize] as i32);
         r.MixedAdd(h, &mut t);
         r.ToExtended(h);

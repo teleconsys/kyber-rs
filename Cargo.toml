@@ -29,6 +29,8 @@ byteorder = "1.4.3"
 impl_ops = "0.1.1"
 aes-gcm = "0.10.1"
 hkdf = "0.12.3"
+flate2 = "1.0.24"
+scanner-rust = "2.0.16"
 
 
 [[bench]]
