@@ -1,5 +1,5 @@
 use crate::group::edwards25519::scalar::Scalar;
-use crate::group::group::Group;
+use crate::group::Group;
 
 use super::Point;
 

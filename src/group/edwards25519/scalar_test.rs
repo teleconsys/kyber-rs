@@ -1,6 +1,6 @@
 use crate::group::edwards25519::scalar::Scalar as EdScalar;
 use crate::group::edwards25519::test_scalars::ONE;
-use crate::group::group::Scalar;
+use crate::group::Scalar;
 use crate::util::random;
 
 use super::test_scalars::SimpleCTScalar;

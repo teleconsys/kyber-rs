@@ -4,11 +4,11 @@ use anyhow::{Error, Result};
 use crate::{
     cipher::Stream,
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling},
-    group::{group, internal::marshalling},
+    group::{self, internal::marshalling, PointCanCheckCanonicalAndSmallOrder},
 };
 
 use super::{
-    constants::{BASEEXT, COFACTOR_SCALAR, NULL_POINT, PRIME_ORDER_SCALAR},
+    constants::{BASEEXT, COFACTOR_SCALAR, NULL_POINT, PRIME_ORDER_SCALAR, WEAK_KEYS},
     ge::{
         geScalarMult, geScalarMultBase, CachedGroupElement, CompletedGroupElement,
         ExtendedGroupElement,
@@ -54,7 +54,7 @@ impl Marshaling for Point {
     }
 
     fn marshal_size(&self) -> usize {
-        todo!()
+        32
     }
 }
 
@@ -205,15 +205,74 @@ impl group::Point<Scalar> for Point {
     }
 }
 
+impl PointCanCheckCanonicalAndSmallOrder<Scalar, Point> for Point {
+    /// HasSmallOrder determines whether the group element has small order
+    ///
+    /// Provides resilience against malicious key substitution attacks (M-S-UEO)
+    /// and message bound security (MSB) even for malicious keys
+    /// See paper https://eprint.iacr.org/2020/823.pdf for definitions and theorems
+    ///
+    /// This is the same code as in
+    /// https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1170
+    fn has_small_order(&self) -> bool {
+        let s = match self.marshal_binary() {
+            Ok(v) => v,
+            Err(_) => return false,
+        };
+
+        let mut c = [0u8; 5];
+
+        for j in 0..31 {
+            for i in 0..5 {
+                c[i] |= s[j] ^ WEAK_KEYS[i][j];
+            }
+        }
+        for i in 0..5 {
+            c[i] |= (s[31] & 0x7f) ^ WEAK_KEYS[i][31];
+        }
+
+        // Constant time verification if one or more of the c's are zero
+        let mut k = 0;
+        for i in 0..5 {
+            k |= (c[i] as u16) - 1;
+        }
+
+        return (k >> 8) & 1 > 0;
+    }
+
+    /// IsCanonical determines whether the group element is canonical
+    ///
+    /// Checks whether group element s is less than p, according to RFC8032§5.1.3.1
+    /// https://tools.ietf.org/html/rfc8032#section-5.1.3
+    ///
+    /// Taken from
+    /// https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1113
+    ///
+    /// The method accepts a buffer instead of calling `MarshalBinary` on the receiver
+    /// because that always returns a value modulo `prime`.
+    fn is_canonical(&self, b: &[u8]) -> bool {
+        if b.len() != 32 {
+            return false;
+        }
+
+        let mut c = (b[31] & 0x7f) ^ 0x7f;
+        for i in 30..0 {
+            c |= b[i] ^ 0xff;
+        }
+
+        // subtraction might underflow
+        c = (((c as u16) - 1) >> 8) as u8;
+        let d = ((0xed - 1 - (b[0] as u16)) >> 8) as u8;
+
+        1 - (c & d & 1) == 1
+    }
+}
+
 impl Point {
     // func (P *point) String() string {
     // 	var b [32]byte
     // 	P.ge.ToBytes(&b)
     // 	return hex.EncodeToString(b[:])
-    // }
-
-    // func (P *point) MarshalSize() int {
-    // 	return 32
     // }
 
     // func (P *point) MarshalBinary() ([]byte, error) {
@@ -345,66 +404,5 @@ impl Point {
     // func (P *point) Neg(A kyber.Point) kyber.Point {
     // 	P.ge.Neg(&A.(*point).ge)
     // 	return P
-    // }
-
-    // // HasSmallOrder determines whether the group element has small order
-    // //
-    // // Provides resilience against malicious key substitution attacks (M-S-UEO)
-    // // and message bound security (MSB) even for malicious keys
-    // // See paper https://eprint.iacr.org/2020/823.pdf for definitions and theorems
-    // //
-    // // This is the same code as in
-    // // https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1170
-    // func (P *point) HasSmallOrder() bool {
-    // 	s, err := P.MarshalBinary()
-    // 	if err != nil {
-    // 		return false
-    // 	}
-
-    // 	var c [5]byte
-
-    // 	for j := 0; j < 31; j++ {
-    // 		for i := 0; i < 5; i++ {
-    // 			c[i] |= s[j] ^ weakKeys[i][j]
-    // 		}
-    // 	}
-    // 	for i := 0; i < 5; i++ {
-    // 		c[i] |= (s[31] & 0x7f) ^ weakKeys[i][31]
-    // 	}
-
-    // 	// Constant time verification if one or more of the c's are zero
-    // 	var k uint16
-    // 	for i := 0; i < 5; i++ {
-    // 		k |= uint16(c[i]) - 1
-    // 	}
-
-    // 	return (k>>8)&1 > 0
-    // }
-
-    // // IsCanonical determines whether the group element is canonical
-    // //
-    // // Checks whether group element s is less than p, according to RFC8032§5.1.3.1
-    // // https://tools.ietf.org/html/rfc8032#section-5.1.3
-    // //
-    // // Taken from
-    // // https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1113
-    // //
-    // // The method accepts a buffer instead of calling `MarshalBinary` on the receiver
-    // // because that always returns a value modulo `prime`.
-    // func (P *point) IsCanonical(s []byte) bool {
-    // 	if len(s) != 32 {
-    // 		return false
-    // 	}
-
-    // 	c := (s[31] & 0x7f) ^ 0x7f
-    // 	for i := 30; i > 0; i-- {
-    // 		c |= s[i] ^ 0xff
-    // 	}
-
-    // 	// subtraction might underflow
-    // 	c = byte((uint16(c) - 1) >> 8)
-    // 	d := byte((0xed - 1 - uint16(s[0])) >> 8)
-
-    // 	return 1-(c&d&1) == 1
     // }
 }

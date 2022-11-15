@@ -3,8 +3,8 @@ use sha2::{Digest, Sha256};
 use crate::cipher::Stream;
 use crate::group::edwards25519::curve::Curve;
 use crate::group::edwards25519::scalar::Scalar;
-use crate::group::group::{Group, Hasher};
 use crate::group::HashFactory;
+use crate::group::{Group, Hasher};
 use crate::util::random;
 use crate::{xof, Random, Suite, XOFFactory};
 

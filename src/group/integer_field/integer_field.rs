@@ -8,7 +8,7 @@ use num_traits::Num;
 
 use crate::cipher::cipher::Stream;
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
-use crate::group::group::Scalar;
+use crate::group::Scalar;
 use serde::{Deserialize, Serialize};
 
 use crate::group::integer_field::integer_field::ByteOrder::{BigEndian, LittleEndian};

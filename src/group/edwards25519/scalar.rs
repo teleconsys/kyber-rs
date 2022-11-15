@@ -1,6 +1,6 @@
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
 use crate::group::internal::marshalling;
-use crate::group::{group, integer_field};
+use crate::group::{self, integer_field, ScalarCanCheckCanonical};
 use crate::util::random;
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
@@ -53,6 +53,39 @@ impl Scalar {
     // marshal_id returns the type tag used in encoding/decoding
     pub fn marshal_id(&self) -> [u8; 8] {
         MARSHAL_SCALAR_ID
+    }
+}
+
+impl ScalarCanCheckCanonical<Scalar> for Scalar {
+    /// IsCanonical whether the scalar in sb is in the range 0<=s<L as required by RFC8032, Section 5.1.7.
+    /// Also provides Strong Unforgeability under Chosen Message Attacks (SUF-CMA)
+    /// See paper https://eprint.iacr.org/2020/823.pdf for definitions and theorems
+    /// See https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L2568
+    /// for a reference.
+    /// The method accepts a buffer instead of calling `MarshalBinary` on the receiver since that
+    /// always returns values modulo `primeOrder`.
+    fn is_canonical(&self, sb: &[u8]) -> bool {
+        if sb.len() != 32 {
+            return false;
+        }
+
+        if sb[31] & 0xf0 == 0 {
+            return true;
+        }
+
+        let (_, mut L) = PRIME_ORDER.to_bytes_be();
+        L.reverse();
+
+        let mut c = 0u8;
+        let mut n = 1u8;
+        for i in 31..=0 {
+            // subtraction might lead to an underflow which needs
+            // to be accounted for in the right shift
+            c |= (((sb[i] as u16) - (L[i] as u16)) >> 8) as u8 & n;
+            n &= (((sb[i] as u16) ^ (L[i] as u16) - 1) >> 8) as u8;
+        }
+
+        c != 0
     }
 }
 
@@ -136,7 +169,7 @@ impl Marshaling for Scalar {
     }
 
     fn marshal_size(&self) -> usize {
-        todo!()
+        32
     }
 }
 

@@ -1,3 +1,7 @@
+pub mod edwards25519;
+pub mod integer_field;
+mod internal;
+
 use anyhow::Result;
 use digest::DynDigest;
 
@@ -53,6 +57,19 @@ pub trait Scalar:
     /// The endianess of the byte-slice is determined by the
     /// implementation.
     fn set_bytes(self, bytes: &[u8]) -> Self;
+}
+
+pub trait ScalarCanCheckCanonical<SCALAR: Scalar> {
+    fn is_canonical(&self, b: &[u8]) -> bool;
+}
+
+pub trait PointCanCheckCanonicalAndSmallOrder<SCALAR, POINT>
+where
+    SCALAR: Scalar,
+    POINT: Point<SCALAR>,
+{
+    fn has_small_order(&self) -> bool;
+    fn is_canonical(&self, b: &[u8]) -> bool;
 }
 
 /// Point represents an element of a public-key cryptographic Group.

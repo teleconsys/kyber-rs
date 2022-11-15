@@ -31,7 +31,7 @@ use core::fmt;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
-use crate::group::HashFactory;
+use crate::group::{HashFactory, PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical};
 use crate::share::poly::{NewPriPoly, PriShare};
 use crate::share::vss::rabin::dh::AEAD;
 use crate::sign::schnorr;
@@ -535,8 +535,8 @@ where
 
 impl<SCALAR, POINT, SUITE> Verifier<SCALAR, POINT, SUITE>
 where
-    SCALAR: Scalar,
-    POINT: Point<SCALAR>,
+    SCALAR: Scalar + ScalarCanCheckCanonical<SCALAR>,
+    POINT: Point<SCALAR> + PointCanCheckCanonicalAndSmallOrder<SCALAR, POINT>,
     SUITE: Suite<SCALAR, POINT>,
 {
     // process_encrypted_deal decrypt the deal received from the Dealer.
