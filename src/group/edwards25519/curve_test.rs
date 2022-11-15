@@ -1,7 +1,7 @@
 
 use num_traits::Pow;
 
-use crate::Random;
+use crate::{Random, util::key::Generator};
 
 use super::{curve::Curve, SuiteEd25519};
 

@@ -24,6 +24,7 @@ pub trait Scalar:
     + ToString
     + Add<Self, Output = Self>
     + Mul<Self, Output = Self>
+    + Default
 {
     //// Set sets the receiver equal to another scalar a.
     fn set(self, a: &Self) -> Self;
@@ -77,7 +78,7 @@ where
 /// this is a number modulo the prime P in a DSA-style Schnorr group,
 /// or an (x, y) point on an elliptic curve.
 /// A Point can contain a Diffie-Hellman public key, an ElGamal ciphertext, etc.
-pub trait Point<SCALAR: Scalar>: Marshaling + Clone + PartialEq {
+pub trait Point<SCALAR: Scalar>: Marshaling + Clone + PartialEq + Default{
     /// Equality test for two Points derived from the same Group.
     fn equal(&self, s2: &Self) -> bool;
 

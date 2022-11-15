@@ -1,10 +1,13 @@
 use sha2::{Digest, Sha256};
+use std::ops::{Deref, DerefMut};
 
 use crate::cipher::Stream;
 use crate::group::edwards25519::curve::Curve;
 use crate::group::edwards25519::scalar::Scalar;
 use crate::group::HashFactory;
 use crate::group::{Group, Hasher};
+use crate::util::key::Generator;
+use crate::util::key::Suite as KeySuite;
 use crate::util::random;
 use crate::{xof, Random, Suite, XOFFactory};
 
@@ -57,6 +60,26 @@ impl SuiteEd25519 {
     // }
 }
 
+impl Deref for SuiteEd25519 {
+    type Target = Curve;
+
+    fn deref(&self) -> &Self::Target {
+        &self.curve
+    }
+}
+
+impl DerefMut for SuiteEd25519 {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.curve
+    }
+}
+
+impl Generator<Scalar> for SuiteEd25519 {
+    fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> anyhow::Result<Scalar> {
+        self.curve.new_key(stream)
+    }
+}
+
 impl Group<Scalar, Point> for SuiteEd25519 {
     fn string(&self) -> String {
         self.curve.string()
@@ -105,3 +128,4 @@ impl HashFactory for SuiteEd25519 {
 }
 
 impl Suite<Scalar, Point> for SuiteEd25519 {}
+impl KeySuite<Scalar, Point> for SuiteEd25519 {}

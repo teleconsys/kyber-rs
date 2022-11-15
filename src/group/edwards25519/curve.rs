@@ -1,3 +1,5 @@
+use crate::util::key::Generator;
+
 use crate::group::Group;
 use crate::{group::edwards25519::scalar::Scalar, util::random};
 use anyhow::Result;
@@ -75,9 +77,13 @@ impl Curve {
         Ok((sc, buff.to_vec(), digest))
     }
 
+    
+}
+
+impl Generator<Scalar> for Curve {
     /// NewKey returns a formatted Ed25519 key (avoiding subgroup attack by requiring
     /// it to be a multiple of 8). NewKey implements the kyber/util/key.Generator interface.
-    pub fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> Result<Scalar> {
+    fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> Result<Scalar> {
         let (secret, _, _) = self.new_key_and_seed(stream)?;
         Ok(secret)
     }
