@@ -61,13 +61,13 @@ impl Marshaling for Point {
 impl PartialEq for Point {
     /// Equality test for two Points on the same curve
     fn eq(&self, other: &Self) -> bool {
-        let (mut b1, mut b2) = ([0u8;32],[0u8;32]);
+        let (mut b1, mut b2) = ([0u8; 32], [0u8; 32]);
         self.ge.ToBytes(&mut b1);
         other.ge.ToBytes(&mut b2);
 
         for i in 0..b1.len() {
             if b1[i] != b2[i] {
-                return false
+                return false;
             }
         }
         true
@@ -286,9 +286,9 @@ impl PointCanCheckCanonicalAndSmallOrder<Scalar, Point> for Point {
 
 impl Point {
     pub fn string(&self) -> String {
-    	let mut b = [0u8;32];
-    	self.ge.ToBytes(&mut b);
-    	return hex::encode(b)
+        let mut b = [0u8; 32];
+        self.ge.ToBytes(&mut b);
+        return hex::encode(b);
     }
 
     // func (P *point) MarshalBinary() ([]byte, error) {

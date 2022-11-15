@@ -1,17 +1,30 @@
-use crate::group::Group;
-use crate::{group::edwards25519::scalar::Scalar, util::random};
+use std::marker::PhantomData;
+
+use crate::group::edwards25519::Point as EdPoint;
+use crate::group::edwards25519::Scalar as EdScalar;
+use crate::util::random;
+use crate::{group::Group, Scalar};
 use anyhow::Result;
 
-use super::Point;
 use sha2::{Digest, Sha512};
 
 /// Curve represents the Ed25519 group.
 /// There are no parameters and no initialization is required
 /// because it supports only this one specific curve.
 #[derive(Clone, Copy)]
-pub struct Curve {}
+pub struct Curve<SCALAR: Scalar> {
+    _phantom: PhantomData<SCALAR>,
+}
 
-impl Group<Scalar, Point> for Curve {
+impl<SCALAR: Scalar> Curve<SCALAR> {
+    pub const fn new() -> Self {
+        Curve {
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl Group<EdScalar, EdPoint> for Curve<EdScalar> {
     /// Return the name of the curve, "Ed25519".
     fn string(&self) -> String {
         "Ed25519".to_string()
@@ -22,16 +35,16 @@ impl Group<Scalar, Point> for Curve {
     /// method, interpreting the bytes as a little-endian integer, in order to remain
     /// compatible with other Ed25519 implementations, and with the standard implementation
     /// of the EdDSA signature.
-    fn scalar(&self) -> Scalar {
-        Scalar::default()
+    fn scalar(&self) -> EdScalar {
+        EdScalar::default()
     }
 
-    fn point(&self) -> Point {
-        Point::default()
+    fn point(&self) -> EdPoint {
+        EdPoint::default()
     }
 }
 
-impl Curve {
+impl Curve<EdScalar> {
     /// ScalarLen returns 32, the size in bytes of an encoded scalar
     /// for the Ed25519 curve.
     fn scalar_len() -> usize {
@@ -46,7 +59,7 @@ impl Curve {
     /// NewKeyAndSeedWithInput returns a formatted Ed25519 key (avoid subgroup attack by
     /// requiring it to be a multiple of 8). It also returns the input and the digest used
     /// to generate the key.
-    pub fn new_key_and_seed_with_input(self, buffer: &[u8]) -> (Scalar, &[u8], Vec<u8>) {
+    pub fn new_key_and_seed_with_input(self, buffer: &[u8]) -> (EdScalar, &[u8], Vec<u8>) {
         let mut hasher = Sha512::new();
         hasher.update(buffer);
 
@@ -67,7 +80,7 @@ impl Curve {
     pub fn new_key_and_seed<S: crate::cipher::Stream>(
         self,
         stream: &mut S,
-    ) -> Result<(Scalar, Vec<u8>, Vec<u8>)> {
+    ) -> Result<(EdScalar, Vec<u8>, Vec<u8>)> {
         let mut buffer = vec![0u8; 32];
         random::bytes(&mut buffer, stream)?;
         let (sc, buff, digest) = self.new_key_and_seed_with_input(&buffer);
@@ -77,20 +90,19 @@ impl Curve {
 
     /// NewKey returns a formatted Ed25519 key (avoiding subgroup attack by requiring
     /// it to be a multiple of 8). NewKey implements the kyber/util/key.Generator interface.
-    pub fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> Result<Scalar> {
+    pub fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> Result<EdScalar> {
         let (secret, _, _) = self.new_key_and_seed(stream)?;
         Ok(secret)
     }
 }
 
-impl Default for Curve {
+impl<SCALAR> Default for Curve<SCALAR>
+where
+    SCALAR: Scalar,
+{
     fn default() -> Self {
-        Curve {}
+        Curve {
+            _phantom: PhantomData,
+        }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn a() {}
 }

@@ -60,7 +60,7 @@ impl Marshaling for SimpleCTScalar {
 }
 
 impl BinaryMarshaler for SimpleCTScalar {
-    fn marshal_binary(&self) -> anyhow::Result<Vec<u8>> {
+    fn marshal_binary(&self) -> Result<Vec<u8>> {
         encoding::marshal_binary(self)
     }
 }

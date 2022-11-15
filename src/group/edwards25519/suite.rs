@@ -1,3 +1,5 @@
+use std::ops::DerefMut;
+
 use sha2::{Digest, Sha256};
 
 use crate::cipher::Stream;
@@ -16,7 +18,7 @@ use super::Point;
 pub struct SuiteEd25519 {
     // Curve
     // r: Box<dyn Stream>,
-    curve: Curve,
+    curve: Curve<Scalar>,
 }
 
 impl SuiteEd25519 {
@@ -55,6 +57,22 @@ impl SuiteEd25519 {
     // suite.r = r
     // return suite
     // }
+}
+
+use core::ops::Deref;
+
+impl Deref for SuiteEd25519 {
+    type Target = Curve<Scalar>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.curve
+    }
+}
+
+impl DerefMut for SuiteEd25519 {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.curve
+    }
 }
 
 impl Group<Scalar, Point> for SuiteEd25519 {

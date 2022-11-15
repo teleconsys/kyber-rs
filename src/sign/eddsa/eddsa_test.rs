@@ -1,4 +1,3 @@
-use flate2::read;
 use std::{fs::File, str::Split};
 
 use crate::{
@@ -12,7 +11,7 @@ use crate::{
 use anyhow::Result;
 use scanner_rust::Scanner;
 
-use super::{new_eddsa, verify};
+use super::verify;
 
 struct EdDSATestVector<'a> {
     private: &'a str,
@@ -58,12 +57,12 @@ fn test_eddsa_marshalling() {
         let seed = hex::decode(vec.private).unwrap();
 
         let mut stream = constant_stream(seed);
-        let eddsa = new_eddsa(&mut stream).unwrap();
+        let eddsa = EdDSA::new(&mut stream).unwrap();
 
         assert_eq!(eddsa.public.string(), vec.public);
 
         let marshalled = eddsa.marshal_binary().unwrap();
-        assert_ne!([0u8; 64], marshalled);
+        assert_ne!([0u8; 64].to_vec(), marshalled);
 
         let mut unmarshalled = EdDSA::default();
         unmarshalled.unmarshal_binary(&marshalled).unwrap();
@@ -84,7 +83,7 @@ fn test_eddsa_signing() {
 
         let mut stream = ConstantStream { seed };
 
-        let ed = new_eddsa(&mut stream).unwrap();
+        let ed = EdDSA::new(&mut stream).unwrap();
 
         let data = ed.public.marshal_binary().unwrap();
         if hex::encode(data) != vec.public {
@@ -124,7 +123,7 @@ fn test_eddsa_verify_malleability() {
 
     let suite = SuiteEd25519::new_blake_sha256ed25519();
     let mut random_stream = suite.random_stream();
-    let ed = new_eddsa(&mut random_stream).unwrap();
+    let ed = EdDSA::new(&mut random_stream).unwrap();
 
     let msg = random::bits(256, true, &mut random_stream);
 
@@ -179,7 +178,7 @@ fn test_eddsa_verify_non_canonical_r() {
 
     let suite = SuiteEd25519::new_blake_sha256ed25519();
     let mut random_stream = suite.random_stream();
-    let ed = new_eddsa(&mut random_stream).unwrap();
+    let ed = EdDSA::new(&mut random_stream).unwrap();
 
     let msg = random::bits(256, true, &mut random_stream);
 
@@ -207,7 +206,7 @@ fn eddsa_verify_non_canonical_pk() {
 
     let suite = SuiteEd25519::new_blake_sha256ed25519();
     let mut random_stream = suite.random_stream();
-    let ed = new_eddsa(&mut random_stream).unwrap();
+    let ed = EdDSA::new(&mut random_stream).unwrap();
 
     let msg = random::bits(256, true, &mut random_stream);
 
@@ -233,7 +232,7 @@ fn test_eddsa_verify_small_order_r() {
 
     let suite = SuiteEd25519::new_blake_sha256ed25519();
     let mut random_stream = suite.random_stream();
-    let ed = new_eddsa(&mut random_stream).unwrap();
+    let ed = EdDSA::new(&mut random_stream).unwrap();
 
     let msg = random::bits(256, true, &mut random_stream);
 
@@ -261,7 +260,7 @@ fn test_eddsa_verify_small_order_pk() {
 
     let suite = SuiteEd25519::new_blake_sha256ed25519();
     let mut random_stream = suite.random_stream();
-    let mut ed = new_eddsa(&mut random_stream).unwrap();
+    let mut ed = EdDSA::new(&mut random_stream).unwrap();
 
     let msg = random::bits(256, true, &mut random_stream);
 
@@ -276,25 +275,6 @@ fn test_eddsa_verify_small_order_pk() {
     )
 }
 
-/// Test the property of a EdDSA signature
-#[test]
-fn test_eddsa_signing_random() {
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
-
-    for _ in 0..10000 {
-        let ed = new_eddsa(&mut suite.random_stream()).unwrap();
-
-        let mut msg = [0u8; 32];
-        random::bytes(&mut msg, &mut suite.random_stream()).unwrap();
-
-        let sig = ed.sign(&msg).unwrap();
-
-        // see https://tools.ietf.org/html/rfc8032#section-5.1.6 (item 6.)
-        assert_eq!(0u8, sig[63] & 0xe0);
-        verify(&ed.public, &msg, &sig).unwrap();
-    }
-}
-
 pub struct ConstantStream {
     pub seed: Vec<u8>,
 }
@@ -307,80 +287,8 @@ impl cipher::Stream for ConstantStream {
 
 // ConstantStream is a cipher.Stream which always returns
 // the same value.
-fn constant_stream(buff: Vec<u8>) -> Box<dyn cipher::Stream> {
+pub fn constant_stream(buff: Vec<u8>) -> Box<dyn cipher::Stream> {
     return Box::new(ConstantStream {
         seed: buff[..32].to_vec(),
     });
-}
-
-/// Adapted from golang.org/x/crypto/ed25519.
-#[test]
-fn test_golden() {
-    // sign.input.gz is a selection of test cases from
-    // https://ed25519.cr.yp.to/python/sign.input
-    let test_data_z = File::open("src/sign/eddsa/testdata/sign.input.gz").unwrap();
-    let mut gz_decoder = read::GzDecoder::new(test_data_z);
-    let mut scanner = Scanner::new(&mut gz_decoder);
-
-    let mut line_no = 0;
-
-    const SIGNATURE_SIZE: usize = 64;
-    const PUBLIC_KEY_SIZE: usize = 32;
-    const PRIVATE_KEY_SIZE: usize = 32;
-
-    loop {
-        let line = match scanner.next().unwrap() {
-            Some(text) => text,
-            None => break,
-        };
-
-        line_no += 1;
-
-        let parts: Vec<&str> = line.split(":").collect();
-        if parts.len() != 5 {
-            panic!("bad number of parts on line {}", line_no)
-        }
-
-        let priv_bytes = hex::decode(parts[0]).unwrap();
-        let pub_key = hex::decode(parts[1]).unwrap();
-        let msg = hex::decode(parts[2]).unwrap();
-        let mut sig = hex::decode(parts[3]).unwrap();
-        // The signatures in the test vectors also include the message
-        // at the end, but we just want R and S.
-        sig = sig[..SIGNATURE_SIZE].to_vec();
-
-        if pub_key.len() != PUBLIC_KEY_SIZE {
-            panic!(
-                "bad public key length on line {}: got {} bytes",
-                line_no,
-                pub_key.len()
-            );
-        }
-
-        let mut priv_long = [0u8; PRIVATE_KEY_SIZE + PUBLIC_KEY_SIZE];
-        priv_long.copy_from_slice(&priv_bytes);
-        priv_long[32..].copy_from_slice(&pub_key);
-
-        let mut stream = constant_stream(priv_bytes);
-        let ed = new_eddsa(&mut stream).unwrap();
-
-        let data = ed.public.marshal_binary().unwrap();
-        if data != pub_key {
-            panic!(
-                "Public not equal on line {}: {:?} vs {:?}",
-                line_no, pub_key, data
-            )
-        }
-
-        let sig2 = ed.sign(&msg).unwrap();
-
-        if sig != sig2 {
-            panic!(
-                "different signature result on line {}: {:?} vs {:?}",
-                line_no, sig, sig2
-            )
-        }
-
-        verify(&ed.public, &msg, &sig2).unwrap();
-    }
 }

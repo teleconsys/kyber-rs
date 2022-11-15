@@ -20,9 +20,9 @@ const MARSHAL_SCALAR_ID: [u8; 8] = [
     'e' as u8, 'd' as u8, '.' as u8, 's' as u8, 'c' as u8, 'a' as u8, 'l' as u8, 'a' as u8,
 ];
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Scalar {
-    pub(crate) v: [u8; 32],
+    pub v: [u8; 32],
 }
 
 impl Default for Scalar {
@@ -38,7 +38,7 @@ impl Scalar {
 
     // string returns the string representation of this scalar (fixed length of 32 bytes, little endian).
     pub fn string(&self) -> String {
-        let mut b = self.to_int().marshal_binary().unwrap();
+        let mut b = self.to_int().marshal_binary().unwrap().to_vec();
         for _ in b.len()..32 {
             b.push(0);
         }

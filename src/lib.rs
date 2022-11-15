@@ -6,8 +6,8 @@ pub mod encoding;
 pub mod group;
 pub mod random;
 mod share;
-mod sign;
-mod util;
+pub mod sign;
+pub mod util;
 mod xof;
 
 extern crate core;
