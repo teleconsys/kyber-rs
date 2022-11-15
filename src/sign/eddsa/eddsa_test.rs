@@ -294,9 +294,7 @@ fn test_golden() {
 
 		line_no += 1;
 
-		let split: Split<&str> = line.split(":");
-		let parts: Vec<&str> = split.collect();
-
+		let parts: Vec<&str> = line.split(":").collect();
 		if parts.len() != 5 {
 			panic!("bad number of parts on line {}", line_no)
 		}
@@ -313,9 +311,9 @@ fn test_golden() {
 			panic!("bad public key length on line {}: got {} bytes", line_no, pub_key.len());
 		}
 
-		let mut private = [0u8; PRIVATE_KEY_SIZE*2];
-		private.copy_from_slice(&priv_bytes);
-		private[32..].copy_from_slice(&pub_key);
+		let mut priv_long = [0u8; PRIVATE_KEY_SIZE+PUBLIC_KEY_SIZE];
+		priv_long.copy_from_slice(&priv_bytes);
+		priv_long[32..].copy_from_slice(&pub_key);
 
 		let mut stream = constant_stream(priv_bytes);
 		let ed = new_eddsa(&mut stream).unwrap();
