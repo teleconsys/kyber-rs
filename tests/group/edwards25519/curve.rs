@@ -1,5 +1,6 @@
 use kyber_rs::{
     group::edwards25519::{Curve, SuiteEd25519},
+    util::key::Generator,
     Random,
 };
 

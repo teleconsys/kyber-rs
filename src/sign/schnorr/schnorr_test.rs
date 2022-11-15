@@ -1,56 +1,53 @@
-// func TestSchnorrSignature(t *testing.T) {
-// 	msg := []byte("Hello Schnorr")
-// 	suite := edwards25519.NewBlakeSHA256Ed25519()
-// 	kp := key.NewKeyPair(suite)
+use crate::{group::edwards25519::SuiteEd25519, util::key, sign::eddsa};
 
-// 	s, err := Sign(suite, kp.Private, msg)
-// 	if err != nil {
-// 		t.Fatalf("Couldn't sign msg: %s: %v", msg, err)
-// 	}
-// 	err = Verify(suite, kp.Public, msg, s)
-// 	if err != nil {
-// 		t.Fatalf("Couldn't verify signature: \n%+v\nfor msg:'%s'. Error:\n%v", s, msg, err)
-// 	}
+use super::{Sign, Verify};
 
-// 	// wrong size
-// 	larger := append(s, []byte{0x01, 0x02}...)
-// 	assert.Error(t, Verify(suite, kp.Public, msg, larger))
+#[test]
+fn test_schnorr_signature() {
+	let msg = "Hello Schnorr".as_bytes();
+	let suite = SuiteEd25519::new_blake_sha256ed25519();
+	let kp = key::new_key_pair(suite).unwrap();
 
-// 	// wrong challenge
-// 	wrongEncoding := []byte{243, 45, 180, 140, 73, 23, 41, 212, 250, 87, 157, 243,
-// 		242, 19, 114, 161, 145, 47, 76, 26, 174, 150, 22, 177, 78, 79, 122, 30, 74,
-// 		42, 156, 203}
-// 	wrChall := make([]byte, len(s))
-// 	copy(wrChall[:32], wrongEncoding)
-// 	copy(wrChall[32:], s[32:])
-// 	assert.Error(t, Verify(suite, kp.Public, msg, wrChall))
+	let s = Sign(suite, kp.private, msg).unwrap();
 
-// 	// wrong response
-// 	wrResp := make([]byte, len(s))
-// 	copy(wrResp[32:], wrongEncoding)
-// 	copy(wrResp[:32], s[:32])
-// 	assert.Error(t, Verify(suite, kp.Public, msg, wrResp))
+	Verify(suite, kp.public, msg, &s).unwrap();
 
-// 	// wrong public key
-// 	wrKp := key.NewKeyPair(suite)
-// 	assert.Error(t, Verify(suite, wrKp.Public, msg, s))
-// }
+	// wrong size
+	let mut larger = s.clone();
+	let mut piece: Vec<u8> = vec![0x01,0x02];
+	larger.append(&mut piece);
+	Verify(suite, kp.public, msg, &larger).unwrap_err();
 
-// func TestEdDSACompatibility(t *testing.T) {
-// 	msg := []byte("Hello Schnorr")
-// 	suite := edwards25519.NewBlakeSHA256Ed25519()
-// 	kp := key.NewKeyPair(suite)
+	// wrong challenge
+	let wrong_encoding: Vec<u8> = vec![243, 45, 180, 140, 73, 23, 41, 212, 250, 87, 157, 243,
+		242, 19, 114, 161, 145, 47, 76, 26, 174, 150, 22, 177, 78, 79, 122, 30, 74,
+		42, 156, 203];
+	let mut wr_chall = [0u8; 64];
+	wr_chall[..32].copy_from_slice(&wrong_encoding);
+	wr_chall[32..].copy_from_slice(&s[32..]);
+	Verify(suite, kp.public, msg, &wr_chall).unwrap_err();
 
-// 	s, err := Sign(suite, kp.Private, msg)
-// 	if err != nil {
-// 		t.Fatalf("Couldn't sign msg: %s: %v", msg, err)
-// 	}
-// 	err = eddsa.Verify(kp.Public, msg, s)
-// 	if err != nil {
-// 		t.Fatalf("Couldn't verify signature: \n%+v\nfor msg:'%s'. Error:\n%v", s, msg, err)
-// 	}
+	// wrong response
+	let mut wr_resp = [0u8; 64];
+	wr_resp[32..].copy_from_slice(&wrong_encoding);
+	wr_resp[..32].copy_from_slice(&s[..32]);
+	Verify(suite, kp.public, msg, &wr_resp).unwrap_err();
 
-// }
+	// wrong public key
+	let wr_pk = key::new_key_pair(suite).unwrap();
+	Verify(suite, wr_pk.public, msg, &s).unwrap_err();
+}
+
+#[test]
+fn test_eddsa_compatibility() {
+	let msg = "Hello Schnorr".as_bytes();
+	let suite = SuiteEd25519::new_blake_sha256ed25519();
+	let kp = key::new_key_pair(suite).unwrap();
+
+	let s = Sign(suite, kp.private, msg).unwrap();
+
+	eddsa::verify(&kp.public, msg, &s).unwrap();
+}
 
 // // Simple random stream using the random instance provided by the testing tool
 // type quickstream struct {
@@ -83,31 +80,28 @@
 // 	}
 // }
 
-// func TestSchnorrMalleability(t *testing.T) {
-// 	/* l = 2^252+27742317777372353535851937790883648493, prime order of the base point */
-// 	var L []uint16 = []uint16{0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7,
-// 		0xa2, 0xde, 0xf9, 0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-// 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10}
-// 	var c uint16 = 0
+#[test]
+fn test_schnorr_malleability() {
+	/* l = 2^252+27742317777372353535851937790883648493, prime order of the base point */
+	let l: [u16;32] = [0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7,
+		0xa2, 0xde, 0xf9, 0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10];
+	let mut c = 0u16;
 
-// 	msg := []byte("Hello Schnorr")
-// 	suite := edwards25519.NewBlakeSHA256Ed25519()
-// 	kp := key.NewKeyPair(suite)
+	let msg = "Hello Schnorr".as_bytes();
+	let suite = SuiteEd25519::new_blake_sha256ed25519();
+	let kp = key::new_key_pair(suite).unwrap();
 
-// 	s, err := Sign(suite, kp.Private, msg)
-// 	assert.NoErrorf(t, err, "Couldn't sign msg: %s: %v", msg, err)
+	let mut s = Sign(suite, kp.private, msg).unwrap();
 
-// 	err = Verify(suite, kp.Public, msg, s)
-// 	assert.NoErrorf(t, err, "Couldn't verify signature (schnorr.Verify): \n%+v\nfor msg:'%s'. Error:\n%v", s, msg, err)
+	Verify(suite, kp.public, msg, &s).unwrap();
 
-// 	// Add l to signature
-// 	for i := 0; i < 32; i++ {
-// 		c += uint16(s[32+i]) + L[i]
-// 		s[32+i] = byte(c)
-// 		c >>= 8
-// 	}
-// 	assert.Error(t, eddsa.Verify(kp.Public, msg, s))
-
-// 	err = Verify(suite, kp.Public, msg, s)
-// 	assert.Error(t, err, "schnorr signature malleable")
-// }
+	// Add l to signature
+	for i in 0..32 {
+		c +=  (s[32+i] as u16) + l[i];
+		s[32+i] = c as u8;
+		c >>= 8
+	}
+	eddsa::verify(&kp.public, msg, &s).unwrap_err();
+	Verify(suite, kp.public, msg, &s).unwrap_err();
+}

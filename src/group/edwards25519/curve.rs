@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use crate::group::edwards25519::Point as EdPoint;
 use crate::group::edwards25519::Scalar as EdScalar;
+use crate::util::key::Generator;
 use crate::util::random;
 use crate::{group::Group, Scalar};
 use anyhow::Result;
@@ -87,10 +88,12 @@ impl Curve<EdScalar> {
 
         Ok((sc, buff.to_vec(), digest))
     }
+}
 
+impl Generator<EdScalar> for Curve<EdScalar> {
     /// NewKey returns a formatted Ed25519 key (avoiding subgroup attack by requiring
     /// it to be a multiple of 8). NewKey implements the kyber/util/key.Generator interface.
-    pub fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> Result<EdScalar> {
+    fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> Result<EdScalar> {
         let (secret, _, _) = self.new_key_and_seed(stream)?;
         Ok(secret)
     }
