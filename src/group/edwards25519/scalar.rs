@@ -79,7 +79,7 @@ impl ScalarCanCheckCanonical<Scalar> for Scalar {
 
         let mut c = 0u8;
         let mut n = 1u8;
-        for i in 31..=0 {
+        for i in (0..=31).rev() {
             // subtraction might lead to an underflow which needs
             // to be accounted for in the right shift
             c |= (((sb[i] as u16) - (L[i] as u16)) >> 8) as u8 & n;
