@@ -31,6 +31,7 @@ use core::fmt;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
+use crate::encoding::{self, BinaryMarshaler};
 use crate::group::{HashFactory, PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical};
 use crate::share::poly::{NewPriPoly, PriShare};
 use crate::share::vss::rabin::dh::AEAD;
@@ -42,9 +43,10 @@ use anyhow::__private::kind::TraitKind;
 use anyhow::{bail, Error, Ok, Result};
 use byteorder::{LittleEndian, WriteBytesExt};
 use digest::DynDigest;
+use serde::Serialize;
 use std::ops::{Deref, DerefMut};
 
-use super::dh::{context, dhExchange};
+use super::dh::{context, dhExchange, AES_NONCE_LENGTH};
 
 /// Suite defines the capabilities required by the vss package.
 pub trait Suite<SCALAR, POINT>:
@@ -66,11 +68,11 @@ where
     suite: SUITE,
     // reader: STREAM,
     // long is the longterm key of the Dealer
-    long: SCALAR,
-    pubb: POINT,
+    pub(crate) long: SCALAR,
+    pub(crate) pubb: POINT,
     pub secret: SCALAR,
     secret_commits: Vec<POINT>,
-    verifiers: Vec<POINT>,
+    pub(crate) verifiers: Vec<POINT>,
     hkdf_context: Vec<u8>,
     // threshold of shares that is needed to reconstruct the secret
     t: usize,
@@ -106,6 +108,7 @@ where
 }
 
 /// Deal encapsulates the verifiable secret share and is sent by the dealer to a verifier.
+#[derive(Serialize)]
 pub struct Deal<SCALAR, POINT, SUITE>
 where
     SCALAR: Scalar,
@@ -139,6 +142,17 @@ where
         // constructors[reflect.TypeOf(&secret).Elem()] = func() interface{} { return s.Scalar() }
         // return protobuf.DecodeWithConstructors(buff, d, constructors)
         todo!()
+    }
+}
+
+impl<SCALAR, POINT, SUITE> BinaryMarshaler for Deal<SCALAR, POINT, SUITE>
+where
+    SCALAR: Scalar + Serialize,
+    POINT: Point<SCALAR> + Serialize,
+    SUITE: Suite<SCALAR, POINT>,
+{
+    fn marshal_binary(&self) -> Result<Vec<u8>> {
+        encoding::marshal_binary(self)
     }
 }
 
@@ -252,8 +266,6 @@ where
     let g = NewPriPoly(suite, t, None, suite.random_stream());
     let d_pubb = suite.point().mul(&longterm, None);
 
-    let hkdf_context = context(&suite, &d_pubb, &verifiers).to_vec();
-
     // Compute public polynomial coefficients
     let F = f.Commit(suite.point().base());
     let (_, secret_commits) = F.Info();
@@ -273,11 +285,11 @@ where
         &session_id,
     );
     // C = F + G
-    let mut d_deals: Vec<Deal<SCALAR, POINT, SUITE>> = vec![];
+    let mut deals: Vec<Deal<SCALAR, POINT, SUITE>> = vec![];
     for i in 0..verifiers.len() {
         let fi = f.Eval(i);
         let gi = g.Eval(i);
-        d_deals.push(Deal {
+        deals.push(Deal {
             session_id: session_id.clone(),
             sec_share: fi,
             rnd_share: gi,
@@ -286,6 +298,8 @@ where
             _phantom: PhantomData,
         });
     }
+
+    let hkdf_context = context(&suite, &d_pubb, &verifiers).to_vec();
 
     Ok(Dealer {
         suite: suite,
@@ -298,7 +312,7 @@ where
         t,
         session_id,
         aggregator,
-        deals: vec![],
+        deals,
     })
 }
 
@@ -313,8 +327,8 @@ where
 
 impl<SCALAR, SUITE, POINT> Dealer<SCALAR, SUITE, POINT>
 where
-    SCALAR: Scalar,
-    POINT: Point<SCALAR>,
+    SCALAR: Scalar + Serialize,
+    POINT: Point<SCALAR> + Serialize,
     SUITE: Suite<SCALAR, POINT>,
 {
     /// EncryptedDeal returns the encryption of the deal that must be given to the
@@ -328,30 +342,27 @@ where
         let vPub = findPub(&self.verifiers, i)
             .ok_or(Error::msg("dealer: wrong index to generate encrypted deal"))?;
         // gen ephemeral key
-        let dhSecret = self.suite.scalar().pick(&mut self.suite.random_stream());
+        // let dhSecret = self.suite.scalar().pick(&mut self.suite.random_stream());
+        let dhSecret = self.suite.scalar().set_int64(0);
         let dhPublic = self.suite.point().mul(&dhSecret, None);
         // signs the public key
-        let dhPublicBuff = dhPublic.marshal_binary()?;
+        // let dhPublicBuff = dhPublic.marshal_binary()?;
+        let dhPublicBuff = vec![1, 2, 3, 4, 5];
         let signature = schnorr::Sign(self.suite, self.long.clone(), &dhPublicBuff)?;
 
         // AES128-GCM
         let pre = dhExchange(self.suite, dhSecret, vPub);
         let gcm = AEAD::new(pre, &self.hkdf_context)?;
 
-        let nonce = vec![0u8; gcm.nonce_size()];
-        // dealBuff, err := protobuf.Encode(self.deals[i])?
-        // let deal_buf = self.deals[i]
-        let deal_buf = [1, 2, 3];
-        let encrypted = gcm.seal(
-            None,
-            &nonce.clone().try_into().unwrap(),
-            &deal_buf,
-            Some(&self.hkdf_context),
-        )?;
+        let nonce = [0u8; AEAD::nonce_size()];
+        // let dealBuff = protobuf.Encode(self.deals[i])?;
+        // let deal_buf = self.deals[i].marshal_binary()?;
+        let deal_buf = vec![1, 2, 3, 4, 5];
+        let encrypted = gcm.seal(None, &nonce, &deal_buf, Some(&self.hkdf_context))?;
         return Ok(EncryptedDeal {
             dhkey: dhPublic,
             signature,
-            nonce: nonce.try_into().unwrap(),
+            nonce: nonce.to_vec(),
             cipher: encrypted,
             _phantom: PhantomData,
         });
@@ -603,12 +614,7 @@ where
     fn decryptDeal(&self, e: &EncryptedDeal<POINT, SCALAR>) -> Result<Deal<SCALAR, POINT, SUITE>> {
         let ephBuff = e.dhkey.marshal_binary()?;
         // verify signature
-        schnorr::Verify(
-            self.suite,
-            self.dealer.clone(),
-            ephBuff.as_slice(),
-            &e.signature,
-        )?;
+        schnorr::Verify(self.suite, &self.dealer, ephBuff.as_slice(), &e.signature)?;
 
         // compute shared key and AES526-GCM cipher
         let pre = dhExchange(self.suite, self.longterm.clone(), e.dhkey.clone());

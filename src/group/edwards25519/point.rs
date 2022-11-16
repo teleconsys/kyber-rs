@@ -1,5 +1,6 @@
 // var marshalPointID = [8]byte{'e', 'd', '.', 'p', 'o', 'i', 'n', 't'}
 use anyhow::{Error, Result};
+use serde::Serialize;
 
 use crate::{
     cipher::Stream,
@@ -17,7 +18,7 @@ use super::{
     Scalar,
 };
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize)]
 pub struct Point {
     ge: ExtendedGroupElement,
     varTime: bool,

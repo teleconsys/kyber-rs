@@ -10,12 +10,14 @@
 
 use anyhow::bail;
 use anyhow::Result;
+use serde::Serialize;
 
 // Some error definitions
 const ERROR_GROUPS: &str = "non-matching groups";
 const ERROR_COEFFS: &str = "different number of coefficients";
 
 /// PriShare represents a private share.
+#[derive(Serialize)]
 pub struct PriShare<SCALAR>
 where
     SCALAR: Scalar,

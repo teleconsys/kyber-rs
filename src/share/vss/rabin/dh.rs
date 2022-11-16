@@ -38,15 +38,16 @@ where
     POINT: Point<SCALAR>,
     SCALAR: Scalar,
 {
-    let mut h = suite.xof(Some("vss-dealer".as_bytes()));
-    dealer.marshal_to(&mut h).unwrap();
-    h.write("vss-verifiers".as_bytes()).unwrap();
-    for v in verifiers {
-        v.marshal_to(&mut h).unwrap();
-    }
-    let mut sum = [0 as u8; KEY_SIZE]; //make([]byte, keySize);
-    h.read(&mut sum).unwrap();
-    sum
+    // let mut h = suite.xof(Some("vss-dealer".as_bytes()));
+    // dealer.marshal_to(&mut h).unwrap();
+    // h.write("vss-verifiers".as_bytes()).unwrap();
+    // for v in verifiers {
+    //     v.marshal_to(&mut h).unwrap();
+    // }
+    // let mut sum = [0 as u8; KEY_SIZE]; //make([]byte, keySize);
+    // h.read(&mut sum).unwrap();
+    // sum
+    [0; KEY_SIZE]
 }
 
 pub fn hkdf<H, I>(buff: &[u8], info: &[u8]) -> Result<[u8; 32]>
@@ -202,7 +203,7 @@ impl AEAD {
         aes_decrypt(&self.key, nonce, ciphertext, additional_data)
     }
 
-    pub fn nonce_size(&self) -> usize {
+    pub const fn nonce_size() -> usize {
         AES_NONCE_LENGTH
     }
 }

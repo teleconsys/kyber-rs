@@ -664,15 +664,16 @@ fn TestVSSShare() {
 use crate::group::edwards25519::scalar::Scalar as EdScalar;
 use crate::group::edwards25519::Point as EdPoint;
 fn genPair() -> (EdScalar, EdPoint) {
-    let SUITE = suite();
+    let suite = suite();
     // let mut s1 = SUITE.scalar();
     // let mut rs1 = SUITE.RandomStream();
     // let secret = s1.pick(&mut rs1);
     // let mut p1 = SUITE.point();
     // let _public = p1.mul(secret, None);
     // (*secret, p1)
-    let secret = SUITE.scalar().pick(&mut SUITE.random_stream());
-    let public = SUITE.point().mul(&secret, None);
+    // let secret = suite.scalar().pick(&mut suite.random_stream());
+    let secret = suite.scalar().set_int64(0);
+    let public = suite.point().mul(&secret, None);
     (secret, public)
 }
 

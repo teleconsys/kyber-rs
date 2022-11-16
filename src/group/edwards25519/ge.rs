@@ -7,6 +7,8 @@
 //   completedGroupElement: ((X:Z),(Y:T)) satisfying x=X/Z, y=Y/T
 //   preComputedGroupElement: (y+x,y-x,2dxy)
 
+use serde::Serialize;
+
 use super::{
     constants::{BASE, D, D2, SQRT_M1},
     fe::{
@@ -75,8 +77,7 @@ fn test_from_bytes() {
     assert!(el.FromBytes(&arr));
 }
 
-#[derive(Clone, Copy, Debug
-)]
+#[derive(Clone, Copy, Debug, Serialize)]
 pub struct ExtendedGroupElement {
     pub X: FieldElement,
     pub Y: FieldElement,
@@ -471,7 +472,7 @@ fn selectPreComputed(t: &mut PreComputedGroupElement, pos: usize, b: i32) {
 /// Preconditions:
 ///   a[31] <= 127
 pub fn geScalarMultBase(h: &mut ExtendedGroupElement, a: &mut [u8; 32]) {
-    let mut e = [0 as i8; 64];      
+    let mut e = [0 as i8; 64];
 
     for (i, v) in a.iter().enumerate() {
         e[2 * i] = (v & 15) as i8;

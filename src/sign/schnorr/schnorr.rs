@@ -34,7 +34,7 @@ pub fn Sign<SUITE: Suite<SCALAR, POINT>, SCALAR: Scalar, POINT: Point<SCALAR>>(
 ) -> Result<Vec<u8>> {
     // var g kyber.Group = s
     // create random secret k and public point commitment R
-    let k = s.scalar().pick(&mut s.random_stream());
+    let k = s.scalar().set_int64(0);
     let R = s.point().mul(&k, None);
 
     // create hash(public || R || message)
@@ -120,7 +120,7 @@ where
 
 /// Verify verifies a given Schnorr signature. It returns nil iff the
 /// given signature is valid.
-pub fn Verify<SCALAR, POINT, GROUP>(g: GROUP, public: POINT, msg: &[u8], sig: &[u8]) -> Result<()>
+pub fn Verify<SCALAR, POINT, GROUP>(g: GROUP, public: &POINT, msg: &[u8], sig: &[u8]) -> Result<()>
 where
     SCALAR: Scalar + ScalarCanCheckCanonical<SCALAR>,
     POINT: Point<SCALAR> + PointCanCheckCanonicalAndSmallOrder<SCALAR, POINT>,
