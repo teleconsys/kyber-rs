@@ -272,7 +272,7 @@ impl PointCanCheckCanonicalAndSmallOrder<Scalar, Point> for Point {
         }
 
         let mut c = (b[31] & 0x7f) ^ 0x7f;
-        for i in 30..0 {
+        for i in (1..=30).into_iter().rev() {
             c |= b[i] ^ 0xff;
         }
 

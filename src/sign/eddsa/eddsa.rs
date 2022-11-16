@@ -6,6 +6,7 @@ use blake2::Digest;
 use sha2::Sha512;
 
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
+use crate::group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical};
 use crate::group::edwards25519::constants::{PRIME_ORDER, WEAK_KEYS};
 use crate::group::edwards25519::{Curve, Point as EdPoint, Scalar as EdScalar};
 use crate::{Group, Point, Scalar};
@@ -173,12 +174,12 @@ pub fn verify_with_checks(public_key: &[u8], msg: &[u8], sig: &[u8]) -> Result<(
     // 	return fmt.Errorf("got R invalid point: %s", err)
     // }
 
-    if r.has_small_order()? {
+    if r.has_small_order() {
         bail!("R has small order")
     }
 
     let mut s = group.scalar();
-    s.unmarshal_binary(&sig[32..])?;
+    s.unmarshal_binary(&sig[32..]);
     // if err := s.UnmarshalBinary(sig[32:]); err != nil {
     // 	return fmt.Errorf("schnorr: s invalid scalar %s", err)
     // }
@@ -191,7 +192,7 @@ pub fn verify_with_checks(public_key: &[u8], msg: &[u8], sig: &[u8]) -> Result<(
     // if err := public.UnmarshalBinary(public_key); err != nil {
     // 	return fmt.Errorf("invalid public key: %s", err)
     // }
-    if public.has_small_order()? {
+    if public.has_small_order() {
         bail!("public key has small order")
     }
 
@@ -223,76 +224,6 @@ pub fn verify(public: &EdPoint, msg: &[u8], sig: &[u8]) -> Result<()> {
     return verify_with_checks(&p_buf, msg, sig);
 }
 
-impl EdScalar {
-    pub fn is_canonical(&self, sb: &[u8]) -> bool {
-        if sb.len() != 32 {
-            return false;
-        }
 
-        if sb[31] & 0xf0 == 0 {
-            return true;
-        }
 
-        let (_, mut l) = PRIME_ORDER.to_bytes_be();
-        let mut j = 31;
-        let mut i = 0;
-        while i < j {
-            (l[i], l[j]) = (l[j], l[i]);
-            (i, j) = (i + 1, j - 1);
-        }
 
-        let mut c = 0u8;
-        let mut n = 1u8;
-
-        for i in (0..32).into_iter().rev() {
-            // subtraction might lead to an underflow which needs
-            // to be accounted for in the right shift
-            c |= (((sb[i] as u16) - (l[i] as u16)) >> 8) as u8 & n;
-            n &= (((sb[i] as u16) ^ (l[i] as u16) - 1) >> 8) as u8;
-        }
-
-        return c != 0;
-    }
-}
-
-impl EdPoint {
-    pub fn is_canonical(&self, s: &[u8]) -> bool {
-        if s.len() != 32 {
-            return false;
-        }
-
-        let mut c = (s[31] & 0x7f) ^ 0x7f;
-        for i in (1..=30).into_iter().rev() {
-            c |= s[i] ^ 0xff;
-        }
-
-        // subtraction might underflow
-        c = (((c as u16) - 1) >> 8) as u8;
-        let d = ((0xed - 1 - (s[0] as u16)) >> 8) as u8;
-
-        return 1 - (c & d & 1) == 1;
-    }
-
-    fn has_small_order(&self) -> Result<bool> {
-        let s = self.marshal_binary()?;
-
-        let mut c = [0u8; 5];
-
-        for j in 0..31 {
-            for i in 0..5 {
-                c[i] |= s[j] ^ WEAK_KEYS[i][j];
-            }
-        }
-        for i in 0..5 {
-            c[i] |= (s[31] & 0x7f) ^ WEAK_KEYS[i][31];
-        }
-
-        // Constant time verification if one or more of the c's are zero
-        let mut k = 0u16;
-        for i in 0..5 {
-            k |= (c[i] as u16) - 1;
-        }
-
-        Ok((k >> 8) & 1 > 0)
-    }
-}
