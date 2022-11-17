@@ -10,6 +10,7 @@
 
 use anyhow::bail;
 use anyhow::Result;
+use lazy_static::__Deref;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -18,7 +19,7 @@ const ERROR_GROUPS: &str = "non-matching groups";
 const ERROR_COEFFS: &str = "different number of coefficients";
 
 /// PriShare represents a private share.
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PriShare<SCALAR: Scalar> {
     /// Index of the private share
     pub i: usize,
@@ -49,14 +50,16 @@ impl<SCALAR: Scalar> Default for PriShare<SCALAR> {
 
 /// PriPoly represents a secret sharing polynomial.
 pub struct PriPoly<GROUP: Group> {
-    _phantom: PhantomData<GROUP::POINT>,
     /// Cryptographic group
     g: GROUP,
     /// Coefficients of the polynomial
     coeffs: Vec<<GROUP::POINT as Point>::SCALAR>,
 }
 
+use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::ops::DerefMut;
+use std::vec;
 
 use crate::{cipher::Stream, Group, Point, Scalar};
 
@@ -64,14 +67,13 @@ use crate::{cipher::Stream, Group, Point, Scalar};
 /// cryptographic group, the secret sharing threshold t, and the secret to be
 /// shared s. If s is nil, a new s is chosen using the provided randomness
 /// stream rand.
-pub fn NewPriPoly<GROUP, STREAM>(
+pub fn NewPriPoly<GROUP: Group, STREAM>(
     group: GROUP,
     t: usize,
     s: Option<<GROUP::POINT as Point>::SCALAR>,
     mut rand: STREAM,
 ) -> PriPoly<GROUP>
 where
-    GROUP: Group,
     STREAM: Stream,
 {
     let mut coeffs: Vec<<GROUP::POINT as Point>::SCALAR> = vec![];
@@ -85,7 +87,6 @@ where
     PriPoly {
         g: group,
         coeffs: coeffs,
-        _phantom: PhantomData,
     }
 }
 
@@ -94,7 +95,7 @@ where
 // 	return &PriPoly{g: g, coeffs: coeffs}
 // }
 
-impl<'a, GROUP: Group> PriPoly<GROUP> {
+impl<GROUP: Group> PriPoly<GROUP> {
     /// Threshold returns the secret sharing threshold.
     pub fn Threshold(&self) -> usize {
         self.coeffs.len()
@@ -174,7 +175,6 @@ impl<'a, GROUP: Group> PriPoly<GROUP> {
             g: self.g.clone(),
             b: Some(b),
             commits,
-            _phantom: PhantomData,
         }
     }
 
@@ -208,35 +208,43 @@ impl<'a, GROUP: Group> PriPoly<GROUP> {
     // }
 }
 
-// // RecoverSecret reconstructs the shared secret p(0) from a list of private
-// // shares using Lagrange interpolation.
-// func RecoverSecret(g kyber.Group, shares []*PriShare, t, n int) (kyber.Scalar, error) {
-// 	x, y := xyScalar(g, shares, t, n)
-// 	if len(x) < t {
-// 		return nil, errors.New("share: not enough shares to recover secret")
-// 	}
+/// RecoverSecret reconstructs the shared secret p(0) from a list of private
+/// shares using Lagrange interpolation.
+pub fn recover_secret<GROUP: Group>(
+    g: GROUP,
+    shares: Vec<PriShare<<GROUP::POINT as Point>::SCALAR>>,
+    t: usize,
+    n: usize,
+) -> Result<<GROUP::POINT as Point>::SCALAR> {
+    // let (x, y) = xy_scalar(g.clone(), shares, t, n);
+    // if x.len() < t {
+    //     bail!("share: not enough shares to recover secret");
+    // }
 
-// 	acc := g.Scalar().Zero()
-// 	num := g.Scalar()
-// 	den := g.Scalar()
-// 	tmp := g.Scalar()
+    // let mut acc = g.scalar().zero();
+    // let mut num = g.scalar();
+    // let mut den = g.scalar();
+    // let mut tmp = g.scalar();
 
-// 	for i, xi := range x {
-// 		yi := y[i]
-// 		num.Set(yi)
-// 		den.One()
-// 		for j, xj := range x {
-// 			if i == j {
-// 				continue
-// 			}
-// 			num.Mul(num, xj)
-// 			den.Mul(den, tmp.Sub(xj, xi))
-// 		}
-// 		acc.Add(acc, num.Div(num, den))
-// 	}
+    // for (i, xi) in x.into_iter().enumerate() {
+    //     let yi = y[&i].clone();
+    //     num.set(&yi);
+    //     todo!();
+    //     //den.one();
+    //     for (j, xj) in x.into_iter().enumerate() {
+    //         if i == j {
+    //             continue;
+    //         }
+    //         num.mul(xj.1);
+    //         den.mul(tmp.sub(&xj.1, &xi.1));
+    //     }
+    //     todo!();
+    //     //acc.add(&num.div(num, den));
+    // }
 
-// 	return acc, nil
-// }
+    // Ok(acc)
+    todo!()
+}
 
 // type byIndexScalar []*PriShare
 
@@ -244,36 +252,47 @@ impl<'a, GROUP: Group> PriPoly<GROUP> {
 // func (s byIndexScalar) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 // func (s byIndexScalar) Less(i, j int) bool { return s[i].I < s[j].I }
 
-// // xyScalar returns the list of (x_i, y_i) pairs indexed. The first map returned
-// // is the list of x_i and the second map is the list of y_i, both indexed in
-// // their respective map at index i.
-// func xyScalar(g kyber.Group, shares []*PriShare, t, n int) (map[int]kyber.Scalar, map[int]kyber.Scalar) {
-// 	// we are sorting first the shares since the shares may be unrelated for
-// 	// some applications. In this case, all participants needs to interpolate on
-// 	// the exact same order shares.
-// 	sorted := make([]*PriShare, 0, n)
-// 	for _, share := range shares {
-// 		if share != nil {
-// 			sorted = append(sorted, share)
-// 		}
-// 	}
-// 	sort.Sort(byIndexScalar(sorted))
+/// xyScalar returns the list of (x_i, y_i) pairs indexed. The first map returned
+/// is the list of x_i and the second map is the list of y_i, both indexed in
+/// their respective map at index i.
+fn xy_scalar<GROUP: Group>(
+    g: GROUP,
+    shares: Vec<PriShare<<GROUP::POINT as Point>::SCALAR>>,
+    t: usize,
+    n: usize,
+) -> (
+    HashMap<usize, <GROUP::POINT as Point>::SCALAR>,
+    HashMap<usize, <GROUP::POINT as Point>::SCALAR>,
+) {
+    // we are sorting first the shares since the shares may be unrelated for
+    // some applications. In this case, all participants needs to interpolate on
+    // the exact same order shares.
+    todo!();
+    let mut sorted: Vec<PriShare<<GROUP::POINT as Point>::SCALAR>> = vec![];
+    // //sorted := make([]*PriShare, 0, n)
+    // for share in shares {
+    // 	// if share != nil {
+    // 	// 	sorted = append(sorted, share)
+    // 	// }
+    //     sorted.push(share);
+    // }
+    // // sort.Sort(byIndexScalar(sorted))
 
-// 	x := make(map[int]kyber.Scalar)
-// 	y := make(map[int]kyber.Scalar)
-// 	for _, s := range sorted {
-// 		if s == nil || s.V == nil || s.I < 0 {
-// 			continue
-// 		}
-// 		idx := s.I
-// 		x[idx] = g.Scalar().SetInt64(int64(idx + 1))
-// 		y[idx] = s.V
-// 		if len(x) == t {
-// 			break
-// 		}
-// 	}
-// 	return x, y
-// }
+    // // let x := make(map[int]kyber.Scalar)
+    // // let y := make(map[int]kyber.Scalar)
+    // // for _, s := range sorted {
+    // // 	if s == nil || s.V == nil || s.I < 0 {
+    // // 		continue
+    // // 	}
+    // // 	idx := s.I
+    // // 	x[idx] = g.Scalar().SetInt64(int64(idx + 1))
+    // // 	y[idx] = s.V
+    // // 	if len(x) == t {
+    // // 		break
+    // // 	}
+    // // }
+    // // return x, y
+}
 
 // func minusConst(g kyber.Group, c kyber.Scalar) *PriPoly {
 // 	neg := g.Scalar().Neg(c)
@@ -344,8 +363,10 @@ pub struct PubShare<POINT: Point> {
 // }
 
 /// PubPoly represents a public commitment polynomial to a secret sharing polynomial.
-pub struct PubPoly<GROUP: Group> {
-    _phantom: PhantomData<<GROUP::POINT as Point>::SCALAR>,
+pub struct PubPoly<GROUP>
+where
+    GROUP: Group,
+{
     /// Cryptographic group
     g: GROUP,
     /// Base point, nil for standard base
@@ -354,20 +375,14 @@ pub struct PubPoly<GROUP: Group> {
     commits: Vec<GROUP::POINT>,
 }
 
-impl<GROUP: Group> PubPoly<GROUP>
-where
-    GROUP: Group,
-{
+impl<GROUP: Group> PubPoly<GROUP> {
     /// NewPubPoly creates a new public commitment polynomial.
-    pub fn new(g: GROUP, b: Option<GROUP::POINT>, commits: &[GROUP::POINT]) -> PubPoly<GROUP> {
-        return PubPoly {
-            g,
-            b,
-            commits: commits.clone().to_vec(),
-            _phantom: PhantomData,
-        };
+    pub fn new(g: GROUP, b: Option<GROUP::POINT>, commits: Vec<GROUP::POINT>) -> PubPoly<GROUP> {
+        return PubPoly { g, b, commits };
     }
+}
 
+impl<GROUP: Group> PubPoly<GROUP> {
     /// Info returns the base point and the commitments to the polynomial coefficients.
     pub fn Info(&self) -> (GROUP::POINT, Vec<GROUP::POINT>) {
         (self.b.as_ref().unwrap().clone(), self.commits.clone())
@@ -431,7 +446,6 @@ where
             g: self.g,
             b: self.b,
             commits,
-            _phantom: PhantomData,
         })
     }
 
