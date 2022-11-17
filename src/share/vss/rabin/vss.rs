@@ -920,16 +920,15 @@ where
     /// deal_certified returns true if there has been less than t complaints, all
     /// Justifications were correct and if EnoughApprovals() returns true.
     pub fn deal_certified(&self) -> bool {
-        todo!();
         // a can be nil if we're calling it before receiving a deal
         // if a == nil {
         // 	return false
         // }
 
-        let verifiers_unstable = 0usize;
+        let mut verifiers_unstable = 0usize;
         // Check either a StatusApproval or StatusComplaint for all known verifiers
         // i.e. make sure all verifiers are either timed-out or OK.
-        for (i, _) in self.verifiers.into_iter().enumerate() {
+        for (i, _) in self.verifiers.iter().enumerate() {
             if !self.responses.contains_key(&(i as u32)) {
                 verifiers_unstable += 1;
             }
