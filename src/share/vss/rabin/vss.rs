@@ -333,8 +333,8 @@ where
 
 impl<SUITE: Suite> Dealer<SUITE>
 where
-    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical + Serialize + DeserializeOwned,
+    SUITE::POINT: PointCanCheckCanonicalAndSmallOrder + Serialize + DeserializeOwned,
 {
     /// PlaintextDeal returns the plaintext version of the deal destined for peer i.
     /// Use this only for testing.
@@ -777,8 +777,8 @@ impl fmt::Display for DealAlreadyProcessedError {
 
 impl<SUITE: Suite> Aggregator<SUITE>
 where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical + Serialize + DeserializeOwned,
+    SUITE::POINT: PointCanCheckCanonicalAndSmallOrder + Serialize + DeserializeOwned,
 {
     /// verify_deal analyzes the deal and returns an error if it's incorrect. If
     /// inclusion is true, it also returns an error if it the second time this struct
@@ -838,7 +838,7 @@ where
     /// response for all verifiers who have no response in the array.
     pub fn cleanVerifiers(&mut self) {
         for i in 0..self.verifiers.len() {
-            if self.responses.contains_key(&(i as u32)) {
+            if !self.responses.contains_key(&(i as u32)) {
                 self.responses.insert(
                     i as u32,
                     Response {
@@ -864,9 +864,8 @@ where
 
         let msg = r.hash(self.suite)?;
 
-        //schnorr::Verify(self.suite, public.unwrap(), &msg, &r.signature)?;
-        //Ok(())
-        todo!()
+        schnorr::Verify(self.suite, &public.unwrap(), &msg, &r.signature)?;
+        Ok(())
     }
 
     fn verify_justification(&mut self, j: &Justification<SUITE>) -> Result<()> {
@@ -920,11 +919,6 @@ where
     /// deal_certified returns true if there has been less than t complaints, all
     /// Justifications were correct and if EnoughApprovals() returns true.
     pub fn deal_certified(&self) -> bool {
-        // a can be nil if we're calling it before receiving a deal
-        // if a == nil {
-        // 	return false
-        // }
-
         let mut verifiers_unstable = 0usize;
         // Check either a StatusApproval or StatusComplaint for all known verifiers
         // i.e. make sure all verifiers are either timed-out or OK.
