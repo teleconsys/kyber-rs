@@ -20,7 +20,7 @@ pub fn dhExchange<'a, SUITE: Suite>(
 }
 
 // KEY_SIZE is arbitrary, make it long enough to seed the XOF
-const KEY_SIZE: usize = 128;
+pub const KEY_SIZE: usize = 128;
 
 /// context returns the context slice to be used when encrypting a share
 pub fn context<SUITE: Suite>(

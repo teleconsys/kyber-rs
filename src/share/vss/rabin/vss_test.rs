@@ -1,12 +1,20 @@
+use bincode::de;
+use core::panic;
 use rand::{Rng, RngCore};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use crate::encoding::BinaryMarshaler;
+use crate::share::vss::rabin::dh;
 use crate::share::vss::rabin::vss::Response;
+use crate::sign::schnorr;
 use crate::{group::edwards25519::SuiteEd25519, Group, Point, Random, Scalar};
 use crate::{random, Suite};
 
-use super::vss::{minimum_t, Dealer, NewDealer, NewVerifier, RecoverSecret, Verifier};
+use super::dh::{context, dhExchange};
+use super::vss::{
+    findPub, minimum_t, sessionID, Dealer, NewDealer, NewVerifier, RecoverSecret, Verifier,
+};
 
 // lazy_static! {
 //     static ref SUITE: SuiteEd25519 = SuiteEd25519::new_blake_sha256ed25519();
@@ -73,14 +81,14 @@ fn default_test_data() -> TestData<SuiteEd25519> {
 fn test_vss_whole() {
     let test_data = default_test_data();
 
-    let (dealer, mut verifiers) = genAll(test_data.clone());
+    let (dealer, mut verifiers) = genAll(&test_data);
 
     // 1. dispatch deal
-    let mut resps = Vec::with_capacity(test_data.nb_verifiers); //make([]*Response, nbVerifiers)
+    let mut resps = vec![];
     let enc_deals = dealer.encrypted_deals().unwrap();
     for (i, d) in enc_deals.iter().enumerate() {
         let resp = verifiers[i].process_encrypted_deal(d).unwrap();
-        resps[i] = resp;
+        resps.push(resp);
     }
 
     // 2. dispatch responses
@@ -178,7 +186,7 @@ fn TestVSSVerifierNew() {
 #[test]
 fn TestVSSShare() {
     let test_data = default_test_data();
-    let (dealer, mut verifiers) = genAll(test_data);
+    let (dealer, mut verifiers) = genAll(&test_data);
     let ver = &mut verifiers[0];
     let deal = dealer.EncryptedDeal(0).unwrap();
 
@@ -219,443 +227,607 @@ fn TestVSSShare() {
     assert!(ver.deal().is_some());
 }
 
-// func TestVSSAggregatorEnoughApprovals(t *testing.T) {
-// 	dealer := genDealer()
-// 	aggr := dealer.aggregator
-// 	// just below
-// 	for i := 0; i < aggr.t-1; i++ {
-// 		aggr.responses[uint32(i)] = &Response{Approved: true}
-// 	}
-
-// 	dealer.SetTimeout()
-
-// 	assert.False(t, aggr.EnoughApprovals())
-// 	assert.Nil(t, dealer.SecretCommit())
-
-// 	aggr.responses[uint32(aggr.t)] = &Response{Approved: true}
-// 	assert.True(t, aggr.EnoughApprovals())
-
-// 	for i := aggr.t + 1; i < nbVerifiers; i++ {
-// 		aggr.responses[uint32(i)] = &Response{Approved: true}
-// 	}
-// 	assert.True(t, aggr.EnoughApprovals())
-// 	assert.Equal(t, suite.Point().Mul(secret, nil), dealer.SecretCommit())
-// }
-
-// func TestVSSAggregatorDealCertified(t *testing.T) {
-// 	dealer := genDealer()
-// 	aggr := dealer.aggregator
-
-// 	for i := 0; i < aggr.t; i++ {
-// 		aggr.responses[uint32(i)] = &Response{Approved: true}
-// 	}
-
-// 	dealer.SetTimeout()
-
-// 	assert.True(t, aggr.DealCertified())
-// 	assert.Equal(t, suite.Point().Mul(secret, nil), dealer.SecretCommit())
-// 	// bad dealer response
-// 	aggr.badDealer = true
-// 	assert.False(t, aggr.DealCertified())
-// 	assert.Nil(t, dealer.SecretCommit())
-// 	// inconsistent state on purpose
-// 	// too much complaints
-// 	for i := 0; i < aggr.t; i++ {
-// 		aggr.responses[uint32(i)] = &Response{Approved: false}
-// 	}
-// 	assert.False(t, aggr.DealCertified())
-// }
-
-// func TestVSSVerifierDecryptDeal(t *testing.T) {
-// 	dealer, verifiers := genAll()
-// 	v := verifiers[0]
-// 	d := dealer.deals[0]
-
-// 	// all fine
-// 	encD, err := dealer.EncryptedDeal(0)
-// 	require.Nil(t, err)
-// 	decD, err := v.decryptDeal(encD)
-// 	require.Nil(t, err)
-// 	b1, _ := protobuf.Encode(d)
-// 	b2, _ := protobuf.Encode(decD)
-// 	assert.Equal(t, b1, b2)
-
-// 	// wrong dh key
-// 	goodDh := encD.DHKey
-// 	encD.DHKey = suite.Point()
-// 	decD, err = v.decryptDeal(encD)
-// 	assert.Error(t, err)
-// 	assert.Nil(t, decD)
-// 	encD.DHKey = goodDh
-
-// 	// wrong signature
-// 	goodSig := encD.Signature
-// 	encD.Signature = randomBytes(32)
-// 	decD, err = v.decryptDeal(encD)
-// 	assert.Error(t, err)
-// 	assert.Nil(t, decD)
-// 	encD.Signature = goodSig
-
-// 	// wrong ciphertext
-// 	goodCipher := encD.Cipher
-// 	encD.Cipher = randomBytes(len(goodCipher))
-// 	decD, err = v.decryptDeal(encD)
-// 	assert.Error(t, err)
-// 	assert.Nil(t, decD)
-// 	encD.Cipher = goodCipher
-// }
-
-// func TestVSSVerifierReceiveDeal(t *testing.T) {
-// 	dealer, verifiers := genAll()
-// 	v := verifiers[0]
-// 	d := dealer.deals[0]
-
-// 	encD, err := dealer.EncryptedDeal(0)
-// 	require.Nil(t, err)
-
-// 	// correct deal
-// 	resp, err := v.ProcessEncryptedDeal(encD)
-// 	require.NotNil(t, resp)
-// 	assert.Equal(t, true, resp.Approved)
-// 	assert.Nil(t, err)
-// 	assert.Equal(t, v.index, int(resp.Index))
-// 	assert.Equal(t, dealer.sid, resp.SessionID)
-// 	assert.Nil(t, schnorr.Verify(suite, v.pub, resp.Hash(suite), resp.Signature))
-// 	assert.Equal(t, v.responses[uint32(v.index)], resp)
-
-// 	// wrong encryption
-// 	goodSig := encD.Signature
-// 	encD.Signature = randomBytes(32)
-// 	resp, err = v.ProcessEncryptedDeal(encD)
-// 	assert.Nil(t, resp)
-// 	assert.Error(t, err)
-// 	encD.Signature = goodSig
-
-// 	// wrong index
-// 	goodIdx := d.SecShare.I
-// 	d.SecShare.I = (goodIdx - 1) % nbVerifiers
-// 	encD, _ = dealer.EncryptedDeal(0)
-// 	resp, err = v.ProcessEncryptedDeal(encD)
-// 	assert.Error(t, err)
-// 	assert.Nil(t, resp)
-// 	d.SecShare.I = goodIdx
-
-// 	// wrong commitments
-// 	goodCommit := d.Commitments[0]
-// 	d.Commitments[0] = suite.Point().Pick(suite.RandomStream())
-// 	encD, _ = dealer.EncryptedDeal(0)
-// 	resp, err = v.ProcessEncryptedDeal(encD)
-// 	assert.Error(t, err)
-// 	assert.Nil(t, resp)
-// 	d.Commitments[0] = goodCommit
-
-// 	// already seen twice
-// 	resp, err = v.ProcessEncryptedDeal(encD)
-// 	assert.Nil(t, resp)
-// 	assert.Error(t, err)
-// 	v.aggregator.deal = nil
-
-// 	// approval already existing from same origin, should never happen right ?
-// 	v.aggregator.responses[uint32(v.index)] = &Response{Approved: true}
-// 	d.Commitments[0] = suite.Point().Pick(suite.RandomStream())
-// 	resp, err = v.ProcessEncryptedDeal(encD)
-// 	assert.Nil(t, resp)
-// 	assert.Error(t, err)
-// 	d.Commitments[0] = goodCommit
-
-// 	// valid complaint
-// 	v.aggregator.deal = nil
-// 	delete(v.aggregator.responses, uint32(v.index))
-// 	d.RndShare.V = suite.Scalar().SetBytes(randomBytes(32))
-// 	resp, err = v.ProcessEncryptedDeal(encD)
-// 	assert.NotNil(t, resp)
-// 	assert.Equal(t, false, resp.Approved)
-// 	assert.Nil(t, err)
-// }
-
-// func TestVSSAggregatorVerifyJustification(t *testing.T) {
-// 	dealer, verifiers := genAll()
-// 	v := verifiers[0]
-// 	d := dealer.deals[0]
-
-// 	wrongV := suite.Scalar().Pick(suite.RandomStream())
-// 	goodV := d.SecShare.V
-// 	d.SecShare.V = wrongV
-// 	encD, _ := dealer.EncryptedDeal(0)
-// 	resp, err := v.ProcessEncryptedDeal(encD)
-// 	assert.NotNil(t, resp)
-// 	assert.Equal(t, false, resp.Approved)
-// 	assert.Nil(t, err)
-// 	assert.Equal(t, v.responses[uint32(v.index)], resp)
-// 	// in tests, pointers point to the same underlying share..
-// 	d.SecShare.V = goodV
-
-// 	j, err := dealer.ProcessResponse(resp)
-
-// 	// invalid deal justified
-// 	goodV = j.Deal.SecShare.V
-// 	j.Deal.SecShare.V = wrongV
-// 	err = v.ProcessJustification(j)
-// 	assert.Error(t, err)
-// 	assert.True(t, v.aggregator.badDealer)
-// 	j.Deal.SecShare.V = goodV
-// 	v.aggregator.badDealer = false
-
-// 	// valid complaint
-// 	assert.Nil(t, v.ProcessJustification(j))
-
-// 	// invalid complaint
-// 	resp.SessionID = randomBytes(len(resp.SessionID))
-// 	badJ, err := dealer.ProcessResponse(resp)
-// 	assert.Nil(t, badJ)
-// 	assert.Error(t, err)
-// 	resp.SessionID = dealer.sid
-
-// 	// no complaints for this justification before
-// 	delete(v.aggregator.responses, uint32(v.index))
-// 	assert.Error(t, v.ProcessJustification(j))
-// 	v.aggregator.responses[uint32(v.index)] = resp
-
-// }
-
-// func TestVSSAggregatorVerifyResponseDuplicate(t *testing.T) {
-// 	dealer, verifiers := genAll()
-// 	v1 := verifiers[0]
-// 	v2 := verifiers[1]
-// 	//d1 := dealer.deals[0]
-// 	//d2 := dealer.deals[1]
-// 	encD1, _ := dealer.EncryptedDeal(0)
-// 	encD2, _ := dealer.EncryptedDeal(1)
-
-// 	resp1, err := v1.ProcessEncryptedDeal(encD1)
-// 	assert.Nil(t, err)
-// 	assert.NotNil(t, resp1)
-// 	assert.Equal(t, true, resp1.Approved)
-
-// 	resp2, err := v2.ProcessEncryptedDeal(encD2)
-// 	assert.Nil(t, err)
-// 	assert.NotNil(t, resp2)
-// 	assert.Equal(t, true, resp2.Approved)
-
-// 	err = v1.ProcessResponse(resp2)
-// 	assert.Nil(t, err)
-// 	r, ok := v1.aggregator.responses[uint32(v2.index)]
-// 	assert.True(t, ok)
-// 	assert.Equal(t, resp2, r)
-
-// 	err = v1.ProcessResponse(resp2)
-// 	assert.Error(t, err)
-
-// 	delete(v1.aggregator.responses, uint32(v2.index))
-// 	v1.aggregator.responses[uint32(v2.index)] = &Response{Approved: true}
-// 	err = v1.ProcessResponse(resp2)
-// 	assert.Error(t, err)
-// }
-
-// func TestVSSAggregatorVerifyResponse(t *testing.T) {
-// 	dealer, verifiers := genAll()
-// 	v := verifiers[0]
-// 	deal := dealer.deals[0]
-// 	//goodSec := deal.SecShare.V
-// 	wrongSec, _ := genPair()
-// 	deal.SecShare.V = wrongSec
-// 	encD, _ := dealer.EncryptedDeal(0)
-// 	// valid complaint
-// 	resp, err := v.ProcessEncryptedDeal(encD)
-// 	assert.Nil(t, err)
-// 	assert.NotNil(t, resp)
-// 	assert.Equal(t, false, resp.Approved)
-// 	assert.NotNil(t, v.aggregator)
-// 	assert.Equal(t, resp.SessionID, dealer.sid)
-
-// 	aggr := v.aggregator
-// 	r, ok := aggr.responses[uint32(v.index)]
-// 	assert.True(t, ok)
-// 	assert.Equal(t, false, r.Approved)
-
-// 	// wrong index
-// 	resp.Index = uint32(len(verifiersPub))
-// 	sig, err := schnorr.Sign(suite, v.longterm, resp.Hash(suite))
-// 	resp.Signature = sig
-// 	assert.Error(t, aggr.verifyResponse(resp))
-// 	resp.Index = 0
-
-// 	// wrong signature
-// 	goodSig := resp.Signature
-// 	resp.Signature = randomBytes(len(goodSig))
-// 	assert.Error(t, aggr.verifyResponse(resp))
-// 	resp.Signature = goodSig
-
-// 	// wrongID
-// 	wrongID := randomBytes(len(resp.SessionID))
-// 	goodID := resp.SessionID
-// 	resp.SessionID = wrongID
-// 	assert.Error(t, aggr.verifyResponse(resp))
-// 	resp.SessionID = goodID
-// }
-
-// func TestVSSAggregatorVerifyDeal(t *testing.T) {
-// 	dealer := genDealer()
-// 	aggr := dealer.aggregator
-// 	deals := dealer.deals
-
-// 	// OK
-// 	deal := deals[0]
-// 	err := aggr.VerifyDeal(deal, true)
-// 	assert.NoError(t, err)
-// 	assert.NotNil(t, aggr.deal)
-
-// 	// already received deal
-// 	err = aggr.VerifyDeal(deal, true)
-// 	assert.Error(t, err)
-
-// 	// wrong T
-// 	wrongT := uint32(1)
-// 	goodT := deal.T
-// 	deal.T = wrongT
-// 	assert.Error(t, aggr.VerifyDeal(deal, false))
-// 	deal.T = goodT
-
-// 	// wrong SessionID
-// 	goodSid := deal.SessionID
-// 	deal.SessionID = make([]byte, 32)
-// 	assert.Error(t, aggr.VerifyDeal(deal, false))
-// 	deal.SessionID = goodSid
-
-// 	// index different in one share
-// 	goodI := deal.RndShare.I
-// 	deal.RndShare.I = goodI + 1
-// 	assert.Error(t, aggr.VerifyDeal(deal, false))
-// 	deal.RndShare.I = goodI
-
-// 	// index not in bounds
-// 	deal.SecShare.I = -1
-// 	assert.Error(t, aggr.VerifyDeal(deal, false))
-// 	deal.SecShare.I = len(verifiersPub)
-// 	assert.Error(t, aggr.VerifyDeal(deal, false))
-
-// 	// shares invalid in respect to the commitments
-// 	wrongSec, _ := genPair()
-// 	deal.SecShare.V = wrongSec
-// 	assert.Error(t, aggr.VerifyDeal(deal, false))
-// }
-
-// func TestVSSAggregatorAddComplaint(t *testing.T) {
-// 	dealer := genDealer()
-// 	aggr := dealer.aggregator
-
-// 	var idx uint32 = 1
-// 	c := &Response{
-// 		Index:    idx,
-// 		Approved: false,
-// 	}
-// 	// ok
-// 	assert.Nil(t, aggr.addResponse(c))
-// 	assert.Equal(t, aggr.responses[idx], c)
-
-// 	// response already there
-// 	assert.Error(t, aggr.addResponse(c))
-// 	delete(aggr.responses, idx)
-
-// }
-
-// func TestVSSAggregatorCleanVerifiers(t *testing.T) {
-// 	dealer := genDealer()
-// 	aggr := dealer.aggregator
-
-// 	for i := 0; i < aggr.t; i++ {
-// 		aggr.responses[uint32(i)] = &Response{Approved: true}
-// 	}
-
-// 	assert.True(t, aggr.EnoughApprovals())
-// 	assert.False(t, aggr.DealCertified())
-
-// 	aggr.cleanVerifiers()
-
-// 	assert.True(t, aggr.DealCertified())
-// }
-
-// func TestVSSDealerSetTimeout(t *testing.T) {
-// 	dealer := genDealer()
-// 	aggr := dealer.aggregator
-
-// 	for i := 0; i < aggr.t; i++ {
-// 		aggr.responses[uint32(i)] = &Response{Approved: true}
-// 	}
-
-// 	assert.True(t, aggr.EnoughApprovals())
-// 	assert.False(t, aggr.DealCertified())
-
-// 	dealer.SetTimeout()
-
-// 	assert.True(t, aggr.DealCertified())
-// }
-
-// func TestVSSVerifierSetTimeout(t *testing.T) {
-// 	dealer, verifiers := genAll()
-// 	ver := verifiers[0]
-
-// 	encD, err := dealer.EncryptedDeal(0)
-
-// 	require.Nil(t, err)
-
-// 	resp, err := ver.ProcessEncryptedDeal(encD)
-
-// 	require.Nil(t, err)
-// 	require.NotNil(t, resp)
-
-// 	aggr := ver.aggregator
-
-// 	for i := 0; i < aggr.t; i++ {
-// 		aggr.responses[uint32(i)] = &Response{Approved: true}
-// 	}
-
-// 	assert.True(t, aggr.EnoughApprovals())
-// 	assert.False(t, aggr.DealCertified())
-
-// 	ver.SetTimeout()
-
-// 	assert.True(t, aggr.DealCertified())
-// }
-
-// func TestVSSSessionID(t *testing.T) {
-// 	dealer, _ := NewDealer(suite, dealerSec, secret, verifiersPub, vssThreshold)
-// 	commitments := dealer.deals[0].Commitments
-// 	sid, err := sessionID(suite, dealerPub, verifiersPub, commitments, dealer.t)
-// 	assert.NoError(t, err)
-
-// 	sid2, err2 := sessionID(suite, dealerPub, verifiersPub, commitments, dealer.t)
-// 	assert.NoError(t, err2)
-// 	assert.Equal(t, sid, sid2)
-
-// 	wrongDealerPub := suite.Point().Add(dealerPub, dealerPub)
-
-// 	sid3, err3 := sessionID(suite, wrongDealerPub, verifiersPub, commitments, dealer.t)
-// 	assert.NoError(t, err3)
-// 	assert.NotEqual(t, sid3, sid2)
-// }
-
-// func TestVSSFindPub(t *testing.T) {
-// 	p, ok := findPub(verifiersPub, 0)
-// 	assert.True(t, ok)
-// 	assert.Equal(t, verifiersPub[0], p)
-
-// 	p, ok = findPub(verifiersPub, uint32(len(verifiersPub)))
-// 	assert.False(t, ok)
-// 	assert.Nil(t, p)
-// }
-
-// func TestVSSDHExchange(t *testing.T) {
-// 	pub := suite.Point().Base()
-// 	priv := suite.Scalar().Pick(suite.RandomStream())
-// 	point := dhExchange(suite, priv, pub)
-// 	assert.Equal(t, pub.Mul(priv, nil).String(), point.String())
-// }
-
-// func TestVSSContext(t *testing.T) {
-// 	c := context(suite, dealerPub, verifiersPub)
-// 	assert.Len(t, c, keySize)
-// }
+#[test]
+fn TestVSSAggregatorEnoughApprovals() {
+    let test_data = default_test_data();
+    let mut dealer = genDealer(&test_data);
+    let aggr = &mut dealer.aggregator;
+    // just below
+    for i in 0..aggr.t - 1 {
+        aggr.responses.insert(
+            i as u32,
+            Response {
+                approved: true,
+                ..Default::default()
+            },
+        );
+    }
+
+    dealer.set_timeout();
+    let aggr = &mut dealer.aggregator;
+
+    // assert.False(t, aggr.EnoughApprovals())
+    assert!(!aggr.enough_approvals());
+    assert!(dealer.secret_commit().is_none());
+    let aggr = &mut dealer.aggregator;
+
+    aggr.responses.insert(
+        aggr.t as u32,
+        Response {
+            approved: true,
+            ..Default::default()
+        },
+    );
+    assert!(aggr.enough_approvals());
+
+    // for i := aggr.t + 1; i < nbVerifiers; i++ {
+    for i in aggr.t + 1..NB_VERIFIERS {
+        aggr.responses.insert(
+            i as u32,
+            Response {
+                approved: true,
+                ..Default::default()
+            },
+        );
+    }
+    assert!(aggr.enough_approvals());
+    assert_eq!(
+        test_data.suite.point().mul(&test_data.clone().secret, None),
+        dealer.secret_commit().unwrap()
+    );
+}
+
+#[test]
+fn TestVSSAggregatorDealCertified() {
+    let test_data = default_test_data();
+    let mut dealer = genDealer(&test_data);
+    let aggr = &mut dealer.aggregator;
+
+    for i in 0..aggr.t {
+        aggr.responses.insert(
+            i as u32,
+            Response {
+                approved: true,
+                ..Default::default()
+            },
+        );
+    }
+
+    dealer.set_timeout();
+
+    let aggr = &mut dealer.aggregator;
+    assert!(aggr.deal_certified());
+    assert_eq!(
+        test_data.suite.point().mul(&test_data.secret, None),
+        dealer.secret_commit().unwrap()
+    );
+    // bad dealer response
+    let aggr = &mut dealer.aggregator;
+    aggr.bad_dealer = true;
+    assert!(!aggr.deal_certified());
+    assert!(dealer.secret_commit().is_none());
+
+    let aggr = &mut dealer.aggregator;
+    // inconsistent state on purpose
+    // too much complaints
+    for i in 0..aggr.t {
+        aggr.responses.insert(
+            i as u32,
+            Response {
+                approved: false,
+                ..Default::default()
+            },
+        );
+    }
+    assert!(!aggr.deal_certified());
+}
+
+#[test]
+fn TestVSSVerifierDecryptDeal() {
+    let test_data = default_test_data();
+    let (dealer, verifiers) = genAll(&test_data);
+    let v = &verifiers[0];
+    let d = &dealer.deals[0];
+
+    // all fine
+    let mut encD = dealer.EncryptedDeal(0).unwrap();
+    let decD = v.decryptDeal(&encD).unwrap();
+    let b1 = d.marshal_binary().unwrap();
+    let b2 = decD.marshal_binary().unwrap();
+    assert_eq!(b1, b2);
+
+    // wrong dh key
+    let goodDh = encD.dhkey;
+    encD.dhkey = test_data.suite.point();
+    let decD = v.decryptDeal(&encD);
+    assert!(decD.is_err());
+    encD.dhkey = goodDh;
+
+    // wrong signature
+    let goodSig = encD.signature;
+    encD.signature = randomBytes(32);
+    let decD = v.decryptDeal(&encD);
+    assert!(decD.is_err());
+    encD.signature = goodSig;
+
+    // wrong ciphertext
+    let goodCipher = encD.cipher;
+    encD.cipher = randomBytes(goodCipher.len());
+    let decD = v.decryptDeal(&encD);
+    assert!(decD.is_err());
+    encD.cipher = goodCipher;
+}
+
+#[test]
+fn TestVSSVerifierReceiveDeal() {
+    let test_data = default_test_data();
+    let (mut dealer, mut verifiers) = genAll(&test_data);
+
+    let mut encD = dealer.EncryptedDeal(0).unwrap();
+
+    let v = &mut verifiers[0];
+
+    // correct deal
+    let resp = v.process_encrypted_deal(&encD).unwrap();
+    assert!(resp.approved);
+    assert_eq!(v.index, resp.index as usize);
+    assert_eq!(dealer.sid, resp.session_id);
+    schnorr::Verify(
+        test_data.suite,
+        &v.pubb,
+        &resp.hash(test_data.suite).unwrap(),
+        &resp.signature,
+    )
+    .unwrap();
+    assert_eq!(v.responses[&((v.index) as u32)], resp);
+
+    // wrong encryption
+    let goodSig = encD.signature;
+    encD.signature = randomBytes(32);
+    let resp = v.process_encrypted_deal(&encD);
+    assert!(resp.is_err());
+    encD.signature = goodSig;
+
+    let d = &mut dealer.deals[0];
+
+    // wrong index
+    let goodIdx = d.sec_share.i;
+    d.sec_share.i = (goodIdx - 1) % NB_VERIFIERS;
+    let encD = dealer.EncryptedDeal(0).unwrap();
+    let resp = v.process_encrypted_deal(&encD);
+    assert!(resp.is_err());
+
+    let d = &mut dealer.deals[0];
+    d.sec_share.i = goodIdx;
+
+    // wrong commitments
+    let goodCommit = d.commitments[0];
+    d.commitments[0] = test_data
+        .suite
+        .point()
+        .pick(&mut test_data.suite.random_stream());
+    let encD = dealer.EncryptedDeal(0).unwrap();
+    let resp = v.process_encrypted_deal(&encD);
+    assert!(resp.is_err());
+
+    let d = &mut dealer.deals[0];
+    d.commitments[0] = goodCommit;
+
+    // already seen twice
+    let resp = v.process_encrypted_deal(&encD);
+    assert!(resp.is_err());
+    let mut v_aggr = v.aggregator.clone().unwrap();
+    v_aggr.deal = None;
+
+    // approval already existing from same origin, should never happen right ?
+    v_aggr.responses.insert(
+        (v.index) as u32,
+        Response {
+            approved: true,
+            ..Default::default()
+        },
+    );
+    d.commitments[0] = test_data
+        .suite
+        .point()
+        .pick(&mut test_data.suite.random_stream());
+    v.aggregator = Some(v_aggr.clone());
+    let resp = v.process_encrypted_deal(&encD);
+    assert!(resp.is_err());
+    d.commitments[0] = goodCommit;
+
+    // valid complaint
+    v_aggr.deal = None;
+    v_aggr.responses.remove(&(v.index as u32));
+    d.rnd_share.v = test_data.suite.scalar().set_bytes(&randomBytes(32));
+    v.aggregator = Some(v_aggr.clone());
+    let resp = v.process_encrypted_deal(&encD).unwrap();
+    assert!(!resp.approved);
+}
+
+#[test]
+fn TestVSSAggregatorVerifyJustification() {
+    let test_data = default_test_data();
+    let (mut dealer, mut verifiers) = genAll(&test_data);
+    let v = &mut verifiers[0];
+    let d = &mut dealer.deals[0];
+
+    let wrongV = test_data
+        .suite
+        .scalar()
+        .pick(&mut test_data.suite.random_stream());
+    let goodV = d.sec_share.v;
+    d.sec_share.v = wrongV;
+    let encD = dealer.EncryptedDeal(0).unwrap();
+    let mut resp = v.process_encrypted_deal(&encD).unwrap();
+    assert!(resp.approved);
+    assert_eq!(v.responses[&(v.index as u32)], resp);
+
+    // in tests, pointers point to the same underlying share..
+    let d = &mut dealer.deals[0];
+    d.sec_share.v = goodV;
+
+    let mut j = dealer.process_response(&resp).unwrap().unwrap();
+
+    // invalid deal justified
+    let goodV = j.deal.sec_share.v;
+    j.deal.sec_share.v = wrongV;
+    let result = v.process_justification(&j);
+    assert!(result.is_err());
+    match &v.aggregator {
+        Some(a) => assert!(a.bad_dealer),
+        None => panic!("missing aggregtor"),
+    }
+
+    j.deal.sec_share.v = goodV;
+    match &mut v.aggregator {
+        Some(a) => a.bad_dealer = false,
+        None => panic!("missing aggregator"),
+    }
+
+    // valid complaint
+    assert!(v.process_justification(&j).is_ok());
+
+    // invalid complaint
+    resp.session_id = randomBytes(resp.session_id.len());
+    let badJ = dealer.process_response(&resp);
+    assert!(badJ.is_err());
+    resp.session_id = dealer.sid.clone();
+
+    // no complaints for this justification before
+    match &mut v.aggregator {
+        Some(a) => {
+            a.responses.remove(&(v.index as u32));
+        }
+        None => panic!("missing aggregator"),
+    }
+    assert!(v.process_justification(&j).is_err());
+    match &mut v.aggregator {
+        Some(a) => {
+            a.responses.insert(v.index as u32, resp);
+        }
+        None => panic!("missing aggregator"),
+    }
+}
+
+#[test]
+fn TestVSSAggregatorVerifyResponseDuplicate() {
+    let test_data = default_test_data();
+    let (mut dealer, mut verifiers) = genAll(&test_data);
+    //d1 := dealer.deals[0]
+    //d2 := dealer.deals[1]
+    let encD1 = dealer.EncryptedDeal(0).unwrap();
+    let encD2 = dealer.EncryptedDeal(1).unwrap();
+
+    let resp1 = verifiers[0].process_encrypted_deal(&encD1).unwrap();
+    assert!(resp1.approved);
+
+    let resp2 = verifiers[1].process_encrypted_deal(&encD2).unwrap();
+    assert!(resp2.approved);
+
+    verifiers[0].process_response(&resp2).unwrap();
+
+    match &verifiers[0].aggregator {
+        Some(a) => {
+            let r = &a.responses[&(verifiers[1].index as u32)];
+            assert_eq!(&resp2, r);
+        }
+        None => panic!("missing aggregator"),
+    }
+
+    let result = verifiers[0].process_response(&resp2);
+    assert!(result.is_err());
+
+    let v1_idx = verifiers[1].index as u32;
+    match &mut verifiers[0].aggregator {
+        Some(a) => {
+            a.responses.remove(&v1_idx);
+            a.responses.insert(
+                v1_idx,
+                Response {
+                    approved: true,
+                    ..Default::default()
+                },
+            );
+        }
+        None => panic!("missing aggregator"),
+    }
+    let result = verifiers[0].process_response(&resp2);
+    assert!(result.is_err());
+}
+
+#[test]
+fn TestVSSAggregatorVerifyResponse() {
+    let test_data = default_test_data();
+    let (mut dealer, mut verifiers) = genAll(&test_data);
+    let v = &mut verifiers[0];
+    let deal = &mut dealer.deals[0];
+    //goodSec := deal.SecShare.V
+    let (wrongSec, _) = genPair();
+    deal.sec_share.v = wrongSec;
+    let encD = dealer.EncryptedDeal(0).unwrap();
+    // valid complaint
+    let mut resp = v.process_encrypted_deal(&encD).unwrap();
+    assert!(!resp.approved);
+    assert!(v.aggregator.is_some());
+    assert_eq!(resp.session_id, dealer.sid);
+
+    let aggr = &mut v.aggregator.as_mut().unwrap();
+    let r = &aggr.responses[&(v.index as u32)];
+    assert!(!r.approved);
+
+    // wrong index
+    resp.index = test_data.verifiers_pub.len() as u32;
+    let sig = schnorr::Sign(
+        test_data.suite,
+        v.longterm,
+        &resp.hash(test_data.suite).unwrap(),
+    )
+    .unwrap();
+    resp.signature = sig;
+    assert!(aggr.verify_response(&resp).is_err());
+    resp.index = 0;
+
+    // wrong signature
+    let goodSig = resp.signature;
+    resp.signature = randomBytes(goodSig.len());
+    assert!(aggr.verify_response(&resp).is_err());
+    resp.signature = goodSig;
+
+    // wrongID
+    let wrongID = randomBytes(resp.session_id.len());
+    let goodID = resp.session_id;
+    resp.session_id = wrongID;
+    assert!(aggr.verify_response(&resp).is_err());
+    resp.session_id = goodID;
+}
+
+#[test]
+fn TestVSSAggregatorVerifyDeal() {
+    let test_data = default_test_data();
+    let mut dealer = genDealer(&test_data);
+    let aggr = &mut dealer.aggregator;
+    let deals = &mut dealer.deals;
+
+    // OK
+    let deal = &mut deals[0];
+    aggr.verify_deal(deal, true).unwrap();
+    assert!(aggr.deal.is_some());
+
+    // already received deal
+    assert!(aggr.verify_deal(deal, true).is_err());
+
+    // wrong T
+    let wrongT = 1u32;
+    let goodT = deal.t;
+    deal.t = wrongT as usize;
+    assert!(aggr.verify_deal(deal, false).is_err());
+    deal.t = goodT;
+
+    // wrong SessionID
+    let goodSid = deal.session_id.clone();
+    deal.session_id = vec![0u8; 32];
+    assert!(aggr.verify_deal(deal, false).is_err());
+    deal.session_id = goodSid;
+
+    // index different in one share
+    let goodI = deal.rnd_share.i;
+    deal.rnd_share.i = goodI + 1;
+    assert!(aggr.verify_deal(deal, false).is_err());
+    deal.rnd_share.i = goodI;
+
+    // index not in bounds
+    deal.sec_share.i = usize::MAX;
+    assert!(aggr.verify_deal(deal, false).is_err());
+    deal.sec_share.i = test_data.verifiers_pub.len();
+    assert!(aggr.verify_deal(deal, false).is_err());
+
+    // shares invalid in respect to the commitments
+    let (wrongSec, _) = genPair();
+    deal.sec_share.v = wrongSec;
+    assert!(aggr.verify_deal(deal, false).is_err());
+}
+
+#[test]
+fn TestVSSAggregatorAddComplaint() {
+    let test_data = default_test_data();
+    let mut dealer = genDealer(&test_data);
+    let aggr = &mut dealer.aggregator;
+
+    let idx = 1u32;
+    let c = Response {
+        index: idx,
+        approved: false,
+        ..Default::default()
+    };
+    // ok
+    assert!(aggr.add_response(c.clone()).is_ok());
+    assert_eq!(aggr.responses[&idx], c);
+
+    // response already there
+    assert!(aggr.add_response(c).is_err());
+    aggr.responses.remove(&idx);
+}
+
+#[test]
+fn TestVSSAggregatorCleanVerifiers() {
+    let test_data = default_test_data();
+    let mut dealer = genDealer(&test_data);
+    let aggr = &mut dealer.aggregator;
+
+    for i in 0..aggr.t {
+        aggr.responses.insert(
+            i as u32,
+            Response {
+                approved: true,
+                ..Default::default()
+            },
+        );
+    }
+
+    assert!(aggr.enough_approvals());
+    assert!(!aggr.deal_certified());
+
+    aggr.cleanVerifiers();
+
+    assert!(aggr.deal_certified());
+}
+
+#[test]
+fn TestVSSDealerSetTimeout() {
+    let test_data = default_test_data();
+    let mut dealer = genDealer(&test_data);
+    let aggr = &mut dealer.aggregator;
+
+    for i in 0..aggr.t {
+        aggr.responses.insert(
+            i as u32,
+            Response {
+                approved: true,
+                ..Default::default()
+            },
+        );
+    }
+
+    assert!(aggr.enough_approvals());
+    assert!(!aggr.deal_certified());
+
+    dealer.set_timeout();
+
+    let aggr = &mut dealer.aggregator;
+    assert!(aggr.deal_certified());
+}
+
+#[test]
+fn TestVSSVerifierSetTimeout() {
+    let test_data = default_test_data();
+    let (dealer, mut verifiers) = genAll(&test_data);
+    let ver = &mut verifiers[0];
+
+    let encD = dealer.EncryptedDeal(0).unwrap();
+
+    let _resp = ver.process_encrypted_deal(&encD).unwrap();
+
+    let aggr = &mut ver.aggregator.as_mut().unwrap();
+
+    for i in 0..aggr.t {
+        aggr.responses.insert(
+            i as u32,
+            Response {
+                approved: true,
+                ..Default::default()
+            },
+        );
+    }
+
+    assert!(aggr.enough_approvals());
+    assert!(!aggr.deal_certified());
+
+    ver.SetTimeout();
+
+    let aggr = &mut ver.aggregator.as_mut().unwrap();
+    assert!(aggr.deal_certified());
+}
+
+#[test]
+fn TestVSSSessionID() {
+    let test_data = default_test_data();
+    let mut dealer = NewDealer(
+        test_data.suite.clone(),
+        test_data.dealer_sec.clone(),
+        test_data.secret.clone(),
+        test_data.verifiers_pub.clone(),
+        test_data.vss_threshold.clone(),
+    )
+    .unwrap();
+    let commitments = &dealer.deals[0].commitments;
+    let sid = sessionID(
+        &test_data.suite,
+        &test_data.dealer_pub,
+        &test_data.verifiers_pub,
+        commitments,
+        dealer.t,
+    )
+    .unwrap();
+
+    let sid2 = sessionID(
+        &test_data.suite,
+        &test_data.dealer_pub,
+        &test_data.verifiers_pub,
+        commitments,
+        dealer.t,
+    )
+    .unwrap();
+    assert_eq!(sid, sid2);
+
+    let wrongDealerPub = test_data
+        .suite
+        .point()
+        .add(&test_data.dealer_pub, &test_data.dealer_pub);
+
+    let sid3 = sessionID(
+        &test_data.suite,
+        &wrongDealerPub,
+        &test_data.verifiers_pub,
+        commitments,
+        dealer.t,
+    )
+    .unwrap();
+    assert_ne!(sid3, sid2);
+}
+
+#[test]
+fn TestVSSFindPub() {
+    let test_data = default_test_data();
+    let p = findPub(&test_data.verifiers_pub, 0).unwrap();
+    assert_eq!(test_data.verifiers_pub[0], p);
+
+    let p_option = findPub(&test_data.verifiers_pub, test_data.verifiers_pub.len());
+    assert!(p_option.is_none());
+}
+
+#[test]
+fn TestVSSDHExchange() {
+    let test_data = default_test_data();
+    let pubb = test_data.suite.point().base();
+    let privv = test_data
+        .suite
+        .scalar()
+        .pick(&mut test_data.suite.random_stream());
+    let point = dhExchange(test_data.suite, privv, pubb);
+    assert_eq!(pubb.mul(&privv, None).string(), point.string());
+}
+
+#[test]
+fn TestVSSContext() {
+    let test_data = default_test_data();
+    let c = context(
+        &test_data.suite,
+        &test_data.dealer_pub,
+        &test_data.verifiers_pub,
+    );
+    assert_eq!(c.len(), dh::KEY_SIZE);
+}
 
 use crate::group::edwards25519::scalar::Scalar as EdScalar;
 use crate::group::edwards25519::Point as EdPoint;
@@ -683,11 +855,12 @@ fn genCommits(n: usize) -> (Vec<EdScalar>, Vec<EdPoint>) {
     (secrets, publics)
 }
 
-fn genDealer<SUITE: Suite>(test_data: TestData<SUITE>) -> Dealer<SUITE>
+fn genDealer<SUITE: Suite>(test_data: &TestData<SUITE>) -> Dealer<SUITE>
 where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
+    let test_data = test_data.clone();
     let d = NewDealer(
         test_data.suite,
         test_data.dealer_sec,
@@ -699,12 +872,12 @@ where
     d
 }
 
-fn genAll<SUITE: Suite>(test_data: TestData<SUITE>) -> (Dealer<SUITE>, Vec<Verifier<SUITE>>)
+fn genAll<SUITE: Suite>(test_data: &TestData<SUITE>) -> (Dealer<SUITE>, Vec<Verifier<SUITE>>)
 where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
-    let dealer = genDealer(test_data.clone());
+    let dealer = genDealer(&test_data);
     let mut verifiers = vec![];
     for i in 0..NB_VERIFIERS {
         let v = NewVerifier(
@@ -719,11 +892,10 @@ where
     (dealer, verifiers)
 }
 
-// func randomBytes(n int) []byte {
-// 	var buff = make([]byte, n)
-// 	_, err := rand.Read(buff)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	return buff
-// }
+fn randomBytes(n: usize) -> Vec<u8> {
+    let mut buff = vec![0; n];
+    for v in &mut buff {
+        *v = rand::random();
+    }
+    return buff;
+}
