@@ -1,6 +1,7 @@
 use std::io::{Read, Write};
 
 use crate::{
+    encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling},
     group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
     Group, Point, Random, Scalar,
 };
@@ -8,18 +9,11 @@ use anyhow::{bail, Context, Error, Result};
 use sha2::{Digest, Sha512};
 
 /// Suite represents the set of functionalities needed by the package schnorr.
-pub trait Suite<SCALAR, POINT>: Group<SCALAR, POINT> + Random
-where
-    SCALAR: Scalar,
-    POINT: Point<SCALAR>,
-{
-}
+pub trait Suite: Group + Random {}
 
-impl<T, SCALAR, POINT> Suite<SCALAR, POINT> for T
+impl<T> Suite for T
 where
-    SCALAR: Scalar,
-    POINT: Point<SCALAR>,
-    T: Group<SCALAR, POINT>,
+    T: Group,
     T: Random,
 {
 }
@@ -27,14 +21,13 @@ where
 /// Sign creates a Sign signature from a msg and a private key. This
 /// signature can be verified with VerifySchnorr. It's also a valid EdDSA
 /// signature when using the edwards25519 Group.
-pub fn Sign<SUITE: Suite<SCALAR, POINT>, SCALAR: Scalar, POINT: Point<SCALAR>>(
+pub fn Sign<SUITE: Suite>(
     s: SUITE,
-    private: SCALAR,
+    private: <SUITE::POINT as Point>::SCALAR,
     msg: &[u8],
 ) -> Result<Vec<u8>> {
-    // var g kyber.Group = s
     // create random secret k and public point commitment R
-    let k = s.scalar().set_int64(0);
+    let k = s.scalar().pick(&mut s.random_stream());
     let R = s.point().mul(&k, None);
 
     // create hash(public || R || message)
@@ -57,16 +50,11 @@ pub fn Sign<SUITE: Suite<SCALAR, POINT>, SCALAR: Scalar, POINT: Point<SCALAR>>(
 /// key public, or an error otherwise. Compared to `Verify`, it performs
 /// additional checks around the canonicality and ensures the public key
 /// does not have a small order when using `edwards25519` group.
-fn VerifyWithChecks<SCALAR, POINT, GROUP>(
-    g: GROUP,
-    pubb: &[u8],
-    msg: &[u8],
-    sig: &[u8],
-) -> Result<()>
+fn VerifyWithChecks<GROUP>(g: GROUP, pubb: &[u8], msg: &[u8], sig: &[u8]) -> Result<()>
 where
-    SCALAR: Scalar + ScalarCanCheckCanonical<SCALAR>,
-    POINT: Point<SCALAR> + PointCanCheckCanonicalAndSmallOrder<SCALAR, POINT>,
-    GROUP: Group<SCALAR, POINT>,
+    <GROUP::POINT as Point>::SCALAR: Scalar + ScalarCanCheckCanonical,
+    GROUP::POINT: Point + PointCanCheckCanonicalAndSmallOrder,
+    GROUP: Group,
 {
     let mut R = g.point();
     let mut s = g.scalar();
@@ -120,11 +108,10 @@ where
 
 /// Verify verifies a given Schnorr signature. It returns nil iff the
 /// given signature is valid.
-pub fn Verify<SCALAR, POINT, GROUP>(g: GROUP, public: &POINT, msg: &[u8], sig: &[u8]) -> Result<()>
+pub fn Verify<GROUP: Group>(g: GROUP, public: &GROUP::POINT, msg: &[u8], sig: &[u8]) -> Result<()>
 where
-    SCALAR: Scalar + ScalarCanCheckCanonical<SCALAR>,
-    POINT: Point<SCALAR> + PointCanCheckCanonicalAndSmallOrder<SCALAR, POINT>,
-    GROUP: Group<SCALAR, POINT>,
+    <GROUP::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
+    GROUP::POINT: PointCanCheckCanonicalAndSmallOrder,
 {
     let p_buf = public
         .marshal_binary()
@@ -132,12 +119,12 @@ where
     return VerifyWithChecks(g, &p_buf, msg, sig);
 }
 
-fn hash<SCALAR, POINT, GROUP>(g: &GROUP, public: &POINT, r: &POINT, msg: &[u8]) -> Result<SCALAR>
-where
-    SCALAR: Scalar,
-    POINT: Point<SCALAR>,
-    GROUP: Group<SCALAR, POINT>,
-{
+fn hash<GROUP: Group>(
+    g: &GROUP,
+    public: &GROUP::POINT,
+    r: &GROUP::POINT,
+    msg: &[u8],
+) -> Result<<GROUP::POINT as Point>::SCALAR> {
     // h := sha512.New()
     let mut h = Sha512::new();
     r.marshal_to(&mut h)?;

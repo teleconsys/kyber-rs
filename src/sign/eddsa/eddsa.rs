@@ -3,41 +3,37 @@
 
 use anyhow::{bail, Result};
 use blake2::Digest;
+use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
-use crate::group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical};
 use crate::group::edwards25519::constants::{PRIME_ORDER, WEAK_KEYS};
 use crate::group::edwards25519::{Curve, Point as EdPoint, Scalar as EdScalar};
+use crate::group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical};
 use crate::{Group, Point, Scalar};
 
-const group: Curve<EdScalar> = Curve::new();
+const group: Curve = Curve::new();
 
 /// EdDSA is a structure holding the data necessary to make a series of
 /// EdDSA signatures.
-#[derive(Debug)]
-pub struct EdDSA<SCALAR, POINT>
-where
-    SCALAR: Scalar,
-    POINT: Point<SCALAR>,
-{
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EdDSA<POINT: Point> {
     // Secret being already hashed + bit tweaked
-    pub secret: SCALAR,
+    pub secret: POINT::SCALAR,
     // Public is the corresponding public key
     pub public: POINT,
-
     pub seed: Vec<u8>,
     pub prefix: Vec<u8>,
 }
 
-impl EdDSA<EdScalar, EdPoint> {
+impl EdDSA<EdPoint> {
     /// NewEdDSA will return a freshly generated key pair to use for generating
     /// EdDSA signatures.
-    pub fn new<S: crate::cipher::Stream>(stream: &mut S) -> Result<EdDSA<EdScalar, EdPoint>> {
+    pub fn new<S: crate::cipher::Stream>(stream: &mut S) -> Result<EdDSA<EdPoint>> {
         let (secret, buffer, prefix) = group.new_key_and_seed(stream)?;
         let public = group.point().mul(&secret, None);
 
-        Ok(EdDSA::<EdScalar, EdPoint> {
+        Ok(EdDSA::<EdPoint> {
             seed: buffer,
             prefix: prefix,
             secret: secret,
@@ -46,9 +42,9 @@ impl EdDSA<EdScalar, EdPoint> {
     }
 }
 
-impl Default for EdDSA<EdScalar, EdPoint> {
+impl Default for EdDSA<EdPoint> {
     fn default() -> Self {
-        EdDSA::<EdScalar, EdPoint> {
+        EdDSA::<EdPoint> {
             seed: vec![],
             prefix: vec![],
             secret: EdScalar::default(),
@@ -57,7 +53,7 @@ impl Default for EdDSA<EdScalar, EdPoint> {
     }
 }
 
-impl PartialEq for EdDSA<EdScalar, EdPoint> {
+impl PartialEq for EdDSA<EdPoint> {
     fn eq(&self, other: &Self) -> bool {
         if self.seed != other.seed {
             return false;
@@ -75,7 +71,7 @@ impl PartialEq for EdDSA<EdScalar, EdPoint> {
     }
 }
 
-impl BinaryUnmarshaler for EdDSA<EdScalar, EdPoint> {
+impl BinaryUnmarshaler for EdDSA<EdPoint> {
     /// UnmarshalBinary transforms a slice of bytes into a EdDSA signature.
     fn unmarshal_binary(&mut self, buff: &[u8]) -> Result<()> {
         if buff.len() != 64 {
@@ -92,7 +88,7 @@ impl BinaryUnmarshaler for EdDSA<EdScalar, EdPoint> {
     }
 }
 
-impl BinaryMarshaler for EdDSA<EdScalar, EdPoint> {
+impl BinaryMarshaler for EdDSA<EdPoint> {
     /// MarshalBinary will return the representation used by the reference
     /// implementation of SUPERCOP ref10, which is "seed || Public".
     fn marshal_binary(&self) -> Result<Vec<u8>> {
@@ -105,7 +101,7 @@ impl BinaryMarshaler for EdDSA<EdScalar, EdPoint> {
     }
 }
 
-impl EdDSA<EdScalar, EdPoint> {
+impl EdDSA<EdPoint> {
     /// Sign will return a EdDSA signature of the message msg using Ed25519.
     pub fn sign(&self, msg: &[u8]) -> Result<[u8; 64]> {
         let mut hash = Sha512::new();
@@ -223,7 +219,3 @@ pub fn verify(public: &EdPoint, msg: &[u8], sig: &[u8]) -> Result<()> {
     // }
     return verify_with_checks(&p_buf, msg, sig);
 }
-
-
-
-

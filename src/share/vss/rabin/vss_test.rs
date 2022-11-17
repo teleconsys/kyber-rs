@@ -1,8 +1,10 @@
 use rand::{Rng, RngCore};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
-use crate::random;
 use crate::share::vss::rabin::vss::Response;
 use crate::{group::edwards25519::SuiteEd25519, Group, Point, Random, Scalar};
+use crate::{random, Suite};
 
 use super::vss::{minimum_t, Dealer, NewDealer, NewVerifier, RecoverSecret, Verifier};
 
@@ -14,37 +16,30 @@ fn suite() -> SuiteEd25519 {
     SuiteEd25519::new_blake_sha256ed25519()
 }
 
-struct TestData<POINT, SCALAR>
-where
-    SCALAR: Scalar,
-    POINT: Point<SCALAR>,
-{
-    suite: SuiteEd25519,
+#[derive(Clone)]
+struct TestData<SUITE: Suite> {
+    suite: SUITE,
     nb_verifiers: usize,
     vss_threshold: usize,
 
-    verifiers_pub: Vec<POINT>,
-    verifiers_sec: Vec<SCALAR>,
+    verifiers_pub: Vec<SUITE::POINT>,
+    verifiers_sec: Vec<<SUITE::POINT as Point>::SCALAR>,
 
-    dealer_pub: POINT,
-    dealer_sec: SCALAR,
+    dealer_pub: SUITE::POINT,
+    dealer_sec: <SUITE::POINT as Point>::SCALAR,
 
-    secret: SCALAR,
+    secret: <SUITE::POINT as Point>::SCALAR,
 }
 const NB_VERIFIERS: usize = 7;
 
-fn new_test_data<POINT, SCALAR>(
+fn new_test_data(
     vss_threshold: usize,
-    verifiers_pub: Vec<POINT>,
-    verifiers_sec: Vec<SCALAR>,
-    dealer_pub: POINT,
-    dealer_sec: SCALAR,
-    secret: SCALAR,
-) -> TestData<POINT, SCALAR>
-where
-    POINT: Point<SCALAR>,
-    SCALAR: Scalar,
-{
+    verifiers_pub: Vec<<SuiteEd25519 as Group>::POINT>,
+    verifiers_sec: Vec<<<SuiteEd25519 as Group>::POINT as Point>::SCALAR>,
+    dealer_pub: <SuiteEd25519 as Group>::POINT,
+    dealer_sec: <<SuiteEd25519 as Group>::POINT as Point>::SCALAR,
+    secret: <<SuiteEd25519 as Group>::POINT as Point>::SCALAR,
+) -> TestData<SuiteEd25519> {
     TestData {
         suite: SuiteEd25519::new_blake_sha256ed25519(),
         nb_verifiers: NB_VERIFIERS,
@@ -57,7 +52,7 @@ where
     }
 }
 
-fn default_test_data() -> TestData<EdPoint, EdScalar> {
+fn default_test_data() -> TestData<SuiteEd25519> {
     let (verifiers_sec, verifiers_pub) = genCommits(NB_VERIFIERS);
     let (dealer_sec, dealer_pub) = genPair();
     let (secret, _) = genPair();
@@ -78,7 +73,7 @@ fn default_test_data() -> TestData<EdPoint, EdScalar> {
 fn test_vss_whole() {
     let test_data = default_test_data();
 
-    let (dealer, mut verifiers) = genAll();
+    let (dealer, mut verifiers) = genAll(test_data.clone());
 
     // 1. dispatch deal
     let mut resps = Vec::with_capacity(test_data.nb_verifiers); //make([]*Response, nbVerifiers)
@@ -182,7 +177,8 @@ fn TestVSSVerifierNew() {
 
 #[test]
 fn TestVSSShare() {
-    let (dealer, mut verifiers) = genAll();
+    let test_data = default_test_data();
+    let (dealer, mut verifiers) = genAll(test_data);
     let ver = &mut verifiers[0];
     let deal = dealer.EncryptedDeal(0).unwrap();
 
@@ -671,8 +667,7 @@ fn genPair() -> (EdScalar, EdPoint) {
     // let mut p1 = SUITE.point();
     // let _public = p1.mul(secret, None);
     // (*secret, p1)
-    // let secret = suite.scalar().pick(&mut suite.random_stream());
-    let secret = suite.scalar().set_int64(0);
+    let secret = suite.scalar().pick(&mut suite.random_stream());
     let public = suite.point().mul(&secret, None);
     (secret, public)
 }
@@ -688,8 +683,11 @@ fn genCommits(n: usize) -> (Vec<EdScalar>, Vec<EdPoint>) {
     (secrets, publics)
 }
 
-fn genDealer() -> Dealer<EdScalar, SuiteEd25519, EdPoint> {
-    let test_data = default_test_data();
+fn genDealer<SUITE: Suite>(test_data: TestData<SUITE>) -> Dealer<SUITE>
+where
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
+{
     let d = NewDealer(
         test_data.suite,
         test_data.dealer_sec,
@@ -701,18 +699,18 @@ fn genDealer() -> Dealer<EdScalar, SuiteEd25519, EdPoint> {
     d
 }
 
-fn genAll() -> (
-    Dealer<EdScalar, SuiteEd25519, EdPoint>,
-    Vec<Verifier<EdScalar, EdPoint, SuiteEd25519>>,
-) {
-    let test_data = default_test_data();
-    let dealer = genDealer();
+fn genAll<SUITE: Suite>(test_data: TestData<SUITE>) -> (Dealer<SUITE>, Vec<Verifier<SUITE>>)
+where
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
+{
+    let dealer = genDealer(test_data.clone());
     let mut verifiers = vec![];
     for i in 0..NB_VERIFIERS {
         let v = NewVerifier(
-            test_data.suite,
+            test_data.suite.clone(),
             test_data.verifiers_sec[i].clone(),
-            test_data.dealer_pub,
+            test_data.dealer_pub.clone(),
             test_data.verifiers_pub.clone(),
         )
         .unwrap();

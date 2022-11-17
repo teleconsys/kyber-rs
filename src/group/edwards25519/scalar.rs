@@ -57,7 +57,7 @@ impl Scalar {
     }
 }
 
-impl ScalarCanCheckCanonical<Scalar> for Scalar {
+impl ScalarCanCheckCanonical for Scalar {
     /// IsCanonical whether the scalar in sb is in the range 0<=s<L as required by RFC8032, Section 5.1.7.
     /// Also provides Strong Unforgeability under Chosen Message Attacks (SUF-CMA)
     /// See paper https://eprint.iacr.org/2020/823.pdf for definitions and theorems

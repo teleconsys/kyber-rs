@@ -7,7 +7,7 @@
 //   completedGroupElement: ((X:Z),(Y:T)) satisfying x=X/Z, y=Y/T
 //   preComputedGroupElement: (y+x,y-x,2dxy)
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::{
     constants::{BASE, D, D2, SQRT_M1},
@@ -77,7 +77,7 @@ fn test_from_bytes() {
     assert!(el.FromBytes(&arr));
 }
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct ExtendedGroupElement {
     pub X: FieldElement,
     pub Y: FieldElement,

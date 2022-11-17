@@ -1,6 +1,6 @@
 // var marshalPointID = [8]byte{'e', 'd', '.', 'p', 'o', 'i', 'n', 't'}
 use anyhow::{Error, Result};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     cipher::Stream,
@@ -18,7 +18,7 @@ use super::{
     Scalar,
 };
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Point {
     ge: ExtendedGroupElement,
     varTime: bool,
@@ -75,7 +75,9 @@ impl PartialEq for Point {
     }
 }
 
-impl group::Point<Scalar> for Point {
+impl group::Point for Point {
+    type SCALAR = Scalar;
+
     /// Equality test for two Points on the same curve
     fn equal(&self, p2: &Self) -> bool {
         let mut b1 = [0 as u8; 32];
@@ -222,7 +224,7 @@ impl group::Point<Scalar> for Point {
     }
 }
 
-impl PointCanCheckCanonicalAndSmallOrder<Scalar, Point> for Point {
+impl PointCanCheckCanonicalAndSmallOrder for Point {
     /// HasSmallOrder determines whether the group element has small order
     ///
     /// Provides resilience against malicious key substitution attacks (M-S-UEO)

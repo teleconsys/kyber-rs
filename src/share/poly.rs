@@ -10,6 +10,7 @@
 
 use anyhow::bail;
 use anyhow::Result;
+use serde::Deserialize;
 use serde::Serialize;
 
 // Some error definitions
@@ -17,15 +18,21 @@ const ERROR_GROUPS: &str = "non-matching groups";
 const ERROR_COEFFS: &str = "different number of coefficients";
 
 /// PriShare represents a private share.
-#[derive(Serialize)]
-pub struct PriShare<SCALAR>
-where
-    SCALAR: Scalar,
-{
+#[derive(Serialize, Deserialize, Clone)]
+pub struct PriShare<SCALAR: Scalar> {
     /// Index of the private share
     pub i: usize,
     /// Value of the private share
     pub v: SCALAR,
+}
+
+impl<SCALAR: Scalar> Default for PriShare<SCALAR> {
+    fn default() -> Self {
+        Self {
+            i: Default::default(),
+            v: Default::default(),
+        }
+    }
 }
 
 // // Hash returns the hash representation of this share
@@ -41,17 +48,12 @@ where
 // }
 
 /// PriPoly represents a secret sharing polynomial.
-pub struct PriPoly<SCALAR, POINT, GROUP>
-where
-    SCALAR: Scalar,
-    POINT: Point<SCALAR>,
-    GROUP: Group<SCALAR, POINT>,
-{
-    _phantom: PhantomData<POINT>,
+pub struct PriPoly<GROUP: Group> {
+    _phantom: PhantomData<GROUP::POINT>,
     /// Cryptographic group
     g: GROUP,
     /// Coefficients of the polynomial
-    coeffs: Vec<SCALAR>,
+    coeffs: Vec<<GROUP::POINT as Point>::SCALAR>,
 }
 
 use std::marker::PhantomData;
@@ -62,19 +64,17 @@ use crate::{cipher::Stream, Group, Point, Scalar};
 /// cryptographic group, the secret sharing threshold t, and the secret to be
 /// shared s. If s is nil, a new s is chosen using the provided randomness
 /// stream rand.
-pub fn NewPriPoly<SCALAR, POINT, GROUP, STREAM>(
+pub fn NewPriPoly<GROUP, STREAM>(
     group: GROUP,
     t: usize,
-    s: Option<SCALAR>,
+    s: Option<<GROUP::POINT as Point>::SCALAR>,
     mut rand: STREAM,
-) -> PriPoly<SCALAR, POINT, GROUP>
+) -> PriPoly<GROUP>
 where
-    SCALAR: Scalar,
-    POINT: Point<SCALAR>,
-    GROUP: Group<SCALAR, POINT>,
+    GROUP: Group,
     STREAM: Stream,
 {
-    let mut coeffs: Vec<SCALAR> = vec![];
+    let mut coeffs: Vec<<GROUP::POINT as Point>::SCALAR> = vec![];
     coeffs.push(match s {
         Some(v) => v,
         None => group.scalar().pick(&mut rand),
@@ -94,25 +94,20 @@ where
 // 	return &PriPoly{g: g, coeffs: coeffs}
 // }
 
-impl<SCALAR, POINT, GROUP> PriPoly<SCALAR, POINT, GROUP>
-where
-    SCALAR: Scalar,
-    POINT: Point<SCALAR>,
-    GROUP: Group<SCALAR, POINT>,
-{
+impl<'a, GROUP: Group> PriPoly<GROUP> {
     /// Threshold returns the secret sharing threshold.
     pub fn Threshold(&self) -> usize {
         self.coeffs.len()
     }
 
     /// Secret returns the shared secret p(0), i.e., the constant term of the polynomial.
-    pub fn Secret(&self) -> SCALAR {
+    pub fn Secret(&self) -> <GROUP::POINT as Point>::SCALAR {
         // return p.coeffs[0]
         todo!()
     }
 
     /// Eval computes the private share v = p(i).
-    pub fn Eval(&self, i: usize) -> PriShare<SCALAR> {
+    pub fn Eval(&self, i: usize) -> PriShare<<GROUP::POINT as Point>::SCALAR> {
         let xi = self.g.scalar().set_int64(1 + i as i64);
         let mut v = self.g.scalar().zero();
         for j in (0..self.Threshold()).rev() {
@@ -169,7 +164,7 @@ where
 
     /// Commit creates a public commitment polynomial for the given base point b or
     /// the standard base if b == nil.
-    pub fn Commit(&self, b: POINT) -> PubPoly<SCALAR, POINT, GROUP> {
+    pub fn Commit(&self, b: GROUP::POINT) -> PubPoly<GROUP> {
         let mut commits = vec![];
         for i in 0..self.Threshold() {
             commits.push(self.g.point().mul(&self.coeffs[i], Some(&b)));
@@ -177,7 +172,7 @@ where
 
         PubPoly {
             g: self.g.clone(),
-            b,
+            b: Some(b),
             commits,
             _phantom: PhantomData,
         }
@@ -332,11 +327,13 @@ where
 // 	return "[ " + strings.Join(strs, ", ") + " ]"
 // }
 
-// // PubShare represents a public share.
-// type PubShare struct {
-// 	I int         // Index of the public share
-// 	V kyber.Point // Value of the public share
-// }
+// PubShare represents a public share.
+pub struct PubShare<POINT: Point> {
+    /// Index of the public share
+    pub i: usize,
+    /// Value of the public share
+    pub v: POINT,
+}
 
 // // Hash returns the hash representation of this share.
 // func (p *PubShare) Hash(s kyber.HashFactory) []byte {
@@ -347,30 +344,33 @@ where
 // }
 
 /// PubPoly represents a public commitment polynomial to a secret sharing polynomial.
-pub struct PubPoly<SCALAR, POINT, GROUP>
-where
-    SCALAR: Scalar,
-    POINT: Point<SCALAR>,
-    GROUP: Group<SCALAR, POINT>,
-{
-    _phantom: PhantomData<SCALAR>,
+pub struct PubPoly<GROUP: Group> {
+    _phantom: PhantomData<<GROUP::POINT as Point>::SCALAR>,
     /// Cryptographic group
     g: GROUP,
     /// Base point, nil for standard base
-    b: POINT,
+    b: Option<GROUP::POINT>,
     /// Commitments to coefficients of the secret sharing polynomial
-    commits: Vec<POINT>,
+    commits: Vec<GROUP::POINT>,
 }
 
-impl<SCALAR, POINT, GROUP> PubPoly<SCALAR, POINT, GROUP>
+impl<GROUP: Group> PubPoly<GROUP>
 where
-    SCALAR: Scalar,
-    POINT: Point<SCALAR>,
-    GROUP: Group<SCALAR, POINT>,
+    GROUP: Group,
 {
+    /// NewPubPoly creates a new public commitment polynomial.
+    pub fn new(g: GROUP, b: Option<GROUP::POINT>, commits: &[GROUP::POINT]) -> PubPoly<GROUP> {
+        return PubPoly {
+            g,
+            b,
+            commits: commits.clone().to_vec(),
+            _phantom: PhantomData,
+        };
+    }
+
     /// Info returns the base point and the commitments to the polynomial coefficients.
-    pub fn Info(&self) -> (POINT, Vec<POINT>) {
-        (self.b.clone(), self.commits.clone())
+    pub fn Info(&self) -> (GROUP::POINT, Vec<GROUP::POINT>) {
+        (self.b.as_ref().unwrap().clone(), self.commits.clone())
     }
 
     /// threshold returns the secret sharing threshold.
@@ -383,16 +383,20 @@ where
     // 	return p.commits[0]
     // }
 
-    // // Eval computes the public share v = p(i).
-    // func (p *PubPoly) Eval(i int) *PubShare {
-    // 	xi := p.g.Scalar().SetInt64(1 + int64(i)) // x-coordinate of this share
-    // 	v := p.g.Point().Null()
-    // 	for j := p.Threshold() - 1; j >= 0; j-- {
-    // 		v.Mul(xi, v)
-    // 		v.Add(v, p.commits[j])
-    // 	}
-    // 	return &PubShare{i, v}
-    // }
+    /// Eval computes the public share v = p(i).
+    pub fn Eval(&self, i: usize) -> PubShare<GROUP::POINT> {
+        // x-coordinate of this share
+        let xi = self.g.scalar().set_int64(1 + (i as i64));
+        let mut v = self.g.point();
+        v.null();
+        for j in (0..=(self.threshold() - 1)).rev() {
+            let v_clone = v.clone();
+            v = v.mul(&xi, Some(&v_clone));
+            let v_clone = v.clone();
+            v = v.add(&v_clone, &self.commits[j]);
+        }
+        return PubShare { i, v };
+    }
 
     // // Shares creates a list of n public commitment shares p(1),...,p(n).
     // func (p *PubPoly) Shares(n int) []*PubShare {
@@ -455,11 +459,6 @@ where
     // 	return pv.V.Equal(ps)
     // }
 }
-
-// // NewPubPoly creates a new public commitment polynomial.
-// func NewPubPoly(g kyber.Group, b kyber.Point, commits []kyber.Point) *PubPoly {
-// 	return &PubPoly{g, b, commits}
-// }
 
 // type byIndexPub []*PubShare
 

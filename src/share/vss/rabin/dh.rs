@@ -7,19 +7,14 @@ use digest::{generic_array::GenericArray, OutputSizeUser};
 use hkdf::{hmac::Hmac, Hkdf, HmacImpl};
 use sha2::Sha256;
 
-use crate::{Point, Scalar, Suite};
+use crate::{encoding::Marshaling, Point, Suite};
 
 /// dhExchange computes the shared key from a private key and a public key
-pub fn dhExchange<SCALAR, POINT, SUITE>(
+pub fn dhExchange<'a, SUITE: Suite>(
     suite: SUITE,
-    ownPrivate: SCALAR,
-    remotePublic: POINT,
-) -> POINT
-where
-    SCALAR: Scalar,
-    POINT: Point<SCALAR>,
-    SUITE: Suite<SCALAR, POINT>,
-{
+    ownPrivate: <SUITE::POINT as Point>::SCALAR,
+    remotePublic: SUITE::POINT,
+) -> SUITE::POINT {
     let sk = suite.point();
     sk.mul(&ownPrivate, Some(&remotePublic))
 }
@@ -28,26 +23,20 @@ where
 const KEY_SIZE: usize = 128;
 
 /// context returns the context slice to be used when encrypting a share
-pub fn context<SUITE, POINT, SCALAR>(
+pub fn context<SUITE: Suite>(
     suite: &SUITE,
-    dealer: &POINT,
-    verifiers: &Vec<POINT>,
-) -> [u8; KEY_SIZE]
-where
-    SUITE: Suite<SCALAR, POINT>,
-    POINT: Point<SCALAR>,
-    SCALAR: Scalar,
-{
-    // let mut h = suite.xof(Some("vss-dealer".as_bytes()));
-    // dealer.marshal_to(&mut h).unwrap();
-    // h.write("vss-verifiers".as_bytes()).unwrap();
-    // for v in verifiers {
-    //     v.marshal_to(&mut h).unwrap();
-    // }
-    // let mut sum = [0 as u8; KEY_SIZE]; //make([]byte, keySize);
-    // h.read(&mut sum).unwrap();
-    // sum
-    [0; KEY_SIZE]
+    dealer: &SUITE::POINT,
+    verifiers: &Vec<SUITE::POINT>,
+) -> [u8; KEY_SIZE] {
+    let mut h = suite.xof(Some("vss-dealer".as_bytes()));
+    dealer.marshal_to(&mut h).unwrap();
+    h.write("vss-verifiers".as_bytes()).unwrap();
+    for v in verifiers {
+        v.marshal_to(&mut h).unwrap();
+    }
+    let mut sum = [0 as u8; KEY_SIZE]; //make([]byte, keySize);
+    h.read(&mut sum).unwrap();
+    sum
 }
 
 pub fn hkdf<H, I>(buff: &[u8], info: &[u8]) -> Result<[u8; 32]>
@@ -115,16 +104,12 @@ pub fn aes_decrypt(
     Ok(decrypted)
 }
 
-pub fn aead_encrypt<S, POINT>(
+pub fn aead_encrypt<POINT: Point>(
     pre_key: POINT,
     info: &[u8],
     nonce: &[u8; AES_NONCE_LENGTH],
     data: &[u8],
-) -> Result<Vec<u8>>
-where
-    S: Scalar,
-    POINT: Point<S>,
-{
+) -> Result<Vec<u8>> {
     let pre_buff = pre_key.marshal_binary()?;
     let key = hkdf::<Sha256, Hmac<Sha256>>(&pre_buff, info)?;
     let encrypted = aes_encrypt(&key, nonce, data, Some(info))?;
@@ -132,16 +117,12 @@ where
     Ok(encrypted)
 }
 
-pub fn aead_decrypt<S, POINT>(
+pub fn aead_decrypt<POINT: Point>(
     pre_key: POINT,
     info: &[u8],
     nonce: &[u8; AES_NONCE_LENGTH],
     cipher: &[u8],
-) -> Result<Vec<u8>>
-where
-    S: Scalar,
-    POINT: Point<S>,
-{
+) -> Result<Vec<u8>> {
     let pre_buff = pre_key.marshal_binary()?;
     let key = hkdf::<Sha256, Hmac<Sha256>>(&pre_buff, info)?;
     let decrypted = aes_decrypt(&key, nonce, cipher, Some(info))?;
@@ -154,11 +135,7 @@ pub struct AEAD {
 }
 
 impl AEAD {
-    pub fn new<SCALAR, POINT>(pre: POINT, hkfd_context: &Vec<u8>) -> Result<Self>
-    where
-        SCALAR: Scalar,
-        POINT: Point<SCALAR>,
-    {
+    pub fn new<POINT: Point>(pre: POINT, hkfd_context: &Vec<u8>) -> Result<Self> {
         let pre_buff = pre.marshal_binary()?;
         let key = hkdf::<Sha256, Hmac<Sha256>>(&pre_buff, &hkfd_context)?;
         Ok(AEAD { key })
