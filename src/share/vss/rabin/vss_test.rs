@@ -460,7 +460,7 @@ fn TestVSSAggregatorVerifyJustification() {
     d.sec_share.v = wrongV;
     let encD = dealer.EncryptedDeal(0).unwrap();
     let mut resp = v.process_encrypted_deal(&encD).unwrap();
-    assert!(resp.approved);
+    assert!(!resp.approved);
     assert_eq!(v.responses[&(v.index as u32)], resp);
 
     // in tests, pointers point to the same underlying share..

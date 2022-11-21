@@ -242,16 +242,20 @@ where
     SUITE::POINT: Serialize + DeserializeOwned,
 {
     /// Hash returns the hash of a Justification.
-    fn hash(self, s: SUITE) -> Vec<u8> {
+    fn hash(self, s: SUITE) -> Result<Vec<u8>> {
         let mut h = s.hash();
         h.update("justification".as_bytes());
         h.update(&self.session_id);
 
+        h.write_u32::<LittleEndian>(self.index)?;
+        let buff = self.deal.marshal_binary()?;
+        h.update(&buff);
+
         // _ = binary.Write(h, binary.LittleEndian, j.Index)
         // buff, _ := protobuf.Encode(j.Deal)
         // _, _ = h.Write(buff)
-        // return h.Sum(nil)
-        todo!()
+
+        Ok(h.finalize().to_vec())
     }
 }
 
@@ -412,7 +416,8 @@ where
             signature: vec![],
         };
 
-        let sig = schnorr::Sign(self.suite, self.long.clone(), &j.clone().hash(self.suite))?;
+        let msg = &j.clone().hash(self.suite)?;
+        let sig = schnorr::Sign(self.suite, self.long.clone(), msg)?;
         j.signature = sig;
 
         Ok(Some(j))
@@ -598,9 +603,10 @@ where
 
         if let Err(err) = result {
             r.approved = false;
+            // TODO: manage error
             match err {
                 VerifyDealError::DealAlreadyProcessedError => bail!(err),
-                VerifyDealError::TextError(e) => bail!(e),
+                VerifyDealError::TextError(e) => if !e.eq("vss: share does not verify against commitments in Deal"){bail!(e)},
             }
         }
 
@@ -877,7 +883,8 @@ where
         if !self.responses.contains_key(&j.index) {
             bail!("vss: no complaints received for this justification")
         }
-        todo!("TAKE R AS CLONE BUT SHOULD BE MODIFIED LATER");
+        
+        // clone the resp here
         let mut r = self.responses[&j.index].clone();
 
         if r.approved {
@@ -890,6 +897,10 @@ where
         } else {
             r.approved = true
         }
+
+        // add the updated resp
+        self.responses.insert(j.index, r);
+
         return verification.map_err(|e| Error::msg(e.to_string()));
     }
 
