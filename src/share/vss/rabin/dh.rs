@@ -105,7 +105,7 @@ pub fn aes_decrypt(
 }
 
 pub fn aead_encrypt<POINT: Point>(
-    pre_key: POINT,
+    pre_key: &POINT,
     info: &[u8],
     nonce: &[u8; AES_NONCE_LENGTH],
     data: &[u8],
@@ -118,7 +118,7 @@ pub fn aead_encrypt<POINT: Point>(
 }
 
 pub fn aead_decrypt<POINT: Point>(
-    pre_key: POINT,
+    pre_key: &POINT,
     info: &[u8],
     nonce: &[u8; AES_NONCE_LENGTH],
     cipher: &[u8],

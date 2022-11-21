@@ -81,7 +81,7 @@ fn default_test_data() -> TestData<SuiteEd25519> {
 fn test_vss_whole() {
     let test_data = default_test_data();
 
-    let (dealer, mut verifiers) = genAll(&test_data);
+    let (mut dealer, mut verifiers) = genAll(&test_data);
 
     // 1. dispatch deal
     let mut resps = vec![];
@@ -93,7 +93,7 @@ fn test_vss_whole() {
 
     // 2. dispatch responses
     for resp in resps {
-        for (i, v) in verifiers.iter().enumerate() {
+        for (i, v) in verifiers.iter_mut().enumerate() {
             if resp.index == i as u32 {
                 continue;
             }
@@ -112,8 +112,8 @@ fn test_vss_whole() {
 
     // 4. collect deals
     let mut deals = Vec::with_capacity(test_data.nb_verifiers);
-    for (i, v) in verifiers.iter().enumerate() {
-        deals[i] = v.deal().unwrap();
+    for v in verifiers {
+        deals.push(v.deal().unwrap());
     }
 
     // 5. recover
@@ -164,7 +164,7 @@ fn TestVSSVerifierNew() {
     let v = NewVerifier(
         test_data.suite,
         test_data.verifiers_sec[rand_idx].clone(),
-        test_data.dealer_pub,
+        test_data.dealer_pub.clone(),
         test_data.verifiers_pub.clone(),
     )
     .unwrap();
@@ -175,9 +175,9 @@ fn TestVSSVerifierNew() {
         .scalar()
         .pick(&mut test_data.suite.random_stream());
     assert!(NewVerifier(
-        test_data.suite,
+        test_data.suite.clone(),
         wrong_key,
-        test_data.dealer_pub,
+        test_data.dealer_pub.clone(),
         test_data.verifiers_pub
     )
     .is_err());
@@ -401,7 +401,7 @@ fn TestVSSVerifierReceiveDeal() {
     d.sec_share.i = goodIdx;
 
     // wrong commitments
-    let goodCommit = d.commitments[0];
+    let goodCommit = d.commitments[0].clone();
     d.commitments[0] = test_data
         .suite
         .point()
@@ -411,7 +411,7 @@ fn TestVSSVerifierReceiveDeal() {
     assert!(resp.is_err());
 
     let d = &mut dealer.deals[0];
-    d.commitments[0] = goodCommit;
+    d.commitments[0] = goodCommit.clone();
 
     // already seen twice
     let resp = v.process_encrypted_deal(&encD);
@@ -434,7 +434,7 @@ fn TestVSSVerifierReceiveDeal() {
     v.aggregator = Some(v_aggr.clone());
     let resp = v.process_encrypted_deal(&encD);
     assert!(resp.is_err());
-    d.commitments[0] = goodCommit;
+    d.commitments[0] = goodCommit.clone();
 
     // valid complaint
     v_aggr.deal = None;
@@ -513,9 +513,7 @@ fn TestVSSAggregatorVerifyJustification() {
 #[test]
 fn TestVSSAggregatorVerifyResponseDuplicate() {
     let test_data = default_test_data();
-    let (mut dealer, mut verifiers) = genAll(&test_data);
-    //d1 := dealer.deals[0]
-    //d2 := dealer.deals[1]
+    let (dealer, mut verifiers) = genAll(&test_data);
     let encD1 = dealer.EncryptedDeal(0).unwrap();
     let encD2 = dealer.EncryptedDeal(1).unwrap();
 
@@ -814,7 +812,7 @@ fn TestVSSDHExchange() {
         .suite
         .scalar()
         .pick(&mut test_data.suite.random_stream());
-    let point = dhExchange(test_data.suite, privv, pubb);
+    let point = dhExchange(test_data.suite, privv, pubb.clone());
     assert_eq!(pubb.mul(&privv, None).string(), point.string());
 }
 

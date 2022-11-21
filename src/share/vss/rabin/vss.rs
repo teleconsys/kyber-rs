@@ -397,7 +397,7 @@ where
     /// it returns a Justification. This Justification must be broadcasted to every
     /// participants. If it's an invalid complaint, it returns an error about the
     /// complaint. The verifiers will also ignore an invalid Complaint.
-    pub fn process_response(&self, r: &Response) -> Result<Option<Justification<SUITE>>> {
+    pub fn process_response(&mut self, r: &Response) -> Result<Option<Justification<SUITE>>> {
         self.aggregator.verify_response(r)?;
 
         if r.approved {
@@ -640,12 +640,11 @@ where
     /// verifier should expect to see a Justification from the Dealer. It returns an
     /// error if it's not a valid response.
     /// Call `v.DealCertified()` to check if the whole protocol is finished.
-    pub fn process_response(&self, resp: &Response) -> Result<()> {
-        let aggregator = self.aggregator.clone();
-        if aggregator.is_none() {
-            bail!("no aggregator for verifier")
+    pub fn process_response(&mut self, resp: &Response) -> Result<()> {
+        match &mut self.aggregator {
+            Some(aggregator) => aggregator.verify_response(resp),
+            None => bail!("no aggregator for verifier"),
         }
-        aggregator.unwrap().verify_response(resp)
     }
 
     /// deal returns the Deal that this verifier has received. It returns
@@ -852,7 +851,7 @@ where
         }
     }
 
-    pub fn verify_response(&self, r: &Response) -> Result<()> {
+    pub fn verify_response(&mut self, r: &Response) -> Result<()> {
         if r.session_id != self.sid {
             bail!("vss: receiving inconsistent sessionID in response")
         }
@@ -865,7 +864,8 @@ where
         let msg = r.hash(self.suite)?;
 
         schnorr::Verify(self.suite, &public.unwrap(), &msg, &r.signature)?;
-        Ok(())
+
+        self.add_response(r.clone())
     }
 
     fn verify_justification(&mut self, j: &Justification<SUITE>) -> Result<()> {
@@ -1008,7 +1008,8 @@ where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
-    let mut shares: Vec<PriShare<<SUITE::POINT as Point>::SCALAR>> = vec![];
+    let mut shares: Vec<PriShare<<SUITE::POINT as Point>::SCALAR>> =
+        vec![PriShare::<<SUITE::POINT as Point>::SCALAR>::default(); deals.len()];
     let d0_sid = deals[0].session_id.clone();
     for (i, deal) in deals.into_iter().enumerate() {
         // all sids the same

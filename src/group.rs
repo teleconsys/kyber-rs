@@ -81,7 +81,7 @@ pub trait Point: Marshaling + Clone + PartialEq + Default {
     fn equal(&self, s2: &Self) -> bool;
 
     /// Null sets the receiver to the neutral identity element.
-    fn null(&mut self) -> &mut Self;
+    fn null(self) -> Self;
 
     /// Base sets the receiver to this group's standard base point.
     fn base(self) -> Self;

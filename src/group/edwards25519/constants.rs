@@ -34,7 +34,7 @@ lazy_static! {
     pub static ref COFACTOR_SCALAR: Scalar = newScalarInt(COFACTOR.clone());
 
     // identity point
-    pub static ref NULL_POINT: EdPoint = *EdPoint::default().null();
+    pub static ref NULL_POINT: EdPoint = EdPoint::default().null();
 }
 
 pub const SQRT_M1: FieldElement = [

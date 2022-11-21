@@ -18,7 +18,7 @@ use super::{
     Scalar,
 };
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Point {
     ge: ExtendedGroupElement,
     varTime: bool,
@@ -51,7 +51,7 @@ impl BinaryUnmarshaler for Point {
 
 impl Marshaling for Point {
     fn marshal_to(&self, w: &mut impl std::io::Write) -> Result<()> {
-        marshalling::point_marshal_to(*self, w)
+        marshalling::point_marshal_to(self, w)
     }
 
     fn marshal_size(&self) -> usize {
@@ -93,7 +93,7 @@ impl group::Point for Point {
     }
 
     /// Set to the neutral element, which is (0,1) for twisted Edwards curves.
-    fn null(&mut self) -> &mut Self {
+    fn null(mut self) -> Self {
         self.ge.Zero();
         self
     }
@@ -159,7 +159,8 @@ impl group::Point for Point {
             // simply by multiplying it by the cofactor.
             if data.is_none() {
                 // multiply by cofactor
-                self.mul(&COFACTOR_SCALAR, Some(&self));
+                let old_self = &self.clone();
+                self = self.mul(&COFACTOR_SCALAR, Some(old_self));
                 if self.equal(&NULL_POINT) {
                     // unlucky; try again
                     continue;

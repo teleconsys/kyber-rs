@@ -403,7 +403,7 @@ impl<GROUP: Group> PubPoly<GROUP> {
         // x-coordinate of this share
         let xi = self.g.scalar().set_int64(1 + (i as i64));
         let mut v = self.g.point();
-        v.null();
+        v = v.null();
         for j in (0..=(self.threshold() - 1)).rev() {
             let v_clone = v.clone();
             v = v.mul(&xi, Some(&v_clone));
