@@ -365,7 +365,7 @@ where
         let dhPublic = self.suite.point().mul(&dhSecret, None);
         // signs the public key
         let dhPublicBuff = dhPublic.marshal_binary()?;
-        let signature = schnorr::Sign(self.suite, self.long.clone(), &dhPublicBuff)?;
+        let signature = schnorr::Sign(&self.suite, &self.long, &dhPublicBuff)?;
 
         // AES128-GCM
         let pre = dhExchange(self.suite, dhSecret, vPub);
@@ -417,7 +417,7 @@ where
         };
 
         let msg = &j.clone().hash(self.suite)?;
-        let sig = schnorr::Sign(self.suite, self.long.clone(), msg)?;
+        let sig = schnorr::Sign(&self.suite, &self.long, msg)?;
         j.signature = sig;
 
         Ok(Some(j))
@@ -606,13 +606,17 @@ where
             // TODO: manage error
             match err {
                 VerifyDealError::DealAlreadyProcessedError => bail!(err),
-                VerifyDealError::TextError(e) => if !e.eq("vss: share does not verify against commitments in Deal"){bail!(e)},
+                VerifyDealError::TextError(e) => {
+                    if !e.eq("vss: share does not verify against commitments in Deal") {
+                        bail!(e)
+                    }
+                }
             }
         }
 
         r.signature = schnorr::Sign(
-            self.suite,
-            self.longterm.clone(),
+            &self.suite,
+            &self.longterm.clone(),
             r.hash(self.suite)?.as_slice(),
         )?;
 
@@ -883,7 +887,7 @@ where
         if !self.responses.contains_key(&j.index) {
             bail!("vss: no complaints received for this justification")
         }
-        
+
         // clone the resp here
         let mut r = self.responses[&j.index].clone();
 

@@ -40,15 +40,15 @@ pub trait Scalar:
 
     // // Set to the modular negation of scalar a.
     // Neg(a scalar) scalar
-    //
-    // // Set to the multiplicative identity (1).
-    // One() scalar
 
-    // // Set to the modular division of scalar a by scalar b.
-    // Div(a, b scalar) scalar
-    //
-    // // Set to the modular inverse of scalar a.
-    // Inv(a scalar) scalar
+    // Set to the multiplicative identity (1).
+    fn one(self) -> Self;
+
+    // Set to the modular division of scalar a by scalar b.
+    fn div(self, a: &Self, b: &Self) -> Self;
+
+    // Set to the modular inverse of scalar a.
+    fn inv(self, a: &Self) -> Self;
 
     // Set to a fresh random or pseudo-random scalar.
     fn pick(self, rand: &mut impl Stream) -> Self;

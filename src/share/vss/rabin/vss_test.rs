@@ -456,8 +456,8 @@ fn TestVSSAggregatorVerifyJustification() {
         .suite
         .scalar()
         .pick(&mut test_data.suite.random_stream());
-    let goodV = d.sec_share.v;
-    d.sec_share.v = wrongV;
+    let goodV = d.sec_share.v.clone();
+    d.sec_share.v = wrongV.clone();
     let encD = dealer.EncryptedDeal(0).unwrap();
     let mut resp = v.process_encrypted_deal(&encD).unwrap();
     assert!(!resp.approved);
@@ -577,8 +577,8 @@ fn TestVSSAggregatorVerifyResponse() {
     // wrong index
     resp.index = test_data.verifiers_pub.len() as u32;
     let sig = schnorr::Sign(
-        test_data.suite,
-        v.longterm,
+        &test_data.suite,
+        &v.longterm,
         &resp.hash(test_data.suite).unwrap(),
     )
     .unwrap();
@@ -812,7 +812,7 @@ fn TestVSSDHExchange() {
         .suite
         .scalar()
         .pick(&mut test_data.suite.random_stream());
-    let point = dhExchange(test_data.suite, privv, pubb.clone());
+    let point = dhExchange(test_data.suite, privv.clone(), pubb.clone());
     assert_eq!(pubb.mul(&privv, None).string(), point.string());
 }
 

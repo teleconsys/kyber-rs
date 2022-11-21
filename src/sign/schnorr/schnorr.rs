@@ -22,8 +22,8 @@ where
 /// signature can be verified with VerifySchnorr. It's also a valid EdDSA
 /// signature when using the edwards25519 Group.
 pub fn Sign<SUITE: Suite>(
-    s: SUITE,
-    private: <SUITE::POINT as Point>::SCALAR,
+    s: &SUITE,
+    private: &<SUITE::POINT as Point>::SCALAR,
     msg: &[u8],
 ) -> Result<Vec<u8>> {
     // create random secret k and public point commitment R
@@ -32,10 +32,10 @@ pub fn Sign<SUITE: Suite>(
 
     // create hash(public || R || message)
     let public = s.point().mul(&private, None);
-    let h = hash(&s, &public, &R, msg)?;
+    let h = hash(s, &public, &R, msg)?;
 
     // compute response s = k + x*h
-    let xh = private * h;
+    let xh = private.clone() * h;
     let S = k + xh;
 
     // return R || s

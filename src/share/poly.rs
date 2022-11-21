@@ -56,6 +56,7 @@ pub struct PriPoly<GROUP: Group> {
     coeffs: Vec<<GROUP::POINT as Point>::SCALAR>,
 }
 
+use std::cmp;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::DerefMut;
@@ -216,34 +217,33 @@ pub fn recover_secret<GROUP: Group>(
     t: usize,
     n: usize,
 ) -> Result<<GROUP::POINT as Point>::SCALAR> {
-    // let (x, y) = xy_scalar(g.clone(), shares, t, n);
-    // if x.len() < t {
-    //     bail!("share: not enough shares to recover secret");
-    // }
+    let (x, y) = xy_scalar(&g, &shares, t, n);
+    if x.len() < t {
+        bail!("share: not enough shares to recover secret");
+    }
 
-    // let mut acc = g.scalar().zero();
-    // let mut num = g.scalar();
-    // let mut den = g.scalar();
-    // let mut tmp = g.scalar();
+    let mut acc = g.scalar().zero();
+    let mut num = g.scalar();
+    let mut den = g.scalar();
+    let mut tmp = g.scalar();
 
-    // for (i, xi) in x.into_iter().enumerate() {
-    //     let yi = y[&i].clone();
-    //     num.set(&yi);
-    //     todo!();
-    //     //den.one();
-    //     for (j, xj) in x.into_iter().enumerate() {
-    //         if i == j {
-    //             continue;
-    //         }
-    //         num.mul(xj.1);
-    //         den.mul(tmp.sub(&xj.1, &xi.1));
-    //     }
-    //     todo!();
-    //     //acc.add(&num.div(num, den));
-    // }
+    for (i, xi) in x.iter().enumerate() {
+        let yi = y[&i].clone();
+        num = num.set(&yi);
+        den = den.one();
+        for (j, xj) in x.iter().enumerate() {
+            if i == j {
+                continue;
+            }
+            num = num * (xj.1.clone());
+            tmp = tmp.sub(&xj.1, &xi.1);
+            den = den * (tmp.clone());
+        }
+        num = num.clone().div(&num, &den);
+        acc = acc + num.clone();
+    }
 
-    // Ok(acc)
-    todo!()
+    Ok(acc)
 }
 
 // type byIndexScalar []*PriShare
@@ -256,8 +256,8 @@ pub fn recover_secret<GROUP: Group>(
 /// is the list of x_i and the second map is the list of y_i, both indexed in
 /// their respective map at index i.
 fn xy_scalar<GROUP: Group>(
-    g: GROUP,
-    shares: Vec<PriShare<<GROUP::POINT as Point>::SCALAR>>,
+    g: &GROUP,
+    shares: &Vec<PriShare<<GROUP::POINT as Point>::SCALAR>>,
     t: usize,
     n: usize,
 ) -> (
@@ -267,31 +267,23 @@ fn xy_scalar<GROUP: Group>(
     // we are sorting first the shares since the shares may be unrelated for
     // some applications. In this case, all participants needs to interpolate on
     // the exact same order shares.
-    todo!();
-    let mut sorted: Vec<PriShare<<GROUP::POINT as Point>::SCALAR>> = vec![];
-    // //sorted := make([]*PriShare, 0, n)
-    // for share in shares {
-    // 	// if share != nil {
-    // 	// 	sorted = append(sorted, share)
-    // 	// }
-    //     sorted.push(share);
-    // }
-    // // sort.Sort(byIndexScalar(sorted))
+    let mut sorted = Vec::with_capacity(n);
+    for share in shares.clone() {
+        sorted.push(share);
+    }
+    sorted.sort_by(|i, j| i.i.cmp(&j.i));
 
-    // // let x := make(map[int]kyber.Scalar)
-    // // let y := make(map[int]kyber.Scalar)
-    // // for _, s := range sorted {
-    // // 	if s == nil || s.V == nil || s.I < 0 {
-    // // 		continue
-    // // 	}
-    // // 	idx := s.I
-    // // 	x[idx] = g.Scalar().SetInt64(int64(idx + 1))
-    // // 	y[idx] = s.V
-    // // 	if len(x) == t {
-    // // 		break
-    // // 	}
-    // // }
-    // // return x, y
+    let mut x = HashMap::new();
+    let mut y = HashMap::new();
+    for s in sorted {
+        let idx = s.i;
+        x.insert(idx, g.scalar().set_int64((idx + 1) as i64));
+        y.insert(idx, s.v);
+        if x.len() == t {
+            break;
+        }
+    }
+    (x, y)
 }
 
 // func minusConst(g kyber.Group, c kyber.Scalar) *PriPoly {

@@ -8,7 +8,7 @@ fn test_schnorr_signature() {
     let suite = SuiteEd25519::new_blake_sha256ed25519();
     let kp = key::new_key_pair(suite).unwrap();
 
-    let s = Sign(suite, kp.private, msg).unwrap();
+    let s = Sign(&suite, &kp.private, msg).unwrap();
 
     Verify(suite, &kp.public, msg, &s).unwrap();
 
@@ -45,7 +45,7 @@ fn test_eddsa_compatibility() {
     let suite = SuiteEd25519::new_blake_sha256ed25519();
     let kp = key::new_key_pair(suite).unwrap();
 
-    let s = Sign(suite, kp.private, msg).unwrap();
+    let s = Sign(&suite, &kp.private, msg).unwrap();
 
     eddsa::verify(&kp.public, msg, &s).unwrap();
 }
@@ -95,7 +95,7 @@ fn test_schnorr_malleability() {
     let suite = SuiteEd25519::new_blake_sha256ed25519();
     let kp = key::new_key_pair(suite).unwrap();
 
-    let mut s = Sign(suite, kp.private, msg).unwrap();
+    let mut s = Sign(&suite, &kp.private, msg).unwrap();
 
     Verify(suite, &kp.public, msg, &s).unwrap();
 

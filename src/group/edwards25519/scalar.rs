@@ -14,13 +14,13 @@ use crate::group::integer_field::integer_field::ByteOrder::LittleEndian;
 use crate::group::integer_field::integer_field::Int;
 use subtle::ConstantTimeEq;
 
-use super::constants::FULL_ORDER;
+use super::constants::{FULL_ORDER, L_MINUS2};
 
 const MARSHAL_SCALAR_ID: [u8; 8] = [
     'e' as u8, 'd' as u8, '.' as u8, 's' as u8, 'c' as u8, 'a' as u8, 'l' as u8, 'a' as u8,
 ];
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Scalar {
     pub v: [u8; 32],
 }
@@ -120,11 +120,11 @@ impl BinaryUnmarshaler for Scalar {
 
 impl ToString for Scalar {
     fn to_string(&self) -> String {
-        todo!()
+        self.string()
     }
 }
 
-use std::ops;
+use std::ops::{self, Shr};
 impl_op_ex!(*|a: &Scalar, b: &Scalar| -> Scalar {
     let mut v = [0 as u8; 32];
     sc_mul(&mut v, &a.v, &b.v);
@@ -170,6 +170,41 @@ impl group::Scalar for Scalar {
 
     fn set_bytes(self, bytes: &[u8]) -> Self {
         self.set_int(&Int::new_int_bytes(bytes, &PRIME_ORDER, LittleEndian))
+    }
+
+    fn one(mut self) -> Self {
+        self.v = [1u8; 32];
+        self
+    }
+
+    fn div(mut self, a: &Self, b: &Self) -> Self {
+        let mut i = Scalar::default();
+        i = i.inv(b);
+        sc_mul(&mut self.v, &a.v, &i.v);
+        self
+    }
+
+    fn inv(mut self, ac: &Self) -> Self {
+        let mut res = Scalar::default();
+        res = res.one();
+        // Modular inversion in a multiplicative group is a^(phi(m)-1) = a^-1 mod m
+        // Since m is prime, phi(m) = m - 1 => a^(m-2) = a^-1 mod m.
+        // The inverse is computed using the exponentation-and-square algorithm.
+        // Implementation is constant time regarding the value a, it only depends on
+        // the modulo.
+        for i in (0..=255).rev() {
+            let bit_is_set = L_MINUS2.bit(i);
+            // square step
+            let res_v_clone = res.v.clone();
+            sc_mul(&mut res.v, &res_v_clone, &res_v_clone);
+            if bit_is_set {
+                // multiply step
+                let res_v_clone = res.v.clone();
+                sc_mul(&mut res.v, &res_v_clone, &ac.v);
+            }
+        }
+        self.v = res.v;
+        self
     }
 }
 

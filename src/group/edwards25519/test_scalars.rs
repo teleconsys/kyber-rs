@@ -137,4 +137,16 @@ impl Scalar for SimpleCTScalar {
         // return s
         todo!()
     }
+
+    fn one(self) -> Self {
+        todo!()
+    }
+
+    fn div(self, a: &Self, b: &Self) -> Self {
+        todo!()
+    }
+
+    fn inv(self, a: &Self) -> Self {
+        todo!()
+    }
 }
