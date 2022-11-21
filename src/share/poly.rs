@@ -104,8 +104,7 @@ impl<GROUP: Group> PriPoly<GROUP> {
 
     /// Secret returns the shared secret p(0), i.e., the constant term of the polynomial.
     pub fn Secret(&self) -> <GROUP::POINT as Point>::SCALAR {
-        // return p.coeffs[0]
-        todo!()
+        self.coeffs[0].clone()
     }
 
     /// Eval computes the private share v = p(i).
@@ -119,14 +118,14 @@ impl<GROUP: Group> PriPoly<GROUP> {
         PriShare { i, v }
     }
 
-    // // Shares creates a list of n private shares p(1),...,p(n).
-    // func (p *PriPoly) Shares(n int) []*PriShare {
-    // 	shares := make([]*PriShare, n)
-    // 	for i := range shares {
-    // 		shares[i] = p.Eval(i)
-    // 	}
-    // 	return shares
-    // }
+    // Shares creates a list of n private shares p(1),...,p(n).
+    pub fn Shares(&self, n: usize) -> Vec<Option<PriShare<<GROUP::POINT as Point>::SCALAR>>> {
+        let mut shares = Vec::with_capacity(n);
+        for i in 0..n {
+            shares.push(Some(self.Eval(i)));
+        }
+        shares
+    }
 
     // // Add computes the component-wise sum of the polynomials p and q and returns it
     // // as a new polynomial.
@@ -213,7 +212,7 @@ impl<GROUP: Group> PriPoly<GROUP> {
 /// shares using Lagrange interpolation.
 pub fn recover_secret<GROUP: Group>(
     g: GROUP,
-    shares: Vec<PriShare<<GROUP::POINT as Point>::SCALAR>>,
+    shares: &[Option<PriShare<<GROUP::POINT as Point>::SCALAR>>],
     t: usize,
     n: usize,
 ) -> Result<<GROUP::POINT as Point>::SCALAR> {
@@ -227,19 +226,20 @@ pub fn recover_secret<GROUP: Group>(
     let mut den = g.scalar();
     let mut tmp = g.scalar();
 
-    for (i, xi) in x.iter().enumerate() {
-        let yi = y[&i].clone();
+    for (i, xi) in x.iter() {
+        let yi = &y[&i];
         num = num.set(&yi);
         den = den.one();
-        for (j, xj) in x.iter().enumerate() {
+        for (j, xj) in x.iter() {
             if i == j {
                 continue;
             }
-            num = num * (xj.1.clone());
-            tmp = tmp.sub(&xj.1, &xi.1);
-            den = den * (tmp.clone());
+            num = num * xj.clone();
+            tmp = tmp.sub(xj, xi);
+            den = den * tmp.clone();
         }
-        num = num.clone().div(&num, &den);
+        let num_clone = num.clone();
+        num = num.div(&num_clone, &den);
         acc = acc + num.clone();
     }
 
@@ -257,7 +257,7 @@ pub fn recover_secret<GROUP: Group>(
 /// their respective map at index i.
 fn xy_scalar<GROUP: Group>(
     g: &GROUP,
-    shares: &Vec<PriShare<<GROUP::POINT as Point>::SCALAR>>,
+    shares: &[Option<PriShare<<GROUP::POINT as Point>::SCALAR>>],
     t: usize,
     n: usize,
 ) -> (
@@ -269,7 +269,9 @@ fn xy_scalar<GROUP: Group>(
     // the exact same order shares.
     let mut sorted = Vec::with_capacity(n);
     for share in shares.clone() {
-        sorted.push(share);
+        if let Some(share) = share {
+            sorted.push(share);
+        }
     }
     sorted.sort_by(|i, j| i.i.cmp(&j.i));
 
@@ -278,7 +280,7 @@ fn xy_scalar<GROUP: Group>(
     for s in sorted {
         let idx = s.i;
         x.insert(idx, g.scalar().set_int64((idx + 1) as i64));
-        y.insert(idx, s.v);
+        y.insert(idx, s.v.clone());
         if x.len() == t {
             break;
         }

@@ -1023,16 +1023,14 @@ where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
-    let mut shares: Vec<PriShare<<SUITE::POINT as Point>::SCALAR>> =
-        vec![PriShare::<<SUITE::POINT as Point>::SCALAR>::default(); deals.len()];
-    let d0_sid = deals[0].session_id.clone();
-    for (i, deal) in deals.into_iter().enumerate() {
+    let mut shares = Vec::with_capacity(deals.len());
+    for deal in &deals {
         // all sids the same
-        if deal.session_id == d0_sid {
-            shares[i] = deal.sec_share.clone();
+        if deal.session_id == deals[0].session_id {
+            shares.push(Some(deal.sec_share.clone()));
         } else {
             bail!("vss: all deals need to have same session id");
         }
     }
-    poly::recover_secret(suite, shares, t, n)
+    poly::recover_secret(suite, &shares, t, n)
 }

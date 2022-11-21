@@ -1,73 +1,75 @@
-// func TestSecretRecovery(test *testing.T) {
-// 	g := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
-// 	poly := NewPriPoly(g, t, nil, g.RandomStream())
-// 	shares := poly.Shares(n)
+use crate::{group::edwards25519, share::poly::PriShare, Random};
 
-// 	recovered, err := RecoverSecret(g, shares, t, n)
-// 	if err != nil {
-// 		test.Fatal(err)
-// 	}
+use super::poly::{recover_secret, NewPriPoly};
 
-// 	if !recovered.Equal(poly.Secret()) {
-// 		test.Fatal("recovered secret does not match initial value")
-// 	}
-// }
+#[test]
+fn TestSecretRecovery() {
+    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let n = 10;
+    let t = n / 2 + 1;
+    let poly = NewPriPoly(g, t, None, g.random_stream());
+    let shares = poly.Shares(n);
 
-// // tests the recovery of a secret when one of the share has an index
-// // higher than the given `n`. This is a valid scenario that can happen during
-// // a DKG-resharing:
-// // 1. we add a new node n6 to an already-established group of 5 nodes.
-// // 2. DKG runs without the first node in the group, i.e. without n1
-// // 3. The list of qualified shares are [n2 ... n6] so the new resulting group
-// //    has 5 members (no need to keep the 1st node around).
-// // 4. When n6 wants to reconstruct, it will give its index given during the
-// // resharing, i.e. 6 (or 5 in 0-based indexing) whereas n = 5.
-// // See TestPublicRecoveryOutIndex for testing with the commitment.
-// func TestSecretRecoveryOutIndex(test *testing.T) {
-// 	g := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
-// 	poly := NewPriPoly(g, t, nil, g.RandomStream())
-// 	shares := poly.Shares(n)
+    let recovered = recover_secret(g, &shares, t, n).unwrap();
 
-// 	selected := shares[n-t:]
-// 	require.Len(test, selected, t)
-// 	newN := t + 1
+    assert_eq!(
+        recovered,
+        poly.Secret(),
+        "recovered secret does not match initial value"
+    );
+}
 
-// 	recovered, err := RecoverSecret(g, selected, t, newN)
-// 	if err != nil {
-// 		test.Fatal(err)
-// 	}
+// tests the recovery of a secret when one of the share has an index
+// higher than the given `n`. This is a valid scenario that can happen during
+// a DKG-resharing:
+// 1. we add a new node n6 to an already-established group of 5 nodes.
+// 2. DKG runs without the first node in the group, i.e. without n1
+// 3. The list of qualified shares are [n2 ... n6] so the new resulting group
+//    has 5 members (no need to keep the 1st node around).
+// 4. When n6 wants to reconstruct, it will give its index given during the
+// resharing, i.e. 6 (or 5 in 0-based indexing) whereas n = 5.
+// See TestPublicRecoveryOutIndex for testing with the commitment.
+fn TestSecretRecoveryOutIndex() {
+    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let n = 10;
+    let t = n / 2 + 1;
+    let poly = NewPriPoly(g, t, None, g.random_stream());
+    let shares = poly.Shares(n);
 
-// 	if !recovered.Equal(poly.Secret()) {
-// 		test.Fatal("recovered secret does not match initial value")
-// 	}
-// }
+    let selected = &shares[n - t..];
+    assert_eq!(selected.len(), t);
+    let newN = t + 1;
 
-// func TestSecretRecoveryDelete(test *testing.T) {
-// 	g := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
-// 	poly := NewPriPoly(g, t, nil, g.RandomStream())
-// 	shares := poly.Shares(n)
+    let recovered = recover_secret(g, selected, t, newN).unwrap();
 
-// 	// Corrupt a few shares
-// 	shares[2] = nil
-// 	shares[5] = nil
-// 	shares[7] = nil
-// 	shares[8] = nil
+    assert_eq!(
+        recovered,
+        poly.Secret(),
+        "recovered secret does not match initial value"
+    );
+}
 
-// 	recovered, err := RecoverSecret(g, shares, t, n)
-// 	if err != nil {
-// 		test.Fatal(err)
-// 	}
+fn TestSecretRecoveryDelete() {
+    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let n = 10;
+    let t = n / 2 + 1;
+    let poly = NewPriPoly(g, t, None, g.random_stream());
+    let mut shares = poly.Shares(n);
 
-// 	if !recovered.Equal(poly.Secret()) {
-// 		test.Fatal("recovered secret does not match initial value")
-// 	}
-// }
+    // Corrupt a few shares
+    shares[2] = None;
+    shares[5] = None;
+    shares[7] = None;
+    shares[8] = None;
+
+    let recovered = recover_secret(g, &shares, t, n).unwrap();
+
+    assert_eq!(
+        recovered,
+        poly.Secret(),
+        "recovered secret does not match initial value",
+    );
+}
 
 // func TestSecretRecoveryDeleteFail(test *testing.T) {
 // 	g := edwards25519.NewBlakeSHA256Ed25519()
@@ -90,25 +92,26 @@
 // 	}
 // }
 
-// func TestSecretPolyEqual(test *testing.T) {
-// 	g := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
+fn TestSecretPolyEqual() {
+    // let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    // let n = 10;
+    // let t = n/2 + 1;
 
-// 	p1 := NewPriPoly(g, t, nil, g.RandomStream())
-// 	p2 := NewPriPoly(g, t, nil, g.RandomStream())
-// 	p3 := NewPriPoly(g, t, nil, g.RandomStream())
+    // let p1 = NewPriPoly(g, t, None, g.random_stream());
+    // let p2 = NewPriPoly(g, t, None, g.random_stream());
+    // let p3 = NewPriPoly(g, t, None, g.random_stream());
 
-// 	p12, _ := p1.Add(p2)
-// 	p13, _ := p1.Add(p3)
+    // p12, _ := p1.Add(p2)
+    // p13, _ := p1.Add(p3)
 
-// 	p123, _ := p12.Add(p3)
-// 	p132, _ := p13.Add(p2)
+    // p123, _ := p12.Add(p3)
+    // p132, _ := p13.Add(p2)
 
-// 	if !p123.Equal(p132) {
-// 		test.Fatal("private polynomials not equal")
-// 	}
-// }
+    // if !p123.Equal(p132) {
+    // 	test.Fatal("private polynomials not equal")
+    // }
+    todo!()
+}
 
 // func TestPublicCheck(test *testing.T) {
 // 	g := edwards25519.NewBlakeSHA256Ed25519()
