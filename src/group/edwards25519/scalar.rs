@@ -173,7 +173,8 @@ impl group::Scalar for Scalar {
     }
 
     fn one(mut self) -> Self {
-        self.v = [1u8; 32];
+        self.v = [0u8; 32];
+        self.v[0] = 1;
         self
     }
 
