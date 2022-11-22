@@ -1,6 +1,7 @@
-use crate::{group::edwards25519, share::poly::PriShare, Random};
 
-use super::poly::{recover_secret, NewPriPoly};
+use crate::{group::edwards25519::{self, SuiteEd25519}, share::poly::{PriShare, RecoverPubPoly}, Random, Point};
+
+use super::poly::{recover_secret, NewPriPoly, RecoverCommit};
 
 #[test]
 fn TestSecretRecovery() {
@@ -29,6 +30,7 @@ fn TestSecretRecovery() {
 // 4. When n6 wants to reconstruct, it will give its index given during the
 // resharing, i.e. 6 (or 5 in 0-based indexing) whereas n = 5.
 // See TestPublicRecoveryOutIndex for testing with the commitment.
+#[test]
 fn TestSecretRecoveryOutIndex() {
     let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
     let n = 10;
@@ -49,6 +51,7 @@ fn TestSecretRecoveryOutIndex() {
     );
 }
 
+#[test]
 fn TestSecretRecoveryDelete() {
     let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
     let n = 10;
@@ -71,89 +74,77 @@ fn TestSecretRecoveryDelete() {
     );
 }
 
-// func TestSecretRecoveryDeleteFail(test *testing.T) {
-// 	g := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
+#[test]
+fn TestSecretRecoveryDeleteFail() {
+    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+	let n = 10;
+	let t = n/2 + 1;
 
-// 	poly := NewPriPoly(g, t, nil, g.RandomStream())
-// 	shares := poly.Shares(n)
+	let poly = NewPriPoly(g, t, None, g.random_stream());
+	let mut shares = poly.Shares(n);
 
-// 	// Corrupt one more share than acceptable
-// 	shares[1] = nil
-// 	shares[2] = nil
-// 	shares[5] = nil
-// 	shares[7] = nil
-// 	shares[8] = nil
+	// Corrupt one more share than acceptable
+	shares[1] = None;
+	shares[2] = None;
+	shares[5] = None;
+	shares[7] = None;
+	shares[8] = None;
 
-// 	_, err := RecoverSecret(g, shares, t, n)
-// 	if err == nil {
-// 		test.Fatal("recovered secret unexpectably")
-// 	}
-// }
-
-fn TestSecretPolyEqual() {
-    // let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
-    // let n = 10;
-    // let t = n/2 + 1;
-
-    // let p1 = NewPriPoly(g, t, None, g.random_stream());
-    // let p2 = NewPriPoly(g, t, None, g.random_stream());
-    // let p3 = NewPriPoly(g, t, None, g.random_stream());
-
-    // p12, _ := p1.Add(p2)
-    // p13, _ := p1.Add(p3)
-
-    // p123, _ := p12.Add(p3)
-    // p132, _ := p13.Add(p2)
-
-    // if !p123.Equal(p132) {
-    // 	test.Fatal("private polynomials not equal")
-    // }
-    todo!()
+	recover_secret(g, &shares, t, n).expect_err("recovered secret unexpectably");
 }
 
-// func TestPublicCheck(test *testing.T) {
-// 	g := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
+#[test]
+fn TestSecretPolyEqual() {
+    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let n = 10;
+    let t = n/2 + 1;
 
-// 	priPoly := NewPriPoly(g, t, nil, g.RandomStream())
-// 	priShares := priPoly.Shares(n)
-// 	pubPoly := priPoly.Commit(nil)
+    let p1 = NewPriPoly(g, t, None, g.random_stream());
+    let p2 = NewPriPoly(g, t, None, g.random_stream());
+    let p3 = NewPriPoly(g, t, None, g.random_stream());
 
-// 	for i, share := range priShares {
-// 		if !pubPoly.Check(share) {
-// 			test.Fatalf("private share %v not valid with respect to the public commitment polynomial", i)
-// 		}
-// 	}
-// }
+    let p12 = p1.Add(&p2).unwrap();
+    let p13 = p1.Add(&p3).unwrap();
 
-// func TestPublicRecovery(test *testing.T) {
-// 	g := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
+    let p123 = p12.Add(&p3).unwrap();
+    let p132 = p13.Add(&p2).unwrap();
 
-// 	priPoly := NewPriPoly(g, t, nil, g.RandomStream())
-// 	pubPoly := priPoly.Commit(nil)
-// 	pubShares := pubPoly.Shares(n)
+    assert!(p123.Equal(&p132).unwrap(), "private polynomials not equal");
+}
 
-// 	recovered, err := RecoverCommit(g, pubShares, t, n)
-// 	if err != nil {
-// 		test.Fatal(err)
-// 	}
+#[test]
+fn TestPublicCheck() {
+	let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+	let n = 10;
+	let t = n/2 + 1;
 
-// 	if !recovered.Equal(pubPoly.Commit()) {
-// 		test.Fatal("recovered commit does not match initial value")
-// 	}
+	let priPoly = NewPriPoly(g, t, None, g.random_stream());
+	let priShares = priPoly.Shares(n);
+	let pubPoly = priPoly.Commit(None);
 
-// 	polyRecovered, err := RecoverPubPoly(g, pubShares, t, n)
-// 	if err != nil {
-// 		test.Fatal(err)
-// 	}
+	for (i, share) in priShares.iter().enumerate() {
+		assert!(pubPoly.Check(&share.as_ref().unwrap()), "{}", format!("private share {} not valid with respect to the public commitment polynomial", i))
+	}
+}
 
-// 	require.True(test, pubPoly.Equal(polyRecovered))
-// }
+#[test]
+fn TestPublicRecovery() {
+	let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+	let n = 10;
+	let t = n/2 + 1;
+
+	let priPoly = NewPriPoly(g, t, None, g.random_stream());
+	let pubPoly = priPoly.Commit(None);
+	let pubShares = pubPoly.Shares(n);
+
+	let recovered = RecoverCommit(g, pubShares.as_slice(), t, n).unwrap();
+
+	assert!(recovered.equal(&pubPoly.Commit()));
+
+    let polyRecovered = RecoverPubPoly(g, &pubShares, t, n).unwrap();
+
+    assert!(pubPoly.Equal(&polyRecovered).unwrap());
+}
 
 // func TestPublicRecoveryOutIndex(test *testing.T) {
 // 	g := edwards25519.NewBlakeSHA256Ed25519()

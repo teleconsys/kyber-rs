@@ -8,6 +8,7 @@
 // Both schemes of this package are core building blocks for more advanced
 // secret sharing techniques.
 
+use anyhow::Ok;
 use anyhow::bail;
 use anyhow::Result;
 use lazy_static::__Deref;
@@ -60,8 +61,10 @@ use std::cmp;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::DerefMut;
+use std::ops::Mul;
 use std::vec;
 
+use crate::encoding::BinaryMarshaler;
 use crate::{cipher::Stream, Group, Point, Scalar};
 
 /// NewPriPoly creates a new secret sharing polynomial using the provided
@@ -118,7 +121,7 @@ impl<GROUP: Group> PriPoly<GROUP> {
         PriShare { i, v }
     }
 
-    // Shares creates a list of n private shares p(1),...,p(n).
+    /// Shares creates a list of n private shares p(1),...,p(n).
     pub fn Shares(&self, n: usize) -> Vec<Option<PriShare<<GROUP::POINT as Point>::SCALAR>>> {
         let mut shares = Vec::with_capacity(n);
         for i in 0..n {
@@ -127,53 +130,55 @@ impl<GROUP: Group> PriPoly<GROUP> {
         shares
     }
 
-    // // Add computes the component-wise sum of the polynomials p and q and returns it
-    // // as a new polynomial.
-    // func (p *PriPoly) Add(q *PriPoly) (*PriPoly, error) {
-    // 	if p.g.String() != q.g.String() {
-    // 		return nil, errorGroups
-    // 	}
-    // 	if p.Threshold() != q.Threshold() {
-    // 		return nil, errorCoeffs
-    // 	}
-    // 	coeffs := make([]kyber.Scalar, p.Threshold())
-    // 	for i := range coeffs {
-    // 		coeffs[i] = p.g.Scalar().Add(p.coeffs[i], q.coeffs[i])
-    // 	}
-    // 	return &PriPoly{p.g, coeffs}, nil
-    // }
+    /// Add computes the component-wise sum of the polynomials p and q and returns it
+    /// as a new polynomial.
+    pub fn Add(&self, q: &PriPoly<GROUP>) -> Result<PriPoly<GROUP>> {
+    	if self.g.string() != q.g.string() {
+    		return Err(anyhow::Error::msg("errorGroups"))
+    	}
+    	if self.Threshold() != q.Threshold() {
+            return Err(anyhow::Error::msg("errorCoeffs"))
+    	}
+        let mut coeffs = Vec::with_capacity(self.Threshold());
+    	//coeffs := make([]kyber.Scalar, p.Threshold())
+    	for i in 0..self.Threshold() {
+            coeffs.push(self.coeffs[i].clone() + q.coeffs[i].clone());
+    	}
+        Ok(PriPoly{g: self.g.clone(), coeffs})
+    }
 
-    // // Equal checks equality of two secret sharing polynomials p and q. If p and q are trivially
-    // // unequal (e.g., due to mismatching cryptographic groups or polynomial size), this routine
-    // // returns in variable time. Otherwise it runs in constant time regardless of whether it
-    // // eventually returns true or false.
-    // func (p *PriPoly) Equal(q *PriPoly) bool {
-    // 	if p.g.String() != q.g.String() {
-    // 		return false
-    // 	}
-    // 	if len(p.coeffs) != len(q.coeffs) {
-    // 		return false
-    // 	}
-    // 	b := 1
-    // 	for i := 0; i < p.Threshold(); i++ {
-    // 		pb, _ := p.coeffs[i].MarshalBinary()
-    // 		qb, _ := q.coeffs[i].MarshalBinary()
-    // 		b &= subtle.ConstantTimeCompare(pb, qb)
-    // 	}
-    // 	return b == 1
-    // }
+    /// Equal checks equality of two secret sharing polynomials p and q. If p and q are trivially
+    /// unequal (e.g., due to mismatching cryptographic groups or polynomial size), this routine
+    /// returns in variable time. Otherwise it runs in constant time regardless of whether it
+    /// eventually returns true or false.
+    pub fn Equal(&self, q: &PriPoly<GROUP>) -> Result<bool> {
+    	if self.g.string() != q.g.string() {
+    		return Ok(false)
+    	}
+    	if self.coeffs.len() != q.coeffs.len() {
+    		return Ok(false)
+    	}
+    	let mut b = true;
+    	for i in 0..self.Threshold() {
+    		let pb = self.coeffs[i].marshal_binary()?;
+    		let qb = q.coeffs[i].marshal_binary()?;
+    		b &= pb.eq(&qb);
+            //b &= subtle.ConstantTimeCompare(pb, qb)
+    	}
+    	Ok(b)
+    }
 
     /// Commit creates a public commitment polynomial for the given base point b or
     /// the standard base if b == nil.
-    pub fn Commit(&self, b: GROUP::POINT) -> PubPoly<GROUP> {
+    pub fn Commit(&self, b: Option<&GROUP::POINT>) -> PubPoly<GROUP> {
         let mut commits = vec![];
         for i in 0..self.Threshold() {
-            commits.push(self.g.point().mul(&self.coeffs[i], Some(&b)));
+            commits.push(self.g.point().mul(&self.coeffs[i], b));
         }
 
         PubPoly {
             g: self.g.clone(),
-            b: Some(b),
+            b: b.map(|p| p.clone()),
             commits,
         }
     }
@@ -387,10 +392,10 @@ impl<GROUP: Group> PubPoly<GROUP> {
         self.commits.len()
     }
 
-    // // Commit returns the secret commitment p(0), i.e., the constant term of the polynomial.
-    // func (p *PubPoly) Commit() kyber.Point {
-    // 	return p.commits[0]
-    // }
+    /// Commit returns the secret commitment p(0), i.e., the constant term of the polynomial.
+    pub fn Commit(&self) -> GROUP::POINT {
+    	return self.commits[0].clone()
+    }
 
     /// Eval computes the public share v = p(i).
     pub fn Eval(&self, i: usize) -> PubShare<GROUP::POINT> {
@@ -407,14 +412,14 @@ impl<GROUP: Group> PubPoly<GROUP> {
         return PubShare { i, v };
     }
 
-    // // Shares creates a list of n public commitment shares p(1),...,p(n).
-    // func (p *PubPoly) Shares(n int) []*PubShare {
-    // 	shares := make([]*PubShare, n)
-    // 	for i := range shares {
-    // 		shares[i] = p.Eval(i)
-    // 	}
-    // 	return shares
-    // }
+    /// Shares creates a list of n public commitment shares p(1),...,p(n).
+    pub fn Shares(&self, n: usize) -> Vec<Option<PubShare<GROUP::POINT>>> {
+    	let mut shares = Vec::with_capacity(n);
+    	for i in 0..n {
+    		shares.push(Some(self.Eval(i)));
+    	}
+    	return shares
+    }
 
     /// Add computes the component-wise sum of the polynomials p and q and returns it
     /// as a new polynomial. NOTE: If the base points p.b and q.b are different then the
@@ -443,29 +448,30 @@ impl<GROUP: Group> PubPoly<GROUP> {
         })
     }
 
-    // // Equal checks equality of two public commitment polynomials p and q. If p and
-    // // q are trivially unequal (e.g., due to mismatching cryptographic groups),
-    // // this routine returns in variable time. Otherwise it runs in constant time
-    // // regardless of whether it eventually returns true or false.
-    // func (p *PubPoly) Equal(q *PubPoly) bool {
-    // 	if p.g.String() != q.g.String() {
-    // 		return false
-    // 	}
-    // 	b := 1
-    // 	for i := 0; i < p.Threshold(); i++ {
-    // 		pb, _ := p.commits[i].MarshalBinary()
-    // 		qb, _ := q.commits[i].MarshalBinary()
-    // 		b &= subtle.ConstantTimeCompare(pb, qb)
-    // 	}
-    // 	return b == 1
-    // }
+    /// Equal checks equality of two public commitment polynomials p and q. If p and
+    /// q are trivially unequal (e.g., due to mismatching cryptographic groups),
+    /// this routine returns in variable time. Otherwise it runs in constant time
+    /// regardless of whether it eventually returns true or false.
+    pub fn Equal(&self, q: &PubPoly<GROUP>) -> Result<bool> {
+    	if self.g.string() != q.g.string() {
+    		return Ok(false)
+    	}
+    	let mut b = true;
+    	for i in 0..self.threshold() {
+    		let pb = self.commits[i].marshal_binary()?;
+    		let qb = q.commits[i].marshal_binary()?;
+    		b &= pb.eq(&qb);
+            //b &= subtle.ConstantTimeCompare(pb, qb)
+    	}
+    	Ok(b)
+    }
 
-    // // Check a private share against a public commitment polynomial.
-    // func (p *PubPoly) Check(s *PriShare) bool {
-    // 	pv := p.Eval(s.I)
-    // 	ps := p.g.Point().Mul(s.V, p.b)
-    // 	return pv.V.Equal(ps)
-    // }
+    /// Check a private share against a public commitment polynomial.
+    pub fn Check(&self, s: &PriShare<<GROUP::POINT as Point>::SCALAR>) -> bool {
+    	let pv = self.Eval(s.i);
+    	let ps = self.g.point().mul(&s.v, self.b.as_ref());
+    	return pv.v.equal(&ps)
+    }
 }
 
 // type byIndexPub []*PubShare
@@ -474,98 +480,103 @@ impl<GROUP: Group> PubPoly<GROUP> {
 // func (s byIndexPub) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 // func (s byIndexPub) Less(i, j int) bool { return s[i].I < s[j].I }
 
-// // xyCommits is the public version of xScalars.
-// func xyCommit(g kyber.Group, shares []*PubShare, t, n int) (map[int]kyber.Scalar, map[int]kyber.Point) {
-// 	// we are sorting first the shares since the shares may be unrelated for
-// 	// some applications. In this case, all participants needs to interpolate on
-// 	// the exact same order shares.
-// 	sorted := make([]*PubShare, 0, n)
-// 	for _, share := range shares {
-// 		if share != nil {
-// 			sorted = append(sorted, share)
-// 		}
-// 	}
-// 	sort.Sort(byIndexPub(sorted))
+/// xyCommits is the public version of xScalars.
+pub fn xyCommit<GROUP: Group>(g: &GROUP, shares: &[Option<PubShare<GROUP::POINT>>], t: usize, n: usize) -> (
+HashMap<usize, <GROUP::POINT as Point>::SCALAR>,
+HashMap<usize, GROUP::POINT>,
+) {
+	// we are sorting first the shares since the shares may be unrelated for
+	// some applications. In this case, all participants needs to interpolate on
+	// the exact same order shares.
+    let mut sorted = Vec::with_capacity(n);
+    for share in shares.clone() {
+        if let Some(share) = share {
+            sorted.push(share);
+        }
+    }
+    sorted.sort_by(|i, j| i.i.cmp(&j.i));
 
-// 	x := make(map[int]kyber.Scalar)
-// 	y := make(map[int]kyber.Point)
+    let mut x = HashMap::new();
+    let mut y = HashMap::new();
+    for s in sorted {
+        let idx = s.i;
+        x.insert(idx, g.scalar().set_int64((idx + 1) as i64));
+        y.insert(idx, s.v.clone());
+        if x.len() == t {
+            break;
+        }
+    }
+    (x, y)
+}
 
-// 	for _, s := range sorted {
-// 		if s == nil || s.V == nil || s.I < 0 {
-// 			continue
-// 		}
-// 		idx := s.I
-// 		x[idx] = g.Scalar().SetInt64(int64(idx + 1))
-// 		y[idx] = s.V
-// 		if len(x) == t {
-// 			break
-// 		}
-// 	}
-// 	return x, y
-// }
+/// RecoverCommit reconstructs the secret commitment p(0) from a list of public
+/// shares using Lagrange interpolation.
+pub fn RecoverCommit<GROUP: Group>(g: GROUP, shares: &[Option<PubShare<GROUP::POINT>>], t: usize, n: usize) -> Result<GROUP::POINT> {
+	let (x, y) = xyCommit(&g, shares, t, n);
 
-// // RecoverCommit reconstructs the secret commitment p(0) from a list of public
-// // shares using Lagrange interpolation.
-// func RecoverCommit(g kyber.Group, shares []*PubShare, t, n int) (kyber.Point, error) {
-// 	x, y := xyCommit(g, shares, t, n)
-// 	if len(x) < t {
-// 		return nil, errors.New("share: not enough good public shares to reconstruct secret commitment")
-// 	}
+    if x.len() < t {
+        bail!("share: not enough good public shares to reconstruct secret commitment")
+    }
 
-// 	num := g.Scalar()
-// 	den := g.Scalar()
-// 	tmp := g.Scalar()
-// 	Acc := g.Point().Null()
-// 	Tmp := g.Point()
+	let mut num = g.scalar();
+	let mut den = g.scalar();
+	let mut tmp = g.scalar();
+	let mut Acc = g.point().null();
+	let mut Tmp = g.point();
 
-// 	for i, xi := range x {
-// 		num.One()
-// 		den.One()
-// 		for j, xj := range x {
-// 			if i == j {
-// 				continue
-// 			}
-// 			num.Mul(num, xj)
-// 			den.Mul(den, tmp.Sub(xj, xi))
-// 		}
-// 		Tmp.Mul(num.Div(num, den), y[i])
-// 		Acc.Add(Acc, Tmp)
-// 	}
+	for (i, xi) in x.iter().enumerate() {
+		num = num.one();
+		den = den.one();
+		for (j, xj) in x.iter().enumerate() {
+			if i == j {
+				continue
+			}
+			num = num * xj.1.clone();
+            tmp = tmp.sub(&xj.1,&xi.1);
+			den = den.mul(tmp.clone());
+		}
+        let num_clone = num.clone();
+        num = num.div(&num_clone, &den);
+		Tmp = Tmp.mul(&num, Some(&y[&i]));
+        let acc_clone = Acc.clone();
+		Acc = Acc.add(&acc_clone, &Tmp);
+	}
 
-// 	return Acc, nil
-// }
+	Ok(Acc)
+}
 
-// // RecoverPubPoly reconstructs the full public polynomial from a set of public
-// // shares using Lagrange interpolation.
-// func RecoverPubPoly(g kyber.Group, shares []*PubShare, t, n int) (*PubPoly, error) {
-// 	x, y := xyCommit(g, shares, t, n)
-// 	if len(x) < t {
-// 		return nil, errors.New("share: not enough good public shares to reconstruct secret commitment")
-// 	}
+/// RecoverPubPoly reconstructs the full public polynomial from a set of public
+/// shares using Lagrange interpolation.
+pub fn RecoverPubPoly<GROUP: Group>(g: GROUP, shares: &[Option<PubShare<GROUP::POINT>>], t: usize, n: usize) -> Result<PubPoly<GROUP>> {
+    todo!();
+	// x, y := xyCommit(g, shares, t, n)
+	// if len(x) < t {
+	// 	return nil, errors.New("share: not enough good public shares to reconstruct secret commitment")
+	// }
 
-// 	var accPoly *PubPoly
-// 	var err error
+	// var accPoly *PubPoly
+	// var err error
 
-// 	for j := range x {
-// 		basis := lagrangeBasis(g, j, x)
+	// for j := range x {
+	// 	basis := lagrangeBasis(g, j, x)
 
-// 		// compute the L_j * y_j polynomial in point space
-// 		tmp := basis.Commit(y[j])
-// 		if accPoly == nil {
-// 			accPoly = tmp
-// 			continue
-// 		}
+	// 	// compute the L_j * y_j polynomial in point space
+	// 	tmp := basis.Commit(y[j])
+	// 	if accPoly == nil {
+	// 		accPoly = tmp
+	// 		continue
+	// 	}
 
-// 		// add all L_j * y_j together
-// 		accPoly, err = accPoly.Add(tmp)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 	}
+	// 	// add all L_j * y_j together
+	// 	accPoly, err = accPoly.Add(tmp)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 
-// 	return accPoly, nil
+	// return accPoly, nil
 
-// }
+}
 
 // // lagrangeBasis returns a PriPoly containing the Lagrange coefficients for the
 // // i-th position. xs is a mapping between the indices and the values that the

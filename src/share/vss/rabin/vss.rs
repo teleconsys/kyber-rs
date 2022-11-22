@@ -287,9 +287,9 @@ where
     let d_pubb = suite.point().mul(&longterm, None);
 
     // Compute public polynomial coefficients
-    let F = f.Commit(suite.point().base());
+    let F = f.Commit(Some(&suite.point().base()));
     let (_, secret_commits) = F.Info();
-    let G = g.Commit(H);
+    let G = g.Commit(Some(&H));
 
     let C = F.Add(&G)?;
     let (_, commitments) = C.Info();
