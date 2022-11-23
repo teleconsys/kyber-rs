@@ -1,7 +1,9 @@
 
-use crate::{group::edwards25519::{self, SuiteEd25519}, share::poly::{PriShare, RecoverPubPoly}, Random, Point};
+use std::ops::Add;
 
-use super::poly::{recover_secret, NewPriPoly, RecoverCommit};
+use crate::{group::edwards25519::{self, SuiteEd25519}, share::poly::{PriShare, RecoverPubPoly, CoefficientsToPriPoly}, Random, Point, Group, Scalar};
+
+use super::poly::{recover_secret, NewPriPoly, RecoverCommit, RecoverPriPoly, PubPoly, PubShare};
 
 #[test]
 fn TestSecretRecovery() {
@@ -20,16 +22,16 @@ fn TestSecretRecovery() {
     );
 }
 
-// tests the recovery of a secret when one of the share has an index
-// higher than the given `n`. This is a valid scenario that can happen during
-// a DKG-resharing:
-// 1. we add a new node n6 to an already-established group of 5 nodes.
-// 2. DKG runs without the first node in the group, i.e. without n1
-// 3. The list of qualified shares are [n2 ... n6] so the new resulting group
-//    has 5 members (no need to keep the 1st node around).
-// 4. When n6 wants to reconstruct, it will give its index given during the
-// resharing, i.e. 6 (or 5 in 0-based indexing) whereas n = 5.
-// See TestPublicRecoveryOutIndex for testing with the commitment.
+/// tests the recovery of a secret when one of the share has an index
+/// higher than the given `n`. This is a valid scenario that can happen during
+/// a DKG-resharing:
+/// 1. we add a new node n6 to an already-established group of 5 nodes.
+/// 2. DKG runs without the first node in the group, i.e. without n1
+/// 3. The list of qualified shares are [n2 ... n6] so the new resulting group
+///    has 5 members (no need to keep the 1st node around).
+/// 4. When n6 wants to reconstruct, it will give its index given during the
+/// resharing, i.e. 6 (or 5 in 0-based indexing) whereas n = 5.
+/// See TestPublicRecoveryOutIndex for testing with the commitment.
 #[test]
 fn TestSecretRecoveryOutIndex() {
     let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
@@ -139,365 +141,342 @@ fn TestPublicRecovery() {
 
 	let recovered = RecoverCommit(g, pubShares.as_slice(), t, n).unwrap();
 
-	assert!(recovered.equal(&pubPoly.Commit()));
+	assert_eq!(recovered, pubPoly.Commit());
 
     let polyRecovered = RecoverPubPoly(g, &pubShares, t, n).unwrap();
 
     assert!(pubPoly.Equal(&polyRecovered).unwrap());
 }
 
-// func TestPublicRecoveryOutIndex(test *testing.T) {
-// 	g := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
-
-// 	priPoly := NewPriPoly(g, t, nil, g.RandomStream())
-// 	pubPoly := priPoly.Commit(nil)
-// 	pubShares := pubPoly.Shares(n)
-
-// 	selected := pubShares[n-t:]
-// 	require.Len(test, selected, t)
-// 	newN := t + 1
-
-// 	recovered, err := RecoverCommit(g, selected, t, newN)
-// 	if err != nil {
-// 		test.Fatal(err)
-// 	}
-
-// 	if !recovered.Equal(pubPoly.Commit()) {
-// 		test.Fatal("recovered commit does not match initial value")
-// 	}
-
-// 	polyRecovered, err := RecoverPubPoly(g, pubShares, t, n)
-// 	if err != nil {
-// 		test.Fatal(err)
-// 	}
-
-// 	require.True(test, pubPoly.Equal(polyRecovered))
-// }
-
-// func TestPublicRecoveryDelete(test *testing.T) {
-// 	g := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
-
-// 	priPoly := NewPriPoly(g, t, nil, g.RandomStream())
-// 	pubPoly := priPoly.Commit(nil)
-// 	shares := pubPoly.Shares(n)
-
-// 	// Corrupt a few shares
-// 	shares[2] = nil
-// 	shares[5] = nil
-// 	shares[7] = nil
-// 	shares[8] = nil
-
-// 	recovered, err := RecoverCommit(g, shares, t, n)
-// 	if err != nil {
-// 		test.Fatal(err)
-// 	}
-
-// 	if !recovered.Equal(pubPoly.Commit()) {
-// 		test.Fatal("recovered commit does not match initial value")
-// 	}
-// }
-
-// func TestPublicRecoveryDeleteFail(test *testing.T) {
-// 	g := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
-
-// 	priPoly := NewPriPoly(g, t, nil, g.RandomStream())
-// 	pubPoly := priPoly.Commit(nil)
-// 	shares := pubPoly.Shares(n)
-
-// 	// Corrupt one more share than acceptable
-// 	shares[1] = nil
-// 	shares[2] = nil
-// 	shares[5] = nil
-// 	shares[7] = nil
-// 	shares[8] = nil
-
-// 	_, err := RecoverCommit(g, shares, t, n)
-// 	if err == nil {
-// 		test.Fatal("recovered commit unexpectably")
-// 	}
-// }
-
-// func TestPrivateAdd(test *testing.T) {
-// 	g := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
-
-// 	p := NewPriPoly(g, t, nil, g.RandomStream())
-// 	q := NewPriPoly(g, t, nil, g.RandomStream())
-
-// 	r, err := p.Add(q)
-// 	if err != nil {
-// 		test.Fatal(err)
-// 	}
-
-// 	ps := p.Secret()
-// 	qs := q.Secret()
-// 	rs := g.Scalar().Add(ps, qs)
-
-// 	if !rs.Equal(r.Secret()) {
-// 		test.Fatal("addition of secret sharing polynomials failed")
-// 	}
-// }
-
-// func TestPublicAdd(test *testing.T) {
-// 	g := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
-
-// 	G := g.Point().Pick(g.RandomStream())
-// 	H := g.Point().Pick(g.RandomStream())
-
-// 	p := NewPriPoly(g, t, nil, g.RandomStream())
-// 	q := NewPriPoly(g, t, nil, g.RandomStream())
-
-// 	P := p.Commit(G)
-// 	Q := q.Commit(H)
-
-// 	R, err := P.Add(Q)
-// 	if err != nil {
-// 		test.Fatal(err)
-// 	}
-
-// 	shares := R.Shares(n)
-// 	recovered, err := RecoverCommit(g, shares, t, n)
-// 	if err != nil {
-// 		test.Fatal(err)
-// 	}
-
-// 	x := P.Commit()
-// 	y := Q.Commit()
-// 	z := g.Point().Add(x, y)
-
-// 	if !recovered.Equal(z) {
-// 		test.Fatal("addition of public commitment polynomials failed")
-// 	}
-// }
-
-// func TestPublicPolyEqual(test *testing.T) {
-// 	g := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
-
-// 	G := g.Point().Pick(g.RandomStream())
-
-// 	p1 := NewPriPoly(g, t, nil, g.RandomStream())
-// 	p2 := NewPriPoly(g, t, nil, g.RandomStream())
-// 	p3 := NewPriPoly(g, t, nil, g.RandomStream())
-
-// 	P1 := p1.Commit(G)
-// 	P2 := p2.Commit(G)
-// 	P3 := p3.Commit(G)
-
-// 	P12, _ := P1.Add(P2)
-// 	P13, _ := P1.Add(P3)
-
-// 	P123, _ := P12.Add(P3)
-// 	P132, _ := P13.Add(P2)
-
-// 	if !P123.Equal(P132) {
-// 		test.Fatal("public polynomials not equal")
-// 	}
-// }
-
-// func TestPriPolyMul(test *testing.T) {
-// 	suite := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
-// 	a := NewPriPoly(suite, t, nil, suite.RandomStream())
-// 	b := NewPriPoly(suite, t, nil, suite.RandomStream())
-
-// 	c := a.Mul(b)
-// 	assert.Equal(test, len(a.coeffs)+len(b.coeffs)-1, len(c.coeffs))
-// 	nul := suite.Scalar().Zero()
-// 	for _, coeff := range c.coeffs {
-// 		assert.NotEqual(test, nul.String(), coeff.String())
-// 	}
-
-// 	a0 := a.coeffs[0]
-// 	b0 := b.coeffs[0]
-// 	mul := suite.Scalar().Mul(b0, a0)
-// 	c0 := c.coeffs[0]
-// 	assert.Equal(test, c0.String(), mul.String())
-
-// 	at := a.coeffs[len(a.coeffs)-1]
-// 	bt := b.coeffs[len(b.coeffs)-1]
-// 	mul = suite.Scalar().Mul(at, bt)
-// 	ct := c.coeffs[len(c.coeffs)-1]
-// 	assert.Equal(test, ct.String(), mul.String())
-// }
-
-// func TestRecoverPriPoly(test *testing.T) {
-// 	suite := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
-// 	a := NewPriPoly(suite, t, nil, suite.RandomStream())
-
-// 	shares := a.Shares(n)
-// 	reverses := make([]*PriShare, len(shares))
-// 	l := len(shares) - 1
-// 	for i := range shares {
-// 		reverses[l-i] = shares[i]
-// 	}
-// 	recovered, err := RecoverPriPoly(suite, shares, t, n)
-// 	assert.Nil(test, err)
-
-// 	reverseRecovered, err := RecoverPriPoly(suite, reverses, t, n)
-// 	assert.Nil(test, err)
-
-// 	for i := 0; i < t; i++ {
-// 		assert.Equal(test, recovered.Eval(i).V.String(), a.Eval(i).V.String())
-// 		assert.Equal(test, reverseRecovered.Eval(i).V.String(), a.Eval(i).V.String())
-// 	}
-// }
-
-// func TestPriPolyCoefficients(test *testing.T) {
-// 	suite := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
-// 	a := NewPriPoly(suite, t, nil, suite.RandomStream())
-
-// 	coeffs := a.Coefficients()
-// 	require.Len(test, coeffs, t)
-
-// 	b := CoefficientsToPriPoly(suite, coeffs)
-// 	require.Equal(test, a.coeffs, b.coeffs)
-
-// }
-
-// func TestRefreshDKG(test *testing.T) {
-// 	g := edwards25519.NewBlakeSHA256Ed25519()
-// 	n := 10
-// 	t := n/2 + 1
-
-// 	// Run an n-fold Pedersen VSS (= DKG)
-// 	priPolys := make([]*PriPoly, n)
-// 	priShares := make([][]*PriShare, n)
-// 	pubPolys := make([]*PubPoly, n)
-// 	pubShares := make([][]*PubShare, n)
-// 	for i := 0; i < n; i++ {
-// 		priPolys[i] = NewPriPoly(g, t, nil, g.RandomStream())
-// 		priShares[i] = priPolys[i].Shares(n)
-// 		pubPolys[i] = priPolys[i].Commit(nil)
-// 		pubShares[i] = pubPolys[i].Shares(n)
-// 	}
-
-// 	// Verify VSS shares
-// 	for i := 0; i < n; i++ {
-// 		for j := 0; j < n; j++ {
-// 			sij := priShares[i][j]
-// 			// s_ij * G
-// 			sijG := g.Point().Base().Mul(sij.V, nil)
-// 			require.True(test, sijG.Equal(pubShares[i][j].V))
-// 		}
-// 	}
-
-// 	// Create private DKG shares
-// 	dkgShares := make([]*PriShare, n)
-// 	for i := 0; i < n; i++ {
-// 		acc := g.Scalar().Zero()
-// 		for j := 0; j < n; j++ { // assuming all participants are in the qualified set
-// 			acc = g.Scalar().Add(acc, priShares[j][i].V)
-// 		}
-// 		dkgShares[i] = &PriShare{i, acc}
-// 	}
-
-// 	// Create public DKG commitments (= verification vector)
-// 	dkgCommits := make([]kyber.Point, t)
-// 	for k := 0; k < t; k++ {
-// 		acc := g.Point().Null()
-// 		for i := 0; i < n; i++ { // assuming all participants are in the qualified set
-// 			_, coeff := pubPolys[i].Info()
-// 			acc = g.Point().Add(acc, coeff[k])
-// 		}
-// 		dkgCommits[k] = acc
-// 	}
-
-// 	// Check that the private DKG shares verify against the public DKG commits
-// 	dkgPubPoly := NewPubPoly(g, nil, dkgCommits)
-// 	for i := 0; i < n; i++ {
-// 		require.True(test, dkgPubPoly.Check(dkgShares[i]))
-// 	}
-
-// 	// Start verifiable resharing process
-// 	subPriPolys := make([]*PriPoly, n)
-// 	subPriShares := make([][]*PriShare, n)
-// 	subPubPolys := make([]*PubPoly, n)
-// 	subPubShares := make([][]*PubShare, n)
-
-// 	// Create subshares and subpolys
-// 	for i := 0; i < n; i++ {
-// 		subPriPolys[i] = NewPriPoly(g, t, dkgShares[i].V, g.RandomStream())
-// 		subPriShares[i] = subPriPolys[i].Shares(n)
-// 		subPubPolys[i] = subPriPolys[i].Commit(nil)
-// 		subPubShares[i] = subPubPolys[i].Shares(n)
-// 		require.True(test, g.Point().Mul(subPriShares[i][0].V, nil).Equal(subPubShares[i][0].V))
-// 	}
-
-// 	// Handout shares to new nodes column-wise and verify them
-// 	newDKGShares := make([]*PriShare, n)
-// 	for i := 0; i < n; i++ {
-// 		tmpPriShares := make([]*PriShare, n) // column-wise reshuffled sub-shares
-// 		tmpPubShares := make([]*PubShare, n) // public commitments to old DKG private shares
-// 		for j := 0; j < n; j++ {
-// 			// Check 1: Verify that the received individual private subshares s_ji
-// 			// is correct by evaluating the public commitment vector
-// 			tmpPriShares[j] = &PriShare{I: j, V: subPriShares[j][i].V} // Shares that participant i gets from j
-// 			require.True(test, g.Point().Mul(tmpPriShares[j].V, nil).Equal(subPubPolys[j].Eval(i).V))
-
-// 			// Check 2: Verify that the received sub public shares are
-// 			// commitments to the original secret
-// 			tmpPubShares[j] = dkgPubPoly.Eval(j)
-// 			require.True(test, tmpPubShares[j].V.Equal(subPubPolys[j].Commit()))
-// 		}
-// 		// Check 3: Verify that the received public shares interpolate to the
-// 		// original DKG public key
-// 		com, err := RecoverCommit(g, tmpPubShares, t, n)
-// 		require.NoError(test, err)
-// 		require.True(test, dkgCommits[0].Equal(com))
-
-// 		// Compute the refreshed private DKG share of node i
-// 		s, err := RecoverSecret(g, tmpPriShares, t, n)
-// 		require.NoError(test, err)
-// 		newDKGShares[i] = &PriShare{I: i, V: s}
-// 	}
-
-// 	// Refresh the DKG commitments (= verification vector)
-// 	newDKGCommits := make([]kyber.Point, t)
-// 	for i := 0; i < t; i++ {
-// 		pubShares := make([]*PubShare, n)
-// 		for j := 0; j < n; j++ {
-// 			_, c := subPubPolys[j].Info()
-// 			pubShares[j] = &PubShare{I: j, V: c[i]}
-// 		}
-// 		com, err := RecoverCommit(g, pubShares, t, n)
-// 		require.NoError(test, err)
-// 		newDKGCommits[i] = com
-// 	}
-
-// 	// Check that the old and new DKG public keys are the same
-// 	require.True(test, dkgCommits[0].Equal(newDKGCommits[0]))
-
-// 	// Check that the old and new DKG private shares are different
-// 	for i := 0; i < n; i++ {
-// 		require.False(test, dkgShares[i].V.Equal(newDKGShares[i].V))
-// 	}
-
-// 	// Check that the refreshed private DKG shares verify against the refreshed public DKG commits
-// 	q := NewPubPoly(g, nil, newDKGCommits)
-// 	for i := 0; i < n; i++ {
-// 		require.True(test, q.Check(newDKGShares[i]))
-// 	}
-
-// 	// Recover the private polynomial
-// 	refreshedPriPoly, err := RecoverPriPoly(g, newDKGShares, t, n)
-// 	require.NoError(test, err)
-
-// 	// Check that the secret and the corresponding (old) public commit match
-// 	require.True(test, g.Point().Mul(refreshedPriPoly.Secret(), nil).Equal(dkgCommits[0]))
-// }
+#[test]
+fn TestPublicRecoveryOutIndex() {
+	let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+	let n = 10;
+	let t = n/2 + 1;
+
+	let priPoly = NewPriPoly(g, t, None, g.random_stream());
+	let pubPoly = priPoly.Commit(None);
+	let pubShares = pubPoly.Shares(n);
+
+	let selected = &pubShares[n-t..];
+    assert_eq!(selected.len(), t);
+
+	let newN = t + 1;
+
+	let recovered = RecoverCommit(g, selected, t, newN).unwrap();
+
+    assert_eq!(recovered, pubPoly.Commit());
+
+	let polyRecovered= RecoverPubPoly(g, &pubShares, t, n).unwrap();
+
+    assert!(pubPoly.Equal(&polyRecovered).unwrap());
+}
+
+#[test]
+fn TestPublicRecoveryDelete() {
+	let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+	let n = 10;
+	let t = n/2 + 1;
+
+	let priPoly = NewPriPoly(g, t, None, g.random_stream());
+	let pubPoly = priPoly.Commit(None);
+	let mut shares = pubPoly.Shares(n);
+
+	// Corrupt aNone;w shares
+	shares[2] = None;
+	shares[5] = None;
+	shares[7] = None;
+	shares[8] = None;
+
+	let recovered = RecoverCommit(g, &shares, t, n).unwrap();
+
+    assert_eq!(recovered, pubPoly.Commit(), "recovered commit does not match initial value");
+}
+
+#[test]
+fn TestPublicRecoveryDeleteFail() {
+	let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+	let n = 10;
+	let t = n/2 + 1;
+
+	let priPoly = NewPriPoly(g, t, None, g.random_stream());
+	let pubPoly = priPoly.Commit(None);
+	let mut shares = pubPoly.Shares(n);
+
+	// Corrupt one more share than acceptable
+	shares[1] = None;
+	shares[2] = None;
+	shares[5] = None;
+	shares[7] = None;
+	shares[8] = None;
+
+	RecoverCommit(g, &shares, t, n).expect_err("recovered commit unexpectably");
+}
+
+#[test]
+fn TestPrivateAdd() {
+	let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+	let n = 10;
+	let t = n/2 + 1;
+
+	let p = NewPriPoly(g, t, None, g.random_stream());
+	let q = NewPriPoly(g, t, None, g.random_stream());
+
+	let r = p.Add(&q).unwrap();
+
+	let ps = p.Secret();
+	let qs = q.Secret();
+    let rs = ps + qs;
+
+    assert_eq!(rs, r.Secret(), "addition of secret sharing polynomials failed");
+}
+
+#[test]
+fn TestPublicAdd() {
+    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+	let n = 10;
+	let t = n/2 + 1;
+
+	let G = g.point().pick(&mut g.random_stream());
+	let H = g.point().pick(&mut g.random_stream());
+
+	let p = NewPriPoly(g, t, None, g.random_stream());
+	let q = NewPriPoly(g, t, None, g.random_stream());
+
+	let P = p.Commit(Some(&G));
+	let Q = q.Commit(Some(&H));
+
+	let R = P.Add(&Q).unwrap();
+
+	let shares = R.Shares(n);
+	let recovered = RecoverCommit(g, &shares, t, n).unwrap();
+
+	let x = P.Commit();
+	let y = Q.Commit();
+	let z = g.point().add(&x, &y);
+
+    assert_eq!(recovered, z, "addition of public commitment polynomials failed");
+
+}
+
+#[test]
+fn TestPublicPolyEqual() {
+    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+	let n = 10;
+	let t = n/2 + 1;
+
+	let G = g.point().pick(&mut g.random_stream());
+
+	let p1 = NewPriPoly(g, t, None, g.random_stream());
+	let p2 = NewPriPoly(g, t, None, g.random_stream());
+	let p3 = NewPriPoly(g, t, None, g.random_stream());
+
+	let P1 = p1.Commit(Some(&G));
+	let P2 = p2.Commit(Some(&G));
+	let P3 = p3.Commit(Some(&G));
+
+	let P12 = P1.Add(&P2).unwrap();
+	let P13 = P1.Add(&P3).unwrap();
+
+	let P123 = P12.Add(&P3).unwrap();
+	let P132 = P13.Add(&P2).unwrap();
+
+    assert!(P123.Equal(&P132).unwrap(), "public polynomials not equal");
+}
+
+#[test]
+fn TestPriPolyMul() {
+	let suite = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+	let n = 10;
+	let t = n/2 + 1;
+	let a = NewPriPoly(suite, t, None, suite.random_stream());
+	let b = NewPriPoly(suite, t, None, suite.random_stream());
+
+	let c = a.Mul(&b);
+	assert_eq!(a.coeffs.len() + b.coeffs.len() - 1, c.coeffs.len());
+	let nul = suite.scalar().zero();
+	for c in c.coeffs.clone() {
+        assert_ne!(nul.to_string(), c.to_string());
+	}
+
+	let a0 = a.coeffs[0].clone();
+	let b0 = b.coeffs[0].clone();
+	let mut mul = b0 * a0;
+	let c0 = c.coeffs[0].clone();
+
+	assert_eq!(c0.to_string(), mul.to_string());
+
+	let at = a.coeffs[a.coeffs.len() - 1].clone();
+	let bt = b.coeffs[b.coeffs.len() - 1].clone();
+	mul = at * bt;
+	let ct = c.coeffs[c.coeffs.len() - 1].clone();
+    assert_eq!(ct.to_string(), mul.to_string());
+}
+
+#[test]
+fn TestRecoverPriPoly() {
+	let suite = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+	let n = 10;
+	let t = n/2 + 1;
+	let a = NewPriPoly(suite, t, None, suite.random_stream());
+
+	let shares = a.Shares(n);
+	let mut reverses = shares.clone();
+    reverses.reverse();
+
+	let recovered = RecoverPriPoly(&suite, &shares, t, n).unwrap();
+
+	let reverseRecovered = RecoverPriPoly(&suite, &reverses, t, n).unwrap();
+
+	for i in 0..t {
+        assert_eq!(recovered.Eval(i).v.to_string(), a.Eval(i).v.to_string());
+        assert_eq!(reverseRecovered.Eval(i).v.to_string(), a.Eval(i).v.to_string());
+	}
+}
+
+#[test]
+fn TestPriPolyCoefficients() {
+	let suite = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+	let n = 10;
+	let t = n/2 + 1;
+	let a = NewPriPoly(suite, t, None, suite.random_stream());
+
+	let coeffs = a.Coefficients();
+	assert_eq!(coeffs.len(), t);
+
+	let b = CoefficientsToPriPoly(&suite, coeffs);
+    assert_eq!(a.coeffs, b.coeffs);
+
+}
+
+#[test]
+fn TestRefreshDKG() {
+	let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+	let n = 10;
+	let t = n/2 + 1;
+
+	// Run an n-fold Pedersen VSS (= DKG)
+	let mut priPolys = Vec::with_capacity(n);
+	let mut priShares = Vec::with_capacity(n);
+	let mut pubPolys = Vec::with_capacity(n);
+	let mut pubShares = Vec::with_capacity(n);
+	for i in 0..n {
+		priPolys.push(NewPriPoly(g, t, None, g.random_stream()));
+		priShares.push(priPolys[i].Shares(n));
+		pubPolys.push(priPolys[i].Commit(None));
+		pubShares.push(pubPolys[i].Shares(n));
+	}
+
+	// Verify VSS shares
+	for i in 0..n {
+		for j in 0..n {
+			let sij = priShares[i][j].clone().unwrap();
+			// s_ij * G
+            let mut sijG = g.point().base();
+			sijG = sijG.mul(&sij.v, None);
+            assert_eq!(sijG, pubShares[i][j].as_ref().unwrap().v);
+		}
+	}
+
+	// Create private DKG shares
+	let mut dkgShares = Vec::with_capacity(n);
+	for i in 0..n {
+		let mut acc = g.scalar().zero();
+		for j in 0..n { // assuming all participants are in the qualified set
+			acc = acc + priShares[j][i].clone().unwrap().v;
+		}
+		dkgShares.push(PriShare{i, v: acc});
+	}
+
+	// Create public DKG commitments (= verification vector)
+	let mut dkgCommits = Vec::with_capacity(t);
+	for k in 0..t {
+		let mut acc = g.point().null();
+		for i in 0..n { // assuming all participants are in the qualified set
+			let (_, coeff) = pubPolys[i].Info();
+            let acc_clone = acc.clone();
+			acc = acc.add(&acc_clone, &coeff[k]);
+		}
+		dkgCommits.push(acc);
+	}
+
+	// Check that the private DKG shares verify against the public DKG commits
+	let dkgPubPoly = PubPoly::new(&g, None, dkgCommits.clone());
+	for i in 0..n {
+		assert!(dkgPubPoly.Check(&dkgShares[i]));
+	}
+
+	// Start verifiable resharing process
+	let mut subPriPolys = Vec::with_capacity(n);
+	let mut subPriShares = Vec::with_capacity(n);
+	let mut subPubPolys = Vec::with_capacity(n);
+	let mut subPubShares = Vec::with_capacity(n);
+
+	// Create subshares and subpolys
+	for i in 0..n {
+		subPriPolys.push(NewPriPoly(g, t, Some(dkgShares[i].clone().v), g.random_stream()));
+		subPriShares.push(subPriPolys[i].Shares(n));
+		subPubPolys.push(subPriPolys[i].Commit(None));
+		subPubShares.push(subPubPolys[i].Shares(n));
+
+        assert_eq!(g.point().mul(&subPriShares[i][0].clone().unwrap().v, None), subPubShares[i][0].as_ref().unwrap().v)
+	}
+
+	// Handout shares to new nodes column-wise and verify them
+	let mut newDKGShares = Vec::with_capacity(n);
+	for i in 0..n {
+		let mut tmpPriShares = Vec::with_capacity(n); // column-wise reshuffled sub-shares
+		let mut tmpPubShares = Vec::with_capacity(n); // public commitments to old DKG private shares
+		for j in 0..n {
+			// Check 1: Verify that the received individual private subshares s_ji
+			// is correct by evaluating the public commitment vector
+			tmpPriShares.push(Some(PriShare{i: j, v: subPriShares[j][i].clone().unwrap().v}));  // Shares that participant i gets from j
+            assert!(g.point().mul(&tmpPriShares[j].clone().unwrap().v, None).equal(&subPubPolys[j].Eval(i).v));
+
+			// Check 2: Verify that the received sub public shares are
+			// commitments to the original secret
+			tmpPubShares.push(Some(dkgPubPoly.Eval(j)));
+            assert!(tmpPubShares[j].as_ref().unwrap().v.equal(&subPubPolys[j].Commit()));
+		}
+		// Check 3: Verify that the received public shares interpolate to the
+		// original DKG public key
+		let com = RecoverCommit(g, &tmpPubShares, t, n).unwrap();
+		assert!(dkgCommits[0].equal(&com));
+
+		// Compute the refreshed private DKG share of node i
+		let s = recover_secret(g, &tmpPriShares, t, n).unwrap();
+		newDKGShares.push(Some(PriShare{i, v: s}));
+	}
+
+	// Refresh the DKG commitments (= verification vector)
+	let mut newDKGCommits = Vec::with_capacity(t);
+	for i in 0..t {
+		let mut pubShares = Vec::with_capacity(n);
+		for j in 0..n {
+			let (_, c) = subPubPolys[j].Info();
+			pubShares.push(Some(PubShare{i: j, v: c[i].clone()}));
+		}
+		let com = RecoverCommit(g, &pubShares, t, n).unwrap();
+		newDKGCommits.push(com);
+	}
+
+	// Check that the old and new DKG public keys are the same
+	assert!(dkgCommits[0].equal(&newDKGCommits[0]));
+
+	// Check that the old and new DKG private shares are different
+	for i in 0..n {
+        assert_ne!(dkgShares[i].v, newDKGShares[i].clone().unwrap().v);
+	}
+
+	// Check that the refreshed private DKG shares verify against the refreshed public DKG commits
+	let q = PubPoly::new(&g, None, newDKGCommits);
+	for i in 0..n {
+		assert!(q.Check(&newDKGShares[i].clone().unwrap()));
+	}
+
+	// Recover the private polynomial
+	let refreshedPriPoly = RecoverPriPoly(&g, &newDKGShares, t, n).unwrap();
+
+	// Check that the secret and the corresponding (old) public commit match
+	assert!(g.point().mul(&refreshedPriPoly.Secret(), None).equal(&dkgCommits[0]));
+}

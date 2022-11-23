@@ -149,4 +149,8 @@ impl Scalar for SimpleCTScalar {
     fn inv(self, a: &Self) -> Self {
         todo!()
     }
+
+    fn neg(self, a: &Self) -> Self {
+        todo!()
+    }
 }

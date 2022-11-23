@@ -832,7 +832,7 @@ where
         let gih = self.suite.point().mul(&gi.v, Some(&H));
         let ci = self.suite.point().add(&fig, &gih);
 
-        let commitPoly = PubPoly::new(self.suite, None, d.commitments.clone());
+        let commitPoly = PubPoly::new(&self.suite, None, d.commitments.clone());
 
         let pubShare = commitPoly.Eval(fi.i);
         if ci != pubShare.v {

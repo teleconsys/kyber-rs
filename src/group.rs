@@ -38,8 +38,8 @@ pub trait Scalar:
     // Set to the modular difference a - b.
     fn sub(self, a: &Self, b: &Self) -> Self;
 
-    // // Set to the modular negation of scalar a.
-    // Neg(a scalar) scalar
+    // Set to the modular negation of scalar a.
+    fn neg(self, a: &Self) -> Self;
 
     // Set to the multiplicative identity (1).
     fn one(self) -> Self;

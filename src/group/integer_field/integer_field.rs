@@ -367,6 +367,10 @@ impl Scalar for Int {
     fn inv(self, a: &Self) -> Self {
         todo!()
     }
+
+    fn neg(self, a: &Self) -> Self {
+        todo!()
+    }
 }
 
 // // new_int_bytes creates a new Int with a given slice of bytes and a big.Int
