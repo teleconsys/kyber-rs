@@ -43,7 +43,7 @@ impl<SCALAR: Scalar> Default for PriShare<SCALAR> {
 
 impl<SCALAR: Scalar> PriShare<SCALAR> {
     /// Hash returns the hash representation of this share
-    fn Hash<HASHFACTORY: HashFactory>(&self, s: HASHFACTORY) -> Result<Vec<u8>> {
+    pub fn hash<HASHFACTORY: HashFactory>(&self, s: HASHFACTORY) -> Result<Vec<u8>> {
     	let mut h = s.hash();
         self.v.marshal_to(&mut h)?;
         h.write_u32::<LittleEndian>(self.i as u32)?;
@@ -51,7 +51,7 @@ impl<SCALAR: Scalar> PriShare<SCALAR> {
     }
 
 
-    fn String(&self) -> String {
+    pub fn string(&self) -> String {
         format!("{{{}:{}}}", self.i, self.v.to_string())
     }
 
