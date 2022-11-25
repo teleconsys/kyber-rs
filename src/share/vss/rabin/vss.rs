@@ -167,8 +167,8 @@ where
 /// correct recipient. The encryption is performed in a similar manner as what is
 /// done in TLS. The dealer generates a temporary key pair, signs it with its
 /// longterm secret key.
-#[derive(Clone)]
-pub struct EncryptedDeal<POINT: Point> {
+#[derive(Clone, Serialize)]
+pub struct EncryptedDeal<POINT: Point + Serialize> {
     /// Ephemeral Diffie Hellman key
     pub(crate) dhkey: POINT,
     /// Signature of the DH key by the longterm key of the dealer
@@ -177,6 +177,13 @@ pub struct EncryptedDeal<POINT: Point> {
     nonce: Vec<u8>,
     /// AEAD encryption of the deal marshalled by protobuf
     pub(crate) cipher: Vec<u8>,
+}
+
+impl<POINT: Point + Serialize> BinaryMarshaler for EncryptedDeal<POINT>
+{
+    fn marshal_binary(&self) -> Result<Vec<u8>> {
+        encoding::marshal_binary(self)
+    }
 }
 
 /// Response is sent by the verifiers to all participants and holds each

@@ -43,7 +43,7 @@ use std::collections::HashMap;
 use byteorder::{WriteBytesExt, LittleEndian};
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::{share::{poly::{PriShare, PubPoly}, vss}, Point, Suite, Scalar, group::{ScalarCanCheckCanonical, PointCanCheckCanonicalAndSmallOrder}, encoding::Marshaling, sign::schnorr};
+use crate::{share::{poly::{PriShare, PubPoly, RecoverPriPoly}, vss}, Point, Suite, Scalar, group::{ScalarCanCheckCanonical, PointCanCheckCanonicalAndSmallOrder}, encoding::{Marshaling, BinaryMarshaler}, sign::schnorr};
 
 use anyhow::{Result, bail};
 
@@ -80,7 +80,7 @@ impl<POINT: Point> DistKeyShare<POINT> {
 /// Dealer.
 ///  NOTE: Doing that in vss.go would be possible but then the Dealer is always
 ///  assumed to be a member of the participants. It's only the case here.
-pub struct Deal<POINT: Point> {
+pub struct Deal<POINT: Point + Serialize> {
 	/// Index of the Dealer in the list of participants
 	pub index: u32,
 	/// Deal issued for another participant
@@ -169,9 +169,8 @@ where
         h.update("commitcomplaint".as_bytes());
         h.write_u32::<LittleEndian>(self.index)?;
         h.write_u32::<LittleEndian>(self.dealer_index)?;
-        todo!("marshal");
-        //buff, _ := protobuf.Encode(cc.Deal)
-        //_, _ = h.Write(buff)
+        let buff = self.deal.marshal_binary()?;
+        h.update(&buff);
         Ok(h.finalize().to_vec())
     }
 
@@ -590,128 +589,142 @@ where
         Ok(rc)
     }
 
-// // ProcessReconstructCommits takes a ReconstructCommits message and stores it
-// // along any others. If there are enough messages to recover the coefficients of
-// // the public polynomials of the malicious dealer in question, then the
-// // polynomial is recovered.
-// func (d *DistKeyGenerator) ProcessReconstructCommits(rs *ReconstructCommits) error {
-// 	if _, ok := d.reconstructed[rs.DealerIndex]; ok {
-// 		// commitments already reconstructed, no need for other shares
-// 		return nil
-// 	}
-// 	_, ok := d.commitments[rs.DealerIndex]
-// 	if ok {
-// 		return errors.New("dkg: commitments not invalidated by any complaints")
-// 	}
+    /// ProcessReconstructCommits takes a ReconstructCommits message and stores it
+    /// along any others. If there are enough messages to recover the coefficients of
+    /// the public polynomials of the malicious dealer in question, then the
+    /// polynomial is recovered.
+    fn process_reconstruct_commits(&mut self, rs: ReconstructCommits<SUITE>) -> Result<()> {
+        if self.reconstructed.contains_key(&rs.dealer_index) {
+            // commitments already reconstructed, no need for other shares
+            return Ok(())
+        }
+        if self.commitments.contains_key(&rs.dealer_index) {
+            bail!("dkg: commitments not invalidated by any complaints")
+        }
 
-// 	pub, ok := findPub(d.participants, rs.Index)
-// 	if !ok {
-// 		return errors.New("dkg: reconstruct commits with invalid verifier index")
-// 	}
+        let pubb = match find_pub(&self.participants, rs.index as usize) {
+            Some(public) => public,
+            None => bail!("dkg: reconstruct commits with invalid verifier index"),
+        };
 
-// 	msg := rs.Hash(d.suite)
-// 	if err := schnorr.Verify(d.suite, pub, msg, rs.Signature); err != nil {
-// 		return err
-// 	}
+        let msg = rs.hash(self.suite)?;
+        schnorr::Verify(self.suite, &pubb, &msg, &rs.signature.clone().expect("dkg: signature should not be none"))?;
+    
+        let arr = self.pending_reconstruct.get_mut(&rs.dealer_index).unwrap();
+        // check if packet is already received or not
+        // or if the session ID does not match the others
+        for r in arr.iter() {
+            if r.index == rs.index {
+                return Ok(())
+            }
+            if r.session_id != rs.session_id {
+                bail!("dkg: reconstruct commits invalid session id")
+            }
+        }
+        // add it to list of pending shares
+        arr.push(rs.clone());
 
-// 	var arr = d.pendingReconstruct[rs.DealerIndex]
-// 	// check if packet is already received or not
-// 	// or if the session ID does not match the others
-// 	for _, r := range arr {
-// 		if r.Index == rs.Index {
-// 			return nil
-// 		}
-// 		if !bytes.Equal(r.SessionID, rs.SessionID) {
-// 			return errors.New("dkg: reconstruct commits invalid session id")
-// 		}
-// 	}
-// 	// add it to list of pending shares
-// 	arr = append(arr, rs)
-// 	d.pendingReconstruct[rs.DealerIndex] = arr
-// 	// check if we can reconstruct commitments
-// 	if len(arr) >= d.t {
-// 		var shares = make([]*share.PriShare, len(arr))
-// 		for i, r := range arr {
-// 			shares[i] = r.Share
-// 		}
-// 		// error only happens when you have less than t shares, but we ensure
-// 		// there are more just before
-// 		pri, _ := share.RecoverPriPoly(d.suite, shares, d.t, len(d.participants))
-// 		d.commitments[rs.DealerIndex] = pri.Commit(d.suite.Point().Base())
-// 		// note it has been reconstructed.
-// 		d.reconstructed[rs.DealerIndex] = true
-// 		delete(d.pendingReconstruct, rs.DealerIndex)
-// 	}
-// 	return nil
-// }
+        // check if we can reconstruct commitments
+        if arr.len() >= self.t {
+            let mut shares = Vec::with_capacity(arr.len());
+            for _ in 0..arr.len() {
+                shares.push(None);
+            }
+            for (i, r) in arr.iter().enumerate() {
+                shares[i] = Some(r.share.clone());
+            }
+            // error only happens when you have less than t shares, but we ensure
+            // there are more just before
+            let pri = RecoverPriPoly(&self.suite, &shares, self.t, self.participants.len())?;
+            self.commitments.insert(rs.dealer_index, pri.Commit(Some(&self.suite.point().base())));
+            // note it has been reconstructed.
+            self.reconstructed.insert(rs.dealer_index, true);
+            self.pending_reconstruct.remove(&rs.dealer_index);
+        }
+        Ok(())
+    }
 
-// // Finished returns true if the DKG has operated the protocol correctly and has
-// // all necessary information to generate the DistKeyShare() by itself. It
-// // returns false otherwise.
-// func (d *DistKeyGenerator) Finished() bool {
-// 	var ret = true
-// 	var nb = 0
-// 	d.qualIter(func(idx uint32, v *vss.Verifier) bool {
-// 		nb++
-// 		// ALL QUAL members should have their commitments by now either given or
-// 		// reconstructed.
-// 		if _, ok := d.commitments[idx]; !ok {
-// 			ret = false
-// 			return false
-// 		}
-// 		return true
-// 	})
-// 	return nb >= d.t && ret
-// }
+    /// Finished returns true if the DKG has operated the protocol correctly and has
+    /// all necessary information to generate the DistKeyShare() by itself. It
+    /// returns false otherwise.
+    fn finished(&self) -> bool {
+        let mut ret = true;
+        let mut nb = 0;
+        self.qual_iter(
+            |i ,_| {
+            nb += 1;
+            // ALL QUAL members should have their commitments by now either given or
+            // reconstructed.
+            if !self.commitments.contains_key(&i) {
+                ret = false;
+                return false
+            }
+            return true
+            }
+        );
+        return nb >= self.t && ret
+    }
 
-// // DistKeyShare generates the distributed key relative to this receiver
-// // It throws an error if something is wrong such as not enough deals received.
-// // The shared secret can be computed when all deals have been sent and
-// // basically consists of a public point and a share. The public point is the sum
-// // of all aggregated individual public commits of each individual secrets.
-// // the share is evaluated from the global Private Polynomial, basically SUM of
-// // fj(i) for a receiver i.
-// func (d *DistKeyGenerator) DistKeyShare() (*DistKeyShare, error) {
-// 	if !d.Certified() {
-// 		return nil, errors.New("dkg: distributed key not certified")
-// 	}
+    /// DistKeyShare generates the distributed key relative to this receiver
+    /// It throws an error if something is wrong such as not enough deals received.
+    /// The shared secret can be computed when all deals have been sent and
+    /// basically consists of a public point and a share. The public point is the sum
+    /// of all aggregated individual public commits of each individual secrets.
+    /// the share is evaluated from the global Private Polynomial, basically SUM of
+    /// fj(i) for a receiver i.
+    fn dist_key_share(&self) -> Result<DistKeyShare<SUITE::POINT>> {
+        if !self.certified() {
+            bail!("dkg: distributed key not certified")
+        }
 
-// 	sh := d.suite.Scalar().Zero()
-// 	var pub *share.PubPoly
-// 	var err error
+        let mut sh = self.suite.scalar().zero();
+        let mut tmp_pubb = None;
+        let mut pubb = None;
 
-// 	d.qualIter(func(i uint32, v *vss.Verifier) bool {
-// 		// share of dist. secret = sum of all share received.
-// 		s := v.Deal().SecShare.V
-// 		sh = sh.Add(sh, s)
-// 		// Dist. public key = sum of all revealed commitments
-// 		poly, ok := d.commitments[i]
-// 		if !ok {
-// 			err = fmt.Errorf("dkg: protocol not finished: %d commitments missing", i)
-// 			return false
-// 		}
-// 		if pub == nil {
-// 			// first polynomial we see (instead of generating n empty commits)
-// 			pub = poly
-// 			return true
-// 		}
-// 		pub, err = pub.Add(poly)
-// 		return err == nil
-// 	})
+        // TODO: fix this weird error management
+        let mut error : Option<anyhow::Error> = None;
 
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	_, commits := pub.Info()
+        self.qual_iter( 
+            |i ,v| {
+                // share of dist. secret = sum of all share received.
+                let s = match v.deal(){
+                    Some(deal) => deal.sec_share.v,
+                    None => {error = Some(anyhow::Error::msg("dkg: deals not found")); return false},
+                };
 
-// 	return &DistKeyShare{
-// 		Commits: commits,
-// 		Share: &share.PriShare{
-// 			I: int(d.index),
-// 			V: sh,
-// 		},
-// 	}, nil
-// }
+                let sh_clone = sh.clone();
+                sh = sh_clone + s;
+                // Dist. public key = sum of all revealed commitments
+                if !self.commitments.contains_key(&i) {
+                    error = Some(anyhow::Error::msg(format!("dkg: protocol not finished: {} commitments missing", i)));
+                    return false
+                }
+                let poly = self.commitments.get(&i).unwrap();
+                if tmp_pubb.is_none()  {
+                    // first polynomial we see (instead of generating n empty commits)
+                    tmp_pubb = Some(poly);
+                    return true
+                }
+                match tmp_pubb.unwrap().Add(&poly) {
+                    Ok(p) => pubb = Some(p),
+                    Err(e) => error = Some(anyhow::Error::msg(e.to_string())),
+                };
+                return error.is_none()
+        });
+
+        if error.is_some() {
+            return Err(error.unwrap())
+        }
+        let (_, commits) = pubb.unwrap().Info();
+
+        Ok(DistKeyShare{
+            commits: commits,
+            share: PriShare{
+                i: self.index as usize,
+                v: sh,
+            },
+        })
+    }
 
 }
 
