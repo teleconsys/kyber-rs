@@ -23,6 +23,12 @@ lazy_static! {
     "7237005577332262213973186563042994240857116359379907606001950938285454250989", 10)
     .unwrap();
 
+    // `l_minus_2` is the order of base point minus two, i.e. 2^252 +
+    // 27742317777372353535851937790883648493 - 2, in little-endian form
+    // This is needed to compute constant time modular inversion of scalars.
+    pub static ref L_MINUS2: BigInt = BigInt::from_str_radix("7237005577332262213973186563042994240857116359379907606001950938285454250987", 10)
+    .unwrap();
+
     // cofactor of the curve, as a ModInt
     pub static ref COFACTOR: BigInt = BigInt::from(8);
 
@@ -34,7 +40,7 @@ lazy_static! {
     pub static ref COFACTOR_SCALAR: Scalar = newScalarInt(COFACTOR.clone());
 
     // identity point
-    pub static ref NULL_POINT: EdPoint = *EdPoint::default().null();
+    pub static ref NULL_POINT: EdPoint = EdPoint::default().null();
 }
 
 pub const SQRT_M1: FieldElement = [

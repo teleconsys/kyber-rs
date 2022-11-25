@@ -1,10 +1,8 @@
-use std::marker::PhantomData;
-
 use crate::group::edwards25519::Point as EdPoint;
 use crate::group::edwards25519::Scalar as EdScalar;
+use crate::group::Group;
 use crate::util::key::Generator;
 use crate::util::random;
-use crate::{group::Group, Scalar};
 use anyhow::Result;
 
 use sha2::{Digest, Sha512};
@@ -13,19 +11,11 @@ use sha2::{Digest, Sha512};
 /// There are no parameters and no initialization is required
 /// because it supports only this one specific curve.
 #[derive(Clone, Copy)]
-pub struct Curve<SCALAR: Scalar> {
-    _phantom: PhantomData<SCALAR>,
-}
+pub struct Curve {}
 
-impl<SCALAR: Scalar> Curve<SCALAR> {
-    pub const fn new() -> Self {
-        Curve {
-            _phantom: PhantomData,
-        }
-    }
-}
+impl Group for Curve {
+    type POINT = EdPoint;
 
-impl Group<EdScalar, EdPoint> for Curve<EdScalar> {
     /// Return the name of the curve, "Ed25519".
     fn string(&self) -> String {
         "Ed25519".to_string()
@@ -45,7 +35,11 @@ impl Group<EdScalar, EdPoint> for Curve<EdScalar> {
     }
 }
 
-impl Curve<EdScalar> {
+impl Curve {
+    pub const fn new() -> Self {
+        Curve {}
+    }
+
     /// ScalarLen returns 32, the size in bytes of an encoded scalar
     /// for the Ed25519 curve.
     fn scalar_len() -> usize {
@@ -90,7 +84,9 @@ impl Curve<EdScalar> {
     }
 }
 
-impl Generator<EdScalar> for Curve<EdScalar> {
+impl Generator for Curve {
+    type SCALAR = EdScalar;
+
     /// NewKey returns a formatted Ed25519 key (avoiding subgroup attack by requiring
     /// it to be a multiple of 8). NewKey implements the kyber/util/key.Generator interface.
     fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> Result<EdScalar> {
@@ -99,13 +95,8 @@ impl Generator<EdScalar> for Curve<EdScalar> {
     }
 }
 
-impl<SCALAR> Default for Curve<SCALAR>
-where
-    SCALAR: Scalar,
-{
+impl Default for Curve {
     fn default() -> Self {
-        Curve {
-            _phantom: PhantomData,
-        }
+        Curve::new()
     }
 }

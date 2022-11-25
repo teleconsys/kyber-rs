@@ -132,9 +132,9 @@ fn test_aead_whole() {
     let mut point = Point::default();
     point.unmarshal_binary(&p).unwrap();
 
-    let encrypted = aead_encrypt(point, &hdfk_context, &nonce, &deal_buff).unwrap();
+    let encrypted = aead_encrypt(&point, &hdfk_context, &nonce, &deal_buff).unwrap();
     assert_eq!(encrypted, known_encrypted);
 
-    let decrypted = aead_decrypt(point, &hdfk_context, &nonce, &encrypted).unwrap();
+    let decrypted = aead_decrypt(&point, &hdfk_context, &nonce, &encrypted).unwrap();
     assert_eq!(decrypted, deal_buff);
 }

@@ -21,7 +21,7 @@ use super::Point;
 pub struct SuiteEd25519 {
     // Curve
     // r: Box<dyn Stream>,
-    curve: Curve<Scalar>,
+    curve: Curve,
 }
 
 impl SuiteEd25519 {
@@ -63,7 +63,7 @@ impl SuiteEd25519 {
 }
 
 impl Deref for SuiteEd25519 {
-    type Target = Curve<Scalar>;
+    type Target = Curve;
 
     fn deref(&self) -> &Self::Target {
         &self.curve
@@ -76,13 +76,16 @@ impl DerefMut for SuiteEd25519 {
     }
 }
 
-impl Generator<Scalar> for SuiteEd25519 {
+impl Generator for SuiteEd25519 {
+    type SCALAR = Scalar;
     fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> anyhow::Result<Scalar> {
         self.curve.new_key(stream)
     }
 }
 
-impl Group<Scalar, Point> for SuiteEd25519 {
+impl Group for SuiteEd25519 {
+    type POINT = Point;
+
     fn string(&self) -> String {
         self.curve.string()
     }
@@ -129,5 +132,5 @@ impl HashFactory for SuiteEd25519 {
     }
 }
 
-impl Suite<Scalar, Point> for SuiteEd25519 {}
-impl KeySuite<Scalar, Point> for SuiteEd25519 {}
+impl Suite for SuiteEd25519 {}
+impl KeySuite for SuiteEd25519 {}

@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{fmt::Debug, io};
 use thiserror::Error;
 
