@@ -57,7 +57,7 @@ pub struct DistKeyShare<POINT: Point> {
 
 impl<POINT: Point> DistKeyShare<POINT> {
     /// Public returns the public key associated with the distributed private key.
-    fn public(&self) -> POINT {
+    pub fn public(&self) -> POINT {
         return self.commits[0].clone()
     }
 
@@ -111,7 +111,7 @@ where
 
 /// SecretCommits is sent during the distributed public key reconstruction phase,
 /// basically a Feldman VSS scheme.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SecretCommits<SUITE: Suite> {
 	/// Index of the Dealer in the list of participants
 	pub index: u32,
@@ -215,7 +215,7 @@ where
 {
 	suite: SUITE,
 
-	index: u32,
+	pub index: u32,
 	long:  <SUITE::POINT as Point>::SCALAR,
 	pubb:   SUITE::POINT,
 
@@ -227,7 +227,7 @@ where
 	verifiers: HashMap<u32, vss::Verifier<SUITE>>,
 
 	/// list of commitments to each secret polynomial
-	commitments: HashMap<u32, PubPoly<SUITE>>,
+	pub commitments: HashMap<u32, PubPoly<SUITE>>,
 
 	/// Map of deals collected to reconstruct the full polynomial of a dealer.
 	/// The key is index of the dealer. Once there are enough ReconstructCommits
@@ -309,7 +309,7 @@ where
                     continue
                 }
 
-                let resp = self.process_deal(distd)?;
+                let resp = self.process_deal(&distd)?;
                 if !resp.response.approved {
                     panic!("dkg: own deal gave a complaint")
                 }
@@ -329,7 +329,7 @@ where
     /// returns a Response to broadcast to every other participants. It returns an
     /// error in case the deal has already been stored, or if the deal is incorrect
     /// (see `vss.Verifier.ProcessEncryptedDeal()`).
-    pub fn process_deal(&mut self, dd: Deal<SUITE::POINT>) -> Result<Response> {
+    pub fn process_deal(&mut self, dd: &Deal<SUITE::POINT>) -> Result<Response> {
     	// public key of the dealer
     	let pubb = match find_pub(&self.participants, dd.index as usize) {
             Some(pubb) => pubb,
@@ -362,7 +362,7 @@ where
     /// and returns nil with a possible error regarding the validity of the response.
     /// If the response designates a deal this dkg has issued, then the dkg will process
     /// the response, and returns a justification.
-    pub fn process_response(&mut self, resp: Response) -> Result<Option<Justification<SUITE>>> {
+    pub fn process_response(&mut self, resp: &Response) -> Result<Option<Justification<SUITE>>> {
         if !self.verifiers.contains_key(&resp.index) {
             bail!("dkg: complaint received but no deal for it");
         }
@@ -419,7 +419,7 @@ where
     /// of all participants that are not disqualified after having  exchanged all
     /// deals, responses and justification. This is the set that is used to extract
     /// the distributed public key with SecretCommits() and ProcessSecretCommits().
-    fn qual(&self) -> Vec<usize> {
+    pub fn qual(&self) -> Vec<usize> {
     	let mut good = Vec::new();
     	self.qual_iter(
             |i ,_| {
@@ -430,7 +430,7 @@ where
     	return good
     }
 
-    fn is_in_qual(&self, idx: u32) -> bool {
+    pub fn is_in_qual(&self, idx: u32) -> bool {
     	let mut found = false;
     	self.qual_iter(
             |i, _| if i == idx {
@@ -461,7 +461,7 @@ where
     /// the coefficients are revealed through a Feldman VSS scheme.
     /// This dkg must have its deal certified, otherwise it returns an error. The
     /// SecretCommits returned is already added to this dkg's list of SecretCommits.
-    fn secret_commits(&mut self) -> Result<SecretCommits<SUITE>> {
+    pub fn secret_commits(&mut self) -> Result<SecretCommits<SUITE>> {
         if !self.dealer.deal_certified() {
             bail!("dkg: can't give SecretCommits if deal not certified")
         }
@@ -485,7 +485,7 @@ where
     /// invalid. In case the SecretCommits are valid, but this dkg can't verify its
     /// share, it returns a ComplaintCommits that must be broadcasted to every other
     /// participant. It returns (nil,nil) otherwise.
-    fn process_secret_commits(&mut self, sc: SecretCommits<SUITE>) -> Result<Option<ComplaintCommits<SUITE>>> {
+    pub fn process_secret_commits(&mut self, sc: &SecretCommits<SUITE>) -> Result<Option<ComplaintCommits<SUITE>>> {
         let pubb = match find_pub(&self.participants, sc.index as usize){
             Some(public) => public,
             None => bail!("dkg: secretcommits received with index out of bounds"),
@@ -503,10 +503,10 @@ where
         }
 
         let msg = sc.hash(self.suite)?;
-        schnorr::Verify(self.suite, &pubb, &msg, &sc.signature.expect("dkg: signature should exists"))?;
+        schnorr::Verify(self.suite, &pubb, &msg, &sc.signature.clone().expect("dkg: signature should exists"))?;
 
         let deal = v.deal().expect("dkg: deal should exists");
-        let poly = PubPoly::new(&self.suite, Some(self.suite.point().base()), sc.commitments);
+        let poly = PubPoly::new(&self.suite, Some(self.suite.point().base()), sc.commitments.clone());
         if !poly.Check(&deal.sec_share) {
             let mut cc = ComplaintCommits::<SUITE>{
                 index:       self.index,
@@ -647,7 +647,7 @@ where
     /// Finished returns true if the DKG has operated the protocol correctly and has
     /// all necessary information to generate the DistKeyShare() by itself. It
     /// returns false otherwise.
-    fn finished(&self) -> bool {
+    pub fn finished(&self) -> bool {
         let mut ret = true;
         let mut nb = 0;
         self.qual_iter(
@@ -672,16 +672,16 @@ where
     /// of all aggregated individual public commits of each individual secrets.
     /// the share is evaluated from the global Private Polynomial, basically SUM of
     /// fj(i) for a receiver i.
-    fn dist_key_share(&self) -> Result<DistKeyShare<SUITE::POINT>> {
+    pub fn dist_key_share(&self) -> Result<DistKeyShare<SUITE::POINT>> {
         if !self.certified() {
             bail!("dkg: distributed key not certified")
         }
 
         let mut sh = self.suite.scalar().zero();
         let mut tmp_pubb = None;
-        let mut pubb = None;
+        let mut pubb: Option<PubPoly<SUITE>> = None;
 
-        // TODO: fix this weird error management
+        // TODO: fix this weird error management and the messy pubb
         let mut error : Option<anyhow::Error> = None;
 
         self.qual_iter( 
@@ -700,15 +700,22 @@ where
                     return false
                 }
                 let poly = self.commitments.get(&i).unwrap();
-                if tmp_pubb.is_none()  {
+                if pubb.is_none() && tmp_pubb.is_none()  {
                     // first polynomial we see (instead of generating n empty commits)
                     tmp_pubb = Some(poly);
                     return true
                 }
-                match tmp_pubb.unwrap().Add(&poly) {
-                    Ok(p) => pubb = Some(p),
-                    Err(e) => error = Some(anyhow::Error::msg(e.to_string())),
-                };
+                if pubb.is_none() {
+                    match tmp_pubb.unwrap().Add(&poly) {
+                        Ok(p) => pubb = Some(p),
+                        Err(e) => error = Some(anyhow::Error::msg(e.to_string())),
+                    }
+                } else {
+                    match pubb.as_ref().unwrap().Add(&poly) {
+                        Ok(p) => pubb = Some(p),
+                        Err(e) => error = Some(anyhow::Error::msg(e.to_string())),
+                    }
+            };
                 return error.is_none()
         });
 

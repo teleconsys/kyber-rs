@@ -1,38 +1,78 @@
-// var suite = edwards25519.NewBlakeSHA256Ed25519()
+use rand::Rng;
+use serde::{de::DeserializeOwned, Serialize};
 
-// var nbParticipants = 7
+use crate::group::{ScalarCanCheckCanonical, PointCanCheckCanonicalAndSmallOrder};
+use crate::share::dkg::rabin::dkg::SecretCommits;
+use crate::share::poly::recover_secret;
+use crate::{Group, Random};
+use crate::{group::edwards25519::SuiteEd25519, Suite, Point, Scalar};
 
-// var partPubs []kyber.Point
-// var partSec []kyber.Scalar
+use super::dkg::{DistKeyGenerator, new_dist_key_generator, DistKeyShare};
 
-// var dkgs []*DistKeyGenerator
+fn suite() -> SuiteEd25519 {
+    SuiteEd25519::new_blake_sha256ed25519()
+}
 
-// func init() {
-// 	partPubs = make([]kyber.Point, nbParticipants)
-// 	partSec = make([]kyber.Scalar, nbParticipants)
-// 	for i := 0; i < nbParticipants; i++ {
-// 		sec, pub := genPair()
-// 		partPubs[i] = pub
-// 		partSec[i] = sec
-// 	}
-// 	dkgs = dkgGen()
-// }
+struct TestData<SUITE: Suite> 
+where
+    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned + ScalarCanCheckCanonical,
+    SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
+{
+    suite: SUITE,
+    nb_participants: usize,
 
-// func TestDKGNewDistKeyGenerator(t *testing.T) {
-// 	long := partSec[0]
-// 	dkg, err := NewDistKeyGenerator(suite, long, partPubs, nbParticipants/2+1)
-// 	assert.Nil(t, err)
-// 	assert.NotNil(t, dkg.dealer)
-// 	// quick testing here; easier.
-// 	scs, err := dkg.SecretCommits()
-// 	assert.Nil(t, scs)
-// 	assert.Error(t, err)
+    part_pubs: Vec<SUITE::POINT>,
+    part_sec: Vec<<SUITE::POINT as Point>::SCALAR>,
 
-// 	sec, _ := genPair()
-// 	_, err = NewDistKeyGenerator(suite, sec, partPubs, nbParticipants/2+1)
-// 	assert.Error(t, err)
+    //dkgs: Vec<DistKeyGenerator<SUITE>>,
+}
+const NB_PARTICIPANTS: usize = 7;
 
-// }
+
+fn new_test_data<SUITE: Suite>() -> TestData<SuiteEd25519>
+where
+    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned + ScalarCanCheckCanonical,
+    SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
+{
+	let mut part_pubs = Vec::with_capacity(NB_PARTICIPANTS);
+    let mut part_sec = Vec::with_capacity(NB_PARTICIPANTS);
+	for _ in 0..NB_PARTICIPANTS {
+		let (sec, pubb) = genPair();
+		part_pubs.push(pubb);
+		part_sec.push(sec);
+	}
+
+    return TestData::<SuiteEd25519> { suite: suite(), nb_participants: NB_PARTICIPANTS, part_pubs, part_sec }
+}
+
+fn dkgGen<SUITE: Suite>(t: &TestData<SUITE>) -> Vec<DistKeyGenerator<SUITE>> 
+where
+    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned + ScalarCanCheckCanonical,
+    SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder{
+	let mut dkgs = Vec::with_capacity(t.nb_participants);
+	for i in 0..t.nb_participants{
+		let dkg= new_dist_key_generator(t.suite, t.part_sec[i].clone(), t.part_pubs.clone(), t.nb_participants/2+1).unwrap();
+		dkgs.push(dkg);
+	}
+	return dkgs
+}
+
+#[test]
+fn TestDKGNewDistKeyGenerator() {
+    let t = new_test_data::<SuiteEd25519>();
+	let long = t.part_sec[0].clone();
+	let mut dkg = new_dist_key_generator(t.suite, long, t.part_pubs.clone(), t.nb_participants/2+1).unwrap();
+	// quick testing here; easier.
+	dkg.secret_commits().unwrap_err();
+
+	let sec = genPair();
+	let res = new_dist_key_generator(t.suite, sec.0, t.part_pubs, t.nb_participants/2+1);
+    if res.is_ok() {
+        panic!("this should fail")
+    }
+
+
+}
 
 // func TestDKGDeal(t *testing.T) {
 // 	dkg := dkgs[0]
@@ -531,150 +571,154 @@
 
 // }
 
-// func TestDistKeyShare(t *testing.T) {
-// 	fullExchange(t)
+#[test]
+fn TestDistKeyShare() {
+	let t = new_test_data::<SuiteEd25519>();
+	let mut dkgs =  full_exchange(&t);
+	let dkgs_len = dkgs.len();
 
-// 	var scs []*SecretCommits
-// 	for i, dkg := range dkgs[:len(dkgs)-1] {
-// 		sc, err := dkg.SecretCommits()
-// 		require.Nil(t, err)
-// 		scs = append(scs, sc)
-// 		for j, dkg := range dkgs[:len(dkgs)-1] {
-// 			if i == j {
-// 				continue
-// 			}
-// 			cc, err := dkg.ProcessSecretCommits(sc)
-// 			require.Nil(t, err)
-// 			require.Nil(t, cc)
-// 		}
-// 	}
+	let mut scs = vec![];
+	for (i, dkg) in dkgs[..dkgs_len-1].iter_mut().enumerate() {
+		let sc = dkg.secret_commits().unwrap();
+		scs.push((i, sc));
+	};
+	for (i, dkg) in dkgs[..dkgs_len-1].iter_mut().enumerate() {
+		for sc in scs.iter() { 
+		if i == sc.0 {
+			continue
+		}
+		let cc = dkg.process_secret_commits(&sc.1).unwrap();
+		assert!(cc.is_none());
+		}
+	}
 
-// 	// check that we can't get the dist key share before exchanging commitments
-// 	lastDkg := dkgs[len(dkgs)-1]
-// 	dks, err := lastDkg.DistKeyShare()
-// 	assert.Nil(t, dks)
-// 	assert.Error(t, err)
+	// check that we can't get the dist key share before exchanging commit.ents
+	let sc: SecretCommits<SuiteEd25519>;
+	// NOTE: need a block for the mut reference to dkgs
+	{
+	let last_dkg = &mut dkgs[dkgs_len-1];
+	let res = last_dkg.dist_key_share();
+	assert!(res.is_err());
 
-// 	for _, sc := range scs {
-// 		cc, err := lastDkg.ProcessSecretCommits(sc)
-// 		require.Nil(t, cc)
-// 		require.Nil(t, err)
-// 	}
+	for sc in scs.iter() {
+		let cc = last_dkg.process_secret_commits(&sc.1).unwrap();
+		assert!(cc.is_none());
+	}
 
-// 	sc, err := lastDkg.SecretCommits()
-// 	require.Nil(t, err)
-// 	require.NotNil(t, sc)
+	sc = last_dkg.secret_commits().unwrap();
+	//require.NotNil(t, sc)
+	}
 
-// 	for _, dkg := range dkgs[:len(dkgs)-1] {
-// 		sc, err := dkg.ProcessSecretCommits(sc)
-// 		require.Nil(t, sc)
-// 		require.Nil(t, err)
+	for dkg in dkgs[..dkgs_len-1].iter_mut() {
+		let sc = dkg.process_secret_commits(&sc).unwrap();
+		assert!(sc.is_none());
 
-// 		require.Equal(t, nbParticipants, len(dkg.QUAL()))
-// 		require.Equal(t, nbParticipants, len(dkg.commitments))
-// 	}
+		assert_eq!(NB_PARTICIPANTS, dkg.qual().len());
+		assert_eq!(NB_PARTICIPANTS, dkg.commitments.len());
+	}
 
-// 	// missing one commitment
-// 	lastCommitment0 := lastDkg.commitments[0]
-// 	delete(lastDkg.commitments, uint32(0))
-// 	dks, err = lastDkg.DistKeyShare()
-// 	assert.Nil(t, dks)
-// 	assert.Error(t, err)
-// 	lastDkg.commitments[uint32(0)] = lastCommitment0
+	// NOTE: need a block for the mut reference to dkgs
+	{
+	let last_dkg = &mut dkgs[dkgs_len-1];
+	// missing one commitment
+	let last_commitment_0 = last_dkg.commitments.remove(&(0 as u32)).unwrap();
+	let res = last_dkg.dist_key_share();
+	assert!(res.is_err());
+	last_dkg.commitments.insert(0 as u32, last_commitment_0);
+	}
 
-// 	// everyone should be finished
-// 	for _, dkg := range dkgs {
-// 		assert.True(t, dkg.Finished())
-// 	}
-// 	// verify integrity of shares etc
-// 	dkss := make([]*DistKeyShare, nbParticipants)
-// 	for i, dkg := range dkgs {
-// 		dks, err := dkg.DistKeyShare()
-// 		require.NotNil(t, dks)
-// 		assert.Nil(t, err)
-// 		dkss[i] = dks
-// 		assert.Equal(t, dkg.index, uint32(dks.Share.I))
-// 	}
+	// everyone should be finished
+	for dkg in dkgs.iter_mut() {
+		assert!(dkg.finished())
+	}
+	// verify integrity of shares etc
+	let mut dkss = Vec::with_capacity(NB_PARTICIPANTS);
+	for dkg in dkgs.iter_mut() {
+		let dks = dkg.dist_key_share().unwrap();
+		let index = dks.share.i;
+		dkss.push(dks);
+		assert_eq!(dkg.index, index as u32);
+	}
 
-// 	shares := make([]*share.PriShare, nbParticipants)
-// 	for i, dks := range dkss {
-// 		assert.True(t, checkDks(dks, dkss[0]), "dist key share not equal %d vs %d", dks.Share.I, 0)
-// 		shares[i] = dks.Share
-// 	}
+	let mut shares = Vec::with_capacity(NB_PARTICIPANTS);
+	for dks in dkss.iter() {
+		assert!(check_dks(dks, &dkss[0]), "dist key share not equal {} vs {}", dks.share.i, 0);
+		shares.push(Some(dks.share.clone())); 
+	}
 
-// 	secret, err := share.RecoverSecret(suite, shares, nbParticipants, nbParticipants)
-// 	assert.Nil(t, err)
+	let secret = recover_secret(t.suite, &shares, NB_PARTICIPANTS, NB_PARTICIPANTS).unwrap();
 
-// 	commitSecret := suite.Point().Mul(secret, nil)
-// 	assert.Equal(t, dkss[0].Public().String(), commitSecret.String())
-// }
+	let commit_secret = t.suite.point().mul(&secret, None);
+	assert_eq!(dkss[0].public().string(), commit_secret.string())
+}
 
-// func dkgGen() []*DistKeyGenerator {
-// 	dkgs := make([]*DistKeyGenerator, nbParticipants)
-// 	for i := 0; i < nbParticipants; i++ {
-// 		dkg, err := NewDistKeyGenerator(suite, partSec[i], partPubs, nbParticipants/2+1)
-// 		if err != nil {
-// 			panic(err)
-// 		}
-// 		dkgs[i] = dkg
-// 	}
-// 	return dkgs
-// }
 
-// func genPair() (kyber.Scalar, kyber.Point) {
-// 	sc := suite.Scalar().Pick(suite.RandomStream())
-// 	return sc, suite.Point().Mul(sc, nil)
-// }
 
-// func randomBytes(n int) []byte {
-// 	var buff = make([]byte, n)
-// 	_, _ = rand.Read(buff[:])
-// 	return buff
-// }
-// func checkDks(dks1, dks2 *DistKeyShare) bool {
-// 	if len(dks1.Commits) != len(dks2.Commits) {
-// 		return false
-// 	}
-// 	for i, p := range dks1.Commits {
-// 		if !p.Equal(dks2.Commits[i]) {
-// 			return false
-// 		}
-// 	}
-// 	return true
-// }
+use crate::group::edwards25519::scalar::Scalar as EdScalar;
+use crate::group::edwards25519::Point as EdPoint;
+fn genPair() -> (EdScalar, EdPoint) {
+    let suite = suite();
+     let secret = suite.scalar().pick(&mut suite.random_stream());
+    let public = suite.point().mul(&secret, None);
+    (secret, public)
+}
 
-// func fullExchange(t *testing.T) {
-// 	dkgs = dkgGen()
-// 	// full secret sharing exchange
-// 	// 1. broadcast deals
-// 	resps := make([]*Response, 0, nbParticipants*nbParticipants)
-// 	for _, dkg := range dkgs {
-// 		deals, err := dkg.Deals()
-// 		require.Nil(t, err)
-// 		for i, d := range deals {
-// 			resp, err := dkgs[i].ProcessDeal(d)
-// 			require.Nil(t, err)
-// 			require.Equal(t, true, resp.Response.Approved)
-// 			resps = append(resps, resp)
-// 		}
-// 	}
-// 	// 2. Broadcast responses
-// 	for _, resp := range resps {
-// 		for _, dkg := range dkgs {
-// 			// ignore all messages from ourself
-// 			if resp.Response.Index == dkg.index {
-// 				continue
-// 			}
-// 			j, err := dkg.ProcessResponse(resp)
-// 			require.Nil(t, err)
-// 			require.Nil(t, j)
-// 		}
-// 	}
-// 	// 3. make sure everyone has the same QUAL set
-// 	for _, dkg := range dkgs {
-// 		for _, dkg2 := range dkgs {
-// 			require.True(t, dkg.isInQUAL(dkg2.index))
-// 		}
-// 	}
+fn random_bytes(n: usize) -> Vec<u8> {
+	let mut rng = rand::thread_rng();
+	let mut buff = Vec::with_capacity(n);
+	for _ in 0..n {
+		buff.push(rng.gen());
+	}
+	return buff
+}
 
-// }
+fn check_dks<POINT: Point>(dks1: &DistKeyShare<POINT>, dks2: &DistKeyShare<POINT>) -> bool {
+	if dks1.commits.len() != dks2.commits.len() {
+		return false
+	}
+	for (i, p) in dks1.commits.iter().enumerate() {
+		if !p.equal(&dks2.commits[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+fn full_exchange(t: &TestData<SuiteEd25519>) -> Vec<DistKeyGenerator<SuiteEd25519>>{
+	let mut dkgs = dkgGen(t);
+	// full secret sharing exchange
+	// 1. broadcast deals
+    let mut all_deals = Vec::with_capacity(NB_PARTICIPANTS);
+	let mut resps = Vec::with_capacity(NB_PARTICIPANTS*NB_PARTICIPANTS);
+	for dkg in dkgs.iter_mut() {
+		let deals = dkg.deals().unwrap();
+        all_deals.push(deals);
+	}
+    for deals in all_deals {
+        for (i, d) in deals {
+        let resp = dkgs[i].process_deal(&d).unwrap();
+        assert!(resp.response.approved);
+        resps.push(resp);
+   		}
+	}
+
+	// 2. Broadcast responses
+	for resp in resps {
+		for dkg in dkgs.iter_mut() {
+			// ignore all messages from ourself
+			if resp.response.index == dkg.index {
+				continue
+			}
+			let j = dkg.process_response(&resp).unwrap();
+			assert!(j.is_none())
+		}
+	}
+	// 3. make sure everyone has the same QUAL set
+	for dkg in &dkgs {
+		for dkg2 in &dkgs {
+            assert!(dkg.is_in_qual(dkg2.index));
+		}
+	}
+
+	return dkgs
+}
