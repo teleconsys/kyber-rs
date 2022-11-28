@@ -401,7 +401,7 @@ where
 
     /// SetTimeout triggers the timeout on all verifiers, and thus makes sure
     /// all verifiers have either responded, or have a StatusComplaint response.
-    fn set_timeout(&mut self) {
+    pub fn set_timeout(&mut self) {
         for (_, v) in self.verifiers.iter_mut() {
             v.SetTimeout()
         }

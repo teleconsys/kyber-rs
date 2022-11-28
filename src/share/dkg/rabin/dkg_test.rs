@@ -486,55 +486,64 @@ fn TestDKGReconstructCommits() {
 	assert!(dkgs[2].finished());
 }
 
-// func TestSetTimeout(t *testing.T) {
-// 	dkgs = dkgGen()
-// 	// full secret sharing exchange
-// 	// 1. broadcast deals
-// 	resps := make([]*Response, 0, nbParticipants*nbParticipants)
-// 	for _, dkg := range dkgs {
-// 		deals, err := dkg.Deals()
-// 		require.Nil(t, err)
-// 		for i, d := range deals {
-// 			resp, err := dkgs[i].ProcessDeal(d)
-// 			require.Nil(t, err)
-// 			require.True(t, resp.Response.Approved)
-// 			resps = append(resps, resp)
-// 		}
-// 	}
+#[test]
+fn TestSetTimeout() {
+	let t = new_test_data::<SuiteEd25519>();
+	let mut dkgs = dkgGen(&t);
+	// full secret sharing exchange
+	// 1. broadcast deals
+	let mut all_deals = Vec::with_capacity(NB_PARTICIPANTS);
+	let mut resps = Vec::with_capacity(NB_PARTICIPANTS*NB_PARTICIPANTS);
+	for dkg in dkgs.iter_mut() {
+		let deals = dkg.deals().unwrap();
+		all_deals.push(deals);
+	}
 
-// 	// 2. Broadcast responses
-// 	for _, resp := range resps {
-// 		for _, dkg := range dkgs {
-// 			if !dkg.verifiers[resp.Index].EnoughApprovals() {
-// 				// ignore messages about ourself
-// 				if resp.Response.Index == dkg.index {
-// 					continuek
-// 				}
-// 				j, err := dkg.ProcessResponse(resp)
-// 				require.Nil(t, err)
-// 				require.Nil(t, j)
-// 			}
-// 		}
-// 	}
+	for deals in all_deals {
+		for (i, d) in deals {
+		let resp = dkgs[i].process_deal(&d).unwrap();
+		assert!(resp.response.approved);
+		resps.push(resp);
+		}
+	}
 
-// 	// 3. make sure everyone has the same QUAL set
-// 	for _, dkg := range dkgs {
-// 		for _, dkg2 := range dkgs {
-// 			require.False(t, dkg.isInQUAL(dkg2.index))
-// 		}
-// 	}
+	// 2. Broadcast responses
+	for resp in resps {
+		for dkg in dkgs.iter_mut() {
+			if !dkg.verifiers.get(&resp.index).unwrap().enough_approvals() {
+				// ignore messages about ourself
+				if resp.response.index == dkg.index {
+					continue
+				}
+				let j = dkg.process_response(&resp).unwrap();
+				assert!(j.is_none());
+			}
+		}
+	}
 
-// 	for _, dkg := range dkgs {
-// 		dkg.SetTimeout()
-// 	}
+	// 3. make sure everyone has the same QUAL set
+	let mut dkg_idxs = Vec::with_capacity(dkgs.len());
+	for dkg in dkgs.iter() {
+		dkg_idxs.push(dkg.index.clone());
+	}
 
-// 	for _, dkg := range dkgs {
-// 		for _, dkg2 := range dkgs {
-// 			require.True(t, dkg.isInQUAL(dkg2.index))
-// 		}
-// 	}
+	for dkg in dkgs.iter() {
+		for idx in dkg_idxs.iter() {
+			assert!(!dkg.is_in_qual(idx.clone()));
+		}
+	}
 
-// }
+	for dkg in dkgs.iter_mut() {
+		dkg.set_timeout();
+	}
+
+	for dkg in dkgs.iter() {
+		for idx in dkg_idxs.iter() {
+			assert!(dkg.is_in_qual(idx.clone()));
+		}
+	}
+
+}
 
 #[test]
 fn TestDistKeyShare() {
