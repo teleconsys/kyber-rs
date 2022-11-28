@@ -1,13 +1,17 @@
+use std::process::id;
+
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::group::{ScalarCanCheckCanonical, PointCanCheckCanonicalAndSmallOrder};
 use crate::share::dkg::rabin::dkg::SecretCommits;
 use crate::share::poly::recover_secret;
+use crate::share::vss;
+use crate::sign::schnorr;
 use crate::{Group, Random};
 use crate::{group::edwards25519::SuiteEd25519, Suite, Point, Scalar};
 
-use super::dkg::{DistKeyGenerator, new_dist_key_generator, DistKeyShare};
+use super::dkg::{DistKeyGenerator, new_dist_key_generator, DistKeyShare, ReconstructCommits};
 
 fn suite() -> SuiteEd25519 {
     SuiteEd25519::new_blake_sha256ed25519()
@@ -74,452 +78,413 @@ fn TestDKGNewDistKeyGenerator() {
 
 }
 
-// func TestDKGDeal(t *testing.T) {
-// 	dkg := dkgs[0]
+#[test]
+fn TestDKGDeal() {
+	let t = new_test_data::<SuiteEd25519>();
+	let mut dkgs =  full_exchange(&t);
+	let dkg = &mut dkgs[0];
 
-// 	dks, err := dkg.DistKeyShare()
-// 	assert.Error(t, err)
-// 	assert.Nil(t, dks)
+	let res = dkg.dist_key_share();
+	assert!(res.is_err());
+	//assert.Nil(t, dks)
 
-// 	deals, err := dkg.Deals()
-// 	require.Nil(t, err)
-// 	assert.Len(t, deals, nbParticipants-1)
+	let deals = dkg.deals().unwrap();
+	assert_eq!(deals.len(), NB_PARTICIPANTS - 1);
 
-// 	for i := range deals {
-// 		assert.NotNil(t, deals[i])
-// 		assert.Equal(t, uint32(0), deals[i].Index)
-// 	}
+	for (_, d) in deals {
+		//assert.NotNil(t, deals[i])
+		assert_eq!(0 as u32, d.index);
+	}
 
-// 	v, ok := dkg.verifiers[dkg.index]
-// 	assert.True(t, ok)
-// 	assert.NotNil(t, v)
-// }
+	let own_index = dkg.index.clone();
+	assert!(dkg.verifiers.contains_key(&own_index));
+	assert!(dkg.verifiers.get(&own_index).is_some());
+}
 
-// func TestDKGProcessDeal(t *testing.T) {
-// 	dkgs = dkgGen()
-// 	dkg := dkgs[0]
-// 	deals, err := dkg.Deals()
-// 	require.Nil(t, err)
+#[test]
+fn TestDKGProcessDeal() {
+	let t = new_test_data::<SuiteEd25519>();
+	let mut dkgs = dkgGen(&t);
+	let dkg = &mut dkgs[0];
+	let mut deals = dkg.deals().unwrap();
 
-// 	rec := dkgs[1]
-// 	deal := deals[1]
-// 	assert.Equal(t, int(deal.Index), 0)
-// 	assert.Equal(t, uint32(1), rec.index)
+	let rec = &mut dkgs[1];
+	let deal = deals.get_mut(&1).unwrap();
+	assert_eq!(deal.index, 0);
+	assert_eq!(1, rec.index);
 
-// 	// verifier don't find itself
-// 	goodP := rec.participants
-// 	rec.participants = make([]kyber.Point, 0)
-// 	resp, err := rec.ProcessDeal(deal)
-// 	assert.Nil(t, resp)
-// 	assert.Error(t, err)
-// 	rec.participants = goodP
+	// verifier don't find itself
+	let good_p = rec.participants.clone();
+	rec.participants = Vec::new();
+	let res = rec.process_deal(deal);
+	assert!(res.is_err());
+	rec.participants = good_p;
 
-// 	// wrong index
-// 	goodIdx := deal.Index
-// 	deal.Index = uint32(nbParticipants + 1)
-// 	resp, err = rec.ProcessDeal(deal)
-// 	assert.Nil(t, resp)
-// 	assert.Error(t, err)
-// 	deal.Index = goodIdx
+	// wrong index
+	let good_idx = deal.index;
+	deal.index = (NB_PARTICIPANTS + 1) as u32;
+	let res = rec.process_deal(deal);
+	assert!(res.is_err());
+	deal.index = good_idx;
 
-// 	// wrong deal
-// 	goodSig := deal.Deal.Signature
-// 	deal.Deal.Signature = randomBytes(len(deal.Deal.Signature))
-// 	resp, err = rec.ProcessDeal(deal)
-// 	assert.Nil(t, resp)
-// 	assert.Error(t, err)
-// 	deal.Deal.Signature = goodSig
+	// wrong deal
+	let good_sig = deal.deal.signature.clone();
+	deal.deal.signature = random_bytes(deal.deal.signature.len());
+	let res = rec.process_deal(deal);
+	assert!(res.is_err());
+	deal.deal.signature = good_sig;
 
-// 	// good deal
-// 	resp, err = rec.ProcessDeal(deal)
-// 	assert.NotNil(t, resp)
-// 	assert.Equal(t, true, resp.Response.Approved)
-// 	assert.Nil(t, err)
-// 	_, ok := rec.verifiers[deal.Index]
-// 	require.True(t, ok)
-// 	assert.Equal(t, uint32(0), resp.Index)
+	// good deal
+	let resp = rec.process_deal(deal).unwrap();
+	assert!(resp.response.approved);
+	assert!(rec.verifiers.contains_key(&deal.index));
+	assert_eq!(0, resp.index);
 
-// 	// duplicate
-// 	resp, err = rec.ProcessDeal(deal)
-// 	assert.Nil(t, resp)
-// 	assert.Error(t, err)
+	// duplicate
+	let res = rec.process_deal(deal);
+	assert!(res.is_err());
 
-// }
+}
 
-// func TestDKGProcessResponse(t *testing.T) {
-// 	// first peer generates wrong deal
-// 	// second peer processes it and returns a complaint
-// 	// first peer process the complaint
+#[test]
+fn TestDKGProcessResponse() {
+	// first peer generates wrong deal
+	// second peer processes it and returns a complaint
+	// first peer process the complaint
 
-// 	dkgs = dkgGen()
-// 	dkg := dkgs[0]
-// 	idxRec := 1
-// 	rec := dkgs[idxRec]
-// 	deal, err := dkg.dealer.PlaintextDeal(idxRec)
-// 	require.Nil(t, err)
+	let t = new_test_data::<SuiteEd25519>();
+	let mut dkgs = dkgGen(&t);
+	let idx_rec = 1;
+	//let deal = dkgs[0].dealer.PlaintextDeal(idx_rec).unwrap();
 
-// 	// give a wrong deal
-// 	goodSecret := deal.RndShare.V
-// 	deal.RndShare.V = suite.Scalar().Zero()
-// 	dd, err := dkg.Deals()
-// 	encD := dd[idxRec]
-// 	require.Nil(t, err)
-// 	resp, err := rec.ProcessDeal(encD)
-// 	assert.Nil(t, err)
-// 	require.NotNil(t, resp)
-// 	assert.Equal(t, false, resp.Response.Approved)
-// 	deal.RndShare.V = goodSecret
-// 	dd, _ = dkg.Deals()
-// 	encD = dd[idxRec]
+	// give a wrong deal
+	let good_secret = dkgs[0].dealer.PlaintextDeal(idx_rec).unwrap().rnd_share.v.clone();
+	dkgs[0].dealer.PlaintextDeal(idx_rec).unwrap().rnd_share.v = t.suite.scalar().zero();
+	let dd = dkgs[0].deals().unwrap();
+	let enc_d = dd.get(&idx_rec).unwrap();
+	let mut resp = dkgs[idx_rec].process_deal(enc_d).unwrap();
+	assert!(!resp.response.approved);
+	dkgs[0].dealer.PlaintextDeal(idx_rec).unwrap().rnd_share.v = good_secret;
+	_ = dkgs[0].deals().unwrap(); //dd
+	//enc_d = dd.get(&idx_rec).unwrap();
 
-// 	// no verifier tied to Response
-// 	v, ok := dkg.verifiers[0]
-// 	require.NotNil(t, v)
-// 	require.True(t, ok)
-// 	require.NotNil(t, v)
-// 	delete(dkg.verifiers, 0)
-// 	j, err := dkg.ProcessResponse(resp)
-// 	assert.Nil(t, j)
-// 	assert.NotNil(t, err)
-// 	dkg.verifiers[0] = v
+	// no verifier tied to Response
+	assert!(dkgs[0].verifiers.contains_key(&0));
+	let v = dkgs[0].verifiers.remove(&0).unwrap();
+	let res = dkgs[0].process_response(&resp);
+	assert!(res.is_err());
+	dkgs[0].verifiers.insert(0, v);
 
-// 	// invalid response
-// 	goodSig := resp.Response.Signature
-// 	resp.Response.Signature = randomBytes(len(goodSig))
-// 	j, err = dkg.ProcessResponse(resp)
-// 	assert.Nil(t, j)
-// 	assert.Error(t, err)
-// 	resp.Response.Signature = goodSig
+	// invalid response
+	let good_sig = resp.response.signature.clone();
+	resp.response.signature = random_bytes(good_sig.len());
+	let res = dkgs[0].process_response(&resp);
+	assert!(res.is_err());
+	resp.response.signature = good_sig;
 
-// 	// valid complaint from our deal
-// 	j, err = dkg.ProcessResponse(resp)
-// 	assert.NotNil(t, j)
-// 	assert.Nil(t, err)
+	// valid complaint from our deal
+	let j = dkgs[0].process_response(&resp).unwrap();
+	assert!(j.is_some());
 
-// 	// valid complaint from another deal from another peer
-// 	dkg2 := dkgs[2]
-// 	require.Nil(t, err)
-// 	// fake a wrong deal
-// 	//deal20, err := dkg2.dealer.PlaintextDeal(0)
-// 	//require.Nil(t, err)
-// 	deal21, err := dkg2.dealer.PlaintextDeal(1)
-// 	require.Nil(t, err)
-// 	goodRnd21 := deal21.RndShare.V
-// 	deal21.RndShare.V = suite.Scalar().Zero()
-// 	deals2, err := dkg2.Deals()
-// 	require.Nil(t, err)
+	// valid complaint from another deal from another peer
+	// fake a wrong deal
+	//deal20, err := dkg2.dealer.PlaintextDeal(0)
+	//require.Nil(t, err)
+	let good_rnd_2_1 = dkgs[2].dealer.PlaintextDeal(1).unwrap().rnd_share.v.clone();
+	dkgs[2].dealer.PlaintextDeal(1).unwrap().rnd_share.v = t.suite.scalar().zero();
+	let mut deals_2 = dkgs[2].deals().unwrap();
 
-// 	resp12, err := rec.ProcessDeal(deals2[idxRec])
-// 	assert.NotNil(t, resp)
-// 	assert.Equal(t, false, resp12.Response.Approved)
+	let mut resp_1_2 = dkgs[idx_rec].process_deal(deals_2.get(&idx_rec).unwrap()).unwrap();
+	assert!(!resp_1_2.response.approved);
 
-// 	deal21.RndShare.V = goodRnd21
-// 	deals2, err = dkg2.Deals()
-// 	require.Nil(t, err)
+	dkgs[2].dealer.PlaintextDeal(1).unwrap().rnd_share.v = good_rnd_2_1;
+	deals_2 = dkgs[2].deals().unwrap();
 
-// 	// give it to the first peer
-// 	// process dealer 2's deal
-// 	r, err := dkg.ProcessDeal(deals2[0])
-// 	assert.Nil(t, err)
-// 	assert.NotNil(t, r)
+	// give it to the first peer
+	// process dealer 2's deal
+	dkgs[0].process_deal(deals_2.get(&0).unwrap()).unwrap(); //r
 
-// 	// process response from peer 1
-// 	j, err = dkg.ProcessResponse(resp12)
-// 	assert.Nil(t, j)
-// 	assert.Nil(t, err)
+	// process response from peer 1
+	let j = dkgs[0].process_response(&resp_1_2).unwrap();
+	assert!(j.is_none());
 
-// 	// Justification part:
-// 	// give the complaint to the dealer
-// 	j, err = dkg2.ProcessResponse(resp12)
-// 	assert.Nil(t, err)
-// 	assert.NotNil(t, j)
+	// Justification part:
+	// give the complaint to the dealer
+	let j = dkgs[2].process_response(&resp_1_2).unwrap().unwrap();
 
-// 	// hack because all is local, and resp has been modified locally by dkg2's
-// 	// dealer, the status has became "justified"
-// 	resp12.Response.Approved = false
-// 	err = dkg.ProcessJustification(j)
-// 	assert.Nil(t, err)
+	// hack because all is local, and resp has been modified locally by dkg2's
+	// dealer, the status has became "justified"
+	resp_1_2.response.approved = false;
+	dkgs[0].process_justification(&j).unwrap();
 
-// 	// remove verifiers
-// 	v = dkg.verifiers[j.Index]
-// 	delete(dkg.verifiers, j.Index)
-// 	err = dkg.ProcessJustification(j)
-// 	assert.Error(t, err)
-// 	dkg.verifiers[j.Index] = v
+	// remove verifiers
+	let v = dkgs[0].verifiers.remove(&j.index).unwrap();
+	let res = dkgs[0].process_justification(&j);
+	assert!(res.is_err());
+	dkgs[0].verifiers.insert(j.index, v);
 
-// }
+}
 
-// func TestDKGSecretCommits(t *testing.T) {
-// 	fullExchange(t)
+#[test]
+fn TestDKGSecretCommits() {
+	let t = new_test_data::<SuiteEd25519>();
+	let mut dkgs = full_exchange(&t);
 
-// 	dkg := dkgs[0]
+	let mut sc = dkgs[0].secret_commits().unwrap();
+	let msg = sc.hash(t.suite).unwrap();
+	schnorr::Verify(t.suite, &dkgs[0].pubb, &msg, &sc.clone().signature.unwrap()).unwrap();
 
-// 	sc, err := dkg.SecretCommits()
-// 	assert.Nil(t, err)
-// 	msg := sc.Hash(suite)
-// 	assert.Nil(t, schnorr.Verify(suite, dkg.pub, msg, sc.Signature))
+	// wrong index
+	let good_idx = sc.index;
+	sc.index = (NB_PARTICIPANTS + 1) as u32;
+	let res = dkgs[1].process_secret_commits(&sc);
+	assert!(res.is_err());
+	sc.index = good_idx;
 
-// 	dkg2 := dkgs[1]
-// 	// wrong index
-// 	goodIdx := sc.Index
-// 	sc.Index = uint32(nbParticipants + 1)
-// 	cc, err := dkg2.ProcessSecretCommits(sc)
-// 	assert.Nil(t, cc)
-// 	assert.Error(t, err)
-// 	sc.Index = goodIdx
+	// not in qual: delete the verifier
+	let good_v = dkgs[1].verifiers.remove(&0).unwrap();
+	let res = dkgs[1].process_secret_commits(&sc);
+	assert!(res.is_err());
+	dkgs[1].verifiers.insert(0, good_v);
 
-// 	// not in qual: delete the verifier
-// 	goodV := dkg2.verifiers[uint32(0)]
-// 	delete(dkg2.verifiers, uint32(0))
-// 	cc, err = dkg2.ProcessSecretCommits(sc)
-// 	assert.Nil(t, cc)
-// 	assert.Error(t, err)
-// 	dkg2.verifiers[uint32(0)] = goodV
+	// invalid sig
+	let good_sig = sc.signature.clone();
+	sc.signature = Some(random_bytes(good_sig.clone().unwrap().len()));
+	let res = dkgs[1].process_secret_commits(&sc);
+	assert!(res.is_err());
+	sc.signature = good_sig;
 
-// 	// invalid sig
-// 	goodSig := sc.Signature
-// 	sc.Signature = randomBytes(len(goodSig))
-// 	cc, err = dkg2.ProcessSecretCommits(sc)
-// 	assert.Nil(t, cc)
-// 	assert.Error(t, err)
-// 	sc.Signature = goodSig
-// 	// invalid session id
-// 	goodSid := sc.SessionID
-// 	sc.SessionID = randomBytes(len(goodSid))
-// 	cc, err = dkg2.ProcessSecretCommits(sc)
-// 	assert.Nil(t, cc)
-// 	assert.Error(t, err)
-// 	sc.SessionID = goodSid
+	// invalid session id
+	let good_sid = sc.session_id;
+	sc.session_id = random_bytes(good_sid.len());
+	let res = dkgs[1].process_secret_commits(&sc);
+	assert!(res.is_err());
+	sc.session_id = good_sid;
 
-// 	// wrong commitments
-// 	goodPoint := sc.Commitments[0]
-// 	sc.Commitments[0] = suite.Point().Null()
-// 	msg = sc.Hash(suite)
-// 	sig, err := schnorr.Sign(suite, dkg.long, msg)
-// 	require.Nil(t, err)
-// 	goodSig = sc.Signature
-// 	sc.Signature = sig
-// 	cc, err = dkg2.ProcessSecretCommits(sc)
-// 	assert.NotNil(t, cc)
-// 	assert.Nil(t, err)
-// 	sc.Commitments[0] = goodPoint
-// 	sc.Signature = goodSig
+	// wrong commitments
+	let good_point = sc.commitments[0].clone();
+	sc.commitments[0] = t.suite.point().null();
+	let msg = sc.hash(t.suite).unwrap();
+	let sig = schnorr::Sign(&t.suite, &dkgs[0].long, &msg).unwrap();
+	let good_sig = sc.signature.clone();
+	sc.signature = Some(sig);
+	let cc = dkgs[1].process_secret_commits(&sc).unwrap();
+	assert!(cc.is_some());
+	sc.commitments[0] = good_point;
+	sc.signature = good_sig;
 
-// 	// all fine
-// 	cc, err = dkg2.ProcessSecretCommits(sc)
-// 	assert.Nil(t, cc)
-// 	assert.Nil(t, err)
-// }
+	// all fine
+	let cc = dkgs[1].process_secret_commits(&sc).unwrap();
+	assert!(cc.is_none());
+}
 
-// func TestDKGComplaintCommits(t *testing.T) {
-// 	fullExchange(t)
+#[test]
+fn TestDKGComplaintCommits() {
+	let t = new_test_data::<SuiteEd25519>();
+	let mut dkgs = full_exchange(&t);
 
-// 	var scs []*SecretCommits
-// 	for _, dkg := range dkgs {
-// 		sc, err := dkg.SecretCommits()
-// 		require.Nil(t, err)
-// 		scs = append(scs, sc)
-// 	}
+	let mut scs = Vec::new();
+	for dkg in dkgs.iter_mut() {
+		let sc = dkg.secret_commits().unwrap();
+		scs.push(sc);
+	}
 
-// 	for _, sc := range scs {
-// 		for _, dkg := range dkgs {
-// 			cc, err := dkg.ProcessSecretCommits(sc)
-// 			assert.Nil(t, err)
-// 			assert.Nil(t, cc)
-// 		}
-// 	}
+	for sc in scs.iter() {
+		for dkg in dkgs.iter_mut() {
+			let cc = dkg.process_secret_commits(sc).unwrap();
+			assert!(cc.is_none());
+		}
+	}
 
-// 	// change the sc for the second one
-// 	wrongSc := &SecretCommits{}
-// 	wrongSc.Index = scs[0].Index
-// 	wrongSc.SessionID = scs[0].SessionID
-// 	wrongSc.Commitments = make([]kyber.Point, len(scs[0].Commitments))
-// 	copy(wrongSc.Commitments, scs[0].Commitments)
-// 	//goodScCommit := scs[0].Commitments[0]
-// 	wrongSc.Commitments[0] = suite.Point().Null()
-// 	msg := wrongSc.Hash(suite)
-// 	wrongSc.Signature, _ = schnorr.Sign(suite, dkgs[0].long, msg)
+	// change the sc for the second one
+	let mut wrong_sc = SecretCommits{
+		index: scs[0].index.clone(),
+		session_id: scs[0].session_id.clone(),
+		commitments: scs[0].commitments.clone(),
+		signature: None
+	};
+	//goodScCommit := scs[0].Commitments[0]
+	wrong_sc.commitments[0] = t.suite.point().null();
+	let msg = wrong_sc.hash(t.suite).unwrap();
+	wrong_sc.signature = Some(schnorr::Sign(&t.suite, &dkgs[0].long, &msg).unwrap());
 
-// 	dkg := dkgs[1]
-// 	cc, err := dkg.ProcessSecretCommits(wrongSc)
-// 	assert.Nil(t, err)
-// 	assert.NotNil(t, cc)
+	let mut cc = dkgs[1].process_secret_commits(&wrong_sc).unwrap().unwrap();
 
-// 	dkg2 := dkgs[2]
-// 	// ComplaintCommits: wrong index
-// 	goodIndex := cc.Index
-// 	cc.Index = uint32(nbParticipants)
-// 	rc, err := dkg2.ProcessComplaintCommits(cc)
-// 	assert.Nil(t, rc)
-// 	assert.Error(t, err)
-// 	cc.Index = goodIndex
+	// ComplaintCommits: wrong index
+	let good_index = cc.index;
+	cc.index = NB_PARTICIPANTS as u32;
+	let res = dkgs[2].process_complaint_commits(&cc);
+	assert!(res.is_err());
+	cc.index = good_index;
 
-// 	// invalid signature
-// 	goodSig := cc.Signature
-// 	cc.Signature = randomBytes(len(cc.Signature))
-// 	rc, err = dkg2.ProcessComplaintCommits(cc)
-// 	assert.Nil(t, rc)
-// 	assert.Error(t, err)
-// 	cc.Signature = goodSig
+	// invalid signature
+	let good_sig = cc.signature.clone();
+	cc.signature = Some(random_bytes(cc.signature.unwrap().len()));
+	let res = dkgs[2].process_complaint_commits(&cc);
+	assert!(res.is_err());
+	cc.signature = good_sig;
 
-// 	// no verifiers
-// 	v := dkg2.verifiers[uint32(0)]
-// 	delete(dkg2.verifiers, uint32(0))
-// 	rc, err = dkg2.ProcessComplaintCommits(cc)
-// 	assert.Nil(t, rc)
-// 	assert.Error(t, err)
-// 	dkg2.verifiers[uint32(0)] = v
+	// no verifiers
+	let v = dkgs[2].verifiers.remove(&0).unwrap();
+	let res = dkgs[2].process_complaint_commits(&cc);
+	assert!(res.is_err());
+	dkgs[2].verifiers.insert(0, v);
 
-// 	// deal does not verify
-// 	goodDeal := cc.Deal
-// 	cc.Deal = &vss.Deal{
-// 		SessionID:   goodDeal.SessionID,
-// 		SecShare:    goodDeal.SecShare,
-// 		RndShare:    goodDeal.RndShare,
-// 		T:           goodDeal.T,
-// 		Commitments: goodDeal.Commitments,
-// 	}
-// 	rc, err = dkg2.ProcessComplaintCommits(cc)
-// 	assert.Nil(t, rc)
-// 	assert.Error(t, err)
-// 	cc.Deal = goodDeal
+	// deal does not verify
+	let good_deal = cc.deal;
+	cc.deal = vss::Deal{
+		session_id:   good_deal.session_id.clone(),
+		sec_share:    good_deal.sec_share.clone(),
+		rnd_share:    good_deal.rnd_share.clone(),
+		t:           good_deal.t.clone(),
+		commitments: good_deal.commitments.clone(),
+	};
+	let res = dkgs[2].process_complaint_commits(&cc);
+	assert!(res.is_err());
+	cc.deal = good_deal;
 
-// 	//  no commitments
-// 	sc := dkg2.commitments[uint32(0)]
-// 	delete(dkg2.commitments, uint32(0))
-// 	rc, err = dkg2.ProcessComplaintCommits(cc)
-// 	assert.Nil(t, rc)
-// 	assert.Error(t, err)
-// 	dkg2.commitments[uint32(0)] = sc
+	//  no commitments
+	let sc = dkgs[2].commitments.remove(&0).unwrap();
+	let res = dkgs[2].process_complaint_commits(&cc);
+	assert!(res.is_err());
+	dkgs[2].commitments.insert(0, sc);
 
-// 	// secret commits are passing the check
-// 	rc, err = dkg2.ProcessComplaintCommits(cc)
-// 	assert.Nil(t, rc)
-// 	assert.Error(t, err)
+	// secret commits are passing the check
+	let res = dkgs[2].process_complaint_commits(&cc);
+	assert!(res.is_err());
 
-// 	/*
-// 		TODO find a way to be the malicious guys,i.e.
-// 		make a deal which validates, but revealing the commitments coefficients makes
-// 		the check fails.
-// 		f is the secret polynomial
-// 		g is the "random" one
-// 		[f(i) + g(i)]*G == [F + G](i)
-// 		but
-// 		f(i)*G != F(i)
+	/*
+		TODO find a way to be the malicious guys,i.e.
+		make a deal which validates, but revealing the commitments coefficients makes
+		the check fails.
+		f is the secret polynomial
+		g is the "random" one
+		[f(i) + g(i)]*G == [F + G](i)
+		but
+		f(i)*G != F(i)
 
-// 		goodV := cc.Deal.SecShare.V
-// 		goodDSig := cc.Deal.Signature
-// 		cc.Deal.SecShare.V = suite.Scalar().Zero()
-// 		msg = msgDeal(cc.Deal)
-// 		sig, _ := sign.Schnorr(suite, dkgs[cc.DealerIndex].long, msg)
-// 		cc.Deal.Signature = sig
-// 		msg = msgCommitComplaint(cc)
-// 		sig, _ = sign.Schnorr(suite, dkgs[cc.Index].long, msg)
-// 		goodCCSig := cc.Signature
-// 		cc.Signature = sig
-// 		rc, err = dkg2.ProcessComplaintCommits(cc)
-// 		assert.Nil(t, err)
-// 		assert.NotNil(t, rc)
-// 		cc.Deal.SecShare.V = goodV
-// 		cc.Deal.Signature = goodDSig
-// 		cc.Signature = goodCCSig
-// 	*/
+		goodV := cc.Deal.SecShare.V
+		goodDSig := cc.Deal.Signature
+		cc.Deal.SecShare.V = suite.Scalar().Zero()
+		msg = msgDeal(cc.Deal)
+		sig, _ := sign.Schnorr(suite, dkgs[cc.DealerIndex].long, msg)
+		cc.Deal.Signature = sig
+		msg = msgCommitComplaint(cc)
+		sig, _ = sign.Schnorr(suite, dkgs[cc.Index].long, msg)
+		goodCCSig := cc.Signature
+		cc.Signature = sig
+		rc, err = dkg2.ProcessComplaintCommits(cc)
+		assert.Nil(t, err)
+		assert.NotNil(t, rc)
+		cc.Deal.SecShare.V = goodV
+		cc.Deal.Signature = goodDSig
+		cc.Signature = goodCCSig
+	*/
 
-// }
+}
 
-// func TestDKGReconstructCommits(t *testing.T) {
-// 	fullExchange(t)
+#[test]
+fn TestDKGReconstructCommits() {
+	let t = new_test_data::<SuiteEd25519>();
+	let mut dkgs = full_exchange(&t);
 
-// 	var scs []*SecretCommits
-// 	for _, dkg := range dkgs {
-// 		sc, err := dkg.SecretCommits()
-// 		require.Nil(t, err)
-// 		scs = append(scs, sc)
-// 	}
+	let mut scs = Vec::new();
+	for dkg in dkgs.iter_mut() {
+		let sc = dkg.secret_commits().unwrap();
+		scs.push(sc);
+	}
 
-// 	// give the secret commits to all dkgs but the second one
-// 	for _, sc := range scs {
-// 		for _, dkg := range dkgs[2:] {
-// 			cc, err := dkg.ProcessSecretCommits(sc)
-// 			assert.Nil(t, err)
-// 			assert.Nil(t, cc)
-// 		}
-// 	}
+	// give the secret commits to all dkgs but the second one
+	for sc in scs.iter() {
+		for dkg in dkgs[2..].iter_mut() {
+			let cc = dkg.process_secret_commits(sc).unwrap();
+			assert!(cc.is_none());
+		}
+	}
 
-// 	// peer 1 wants to reconstruct coeffs from dealer 1
-// 	rc := &ReconstructCommits{
-// 		Index:       1,
-// 		DealerIndex: 0,
-// 		Share:       dkgs[uint32(1)].verifiers[uint32(0)].Deal().SecShare,
-// 		SessionID:   dkgs[uint32(1)].verifiers[uint32(0)].Deal().SessionID,
-// 	}
-// 	msg := rc.Hash(suite)
-// 	rc.Signature, _ = schnorr.Sign(suite, dkgs[1].long, msg)
+	// peer 1 wants to reconstruct coeffs from dealer 1
+	let mut rc = ReconstructCommits{
+		index:       1,
+		dealer_index: 0,
+		share:       dkgs[1].verifiers.get(&0).unwrap().deal().unwrap().sec_share,
+		session_id:   dkgs[1].verifiers.get(&0).unwrap().deal().unwrap().session_id,
+		signature: None
+	};
+	let msg = rc.hash(t.suite).unwrap();
+	rc.signature = Some(schnorr::Sign(&t.suite, &dkgs[1].long, &msg).unwrap());
 
-// 	dkg2 := dkgs[2]
-// 	// reconstructed already set
-// 	dkg2.reconstructed[0] = true
-// 	assert.Nil(t, dkg2.ProcessReconstructCommits(rc))
-// 	delete(dkg2.reconstructed, uint32(0))
+	// reconstructed already set
+	dkgs[2].reconstructed.insert(0, true);
+	dkgs[2].process_reconstruct_commits(&rc).unwrap();
+	dkgs[2].reconstructed.remove(&0);
 
-// 	// commitments not invalidated by any complaints
-// 	assert.Error(t, dkg2.ProcessReconstructCommits(rc))
-// 	delete(dkg2.commitments, uint32(0))
+	// commitments not invalidated by any complaints
+	assert!(dkgs[2].process_reconstruct_commits(&rc).is_err());
+	dkgs[2].commitments.remove(&0);
 
-// 	// invalid index
-// 	goodI := rc.Index
-// 	rc.Index = uint32(nbParticipants)
-// 	assert.Error(t, dkg2.ProcessReconstructCommits(rc))
-// 	rc.Index = goodI
+	// invalid index
+	let good_i = rc.index;
+	rc.index = NB_PARTICIPANTS as u32;
+	assert!(dkgs[2].process_reconstruct_commits(&rc).is_err());
+	rc.index = good_i;
 
-// 	// invalid sig
-// 	goodSig := rc.Signature
-// 	rc.Signature = randomBytes(len(goodSig))
-// 	assert.Error(t, dkg2.ProcessReconstructCommits(rc))
-// 	rc.Signature = goodSig
+	// invalid sig
+	let good_sig = rc.signature.clone();
+	rc.signature = Some(random_bytes(good_sig.clone().unwrap().len()));
+	assert!(dkgs[2].process_reconstruct_commits(&rc).is_err());
+	rc.signature = good_sig;
 
-// 	// all fine
-// 	assert.Nil(t, dkg2.ProcessReconstructCommits(rc))
+	// all fine
+	dkgs[2].process_reconstruct_commits(&rc).unwrap();
 
-// 	// packet already received
-// 	var found bool
-// 	for _, p := range dkg2.pendingReconstruct[rc.DealerIndex] {
-// 		if p.Index == rc.Index {
-// 			found = true
-// 			break
-// 		}
-// 	}
-// 	assert.True(t, found)
-// 	assert.False(t, dkg2.Finished())
-// 	// generate enough secret commits  to recover the secret
-// 	for _, dkg := range dkgs[2:] {
-// 		rc = &ReconstructCommits{
-// 			SessionID:   dkg.verifiers[uint32(0)].Deal().SessionID,
-// 			Index:       dkg.index,
-// 			DealerIndex: 0,
-// 			Share:       dkg.verifiers[uint32(0)].Deal().SecShare,
-// 		}
-// 		msg := rc.Hash(suite)
-// 		rc.Signature, _ = schnorr.Sign(suite, dkg.long, msg)
+	// packet already received
+	let mut found = false;
+	for p in dkgs[2].pending_reconstruct.get(&rc.dealer_index).unwrap() {
+		if p.index == rc.index {
+			found = true;
+			break
+		}
+	}
+	assert!(found);
+	assert!(!dkgs[2].finished());
 
-// 		if dkg2.reconstructed[uint32(0)] {
-// 			break
-// 		}
-// 		// invalid session ID
-// 		goodSID := rc.SessionID
-// 		rc.SessionID = randomBytes(len(goodSID))
-// 		require.Error(t, dkg2.ProcessReconstructCommits(rc))
-// 		rc.SessionID = goodSID
+	let mut rcs = Vec::new();
+	// generate enough secret commits  to recover the secret
+	for dkg in dkgs[2..].iter_mut() {
+		let mut rc = ReconstructCommits{
+			session_id:   dkg.verifiers.get(&0).unwrap().deal().unwrap().session_id,
+			index:       dkg.index,
+			dealer_index: 0,
+			share:       dkg.verifiers.get(&0).unwrap().deal().unwrap().sec_share,
+			signature: None
+		};
+		let msg = rc.hash(t.suite).unwrap();
+		rc.signature = Some(schnorr::Sign(&t.suite,& dkg.long, &msg).unwrap());
 
-// 		_ = dkg2.ProcessReconstructCommits(rc)
-// 	}
-// 	assert.True(t, dkg2.reconstructed[uint32(0)])
-// 	com := dkg2.commitments[uint32(0)]
-// 	assert.NotNil(t, com)
-// 	assert.Equal(t, dkgs[0].dealer.SecretCommit().String(), com.Commit().String())
+		rcs.push(rc);
+	}
 
-// 	assert.True(t, dkg2.Finished())
-// }
+	for rc in rcs.iter_mut() {
+		if dkgs[2].reconstructed.contains_key(&0) {		
+			if *dkgs[2].reconstructed.get(&0).unwrap() {
+				break
+			}
+		}
+		// invalid session ID
+		let good_sid = rc.session_id.clone();
+		rc.session_id = random_bytes(good_sid.len());
+		assert!(dkgs[2].process_reconstruct_commits(&rc).is_err());
+		rc.session_id = good_sid;
+
+		dkgs[2].process_reconstruct_commits(&rc).unwrap();
+	}
+	assert!(dkgs[2].reconstructed.contains_key(&0));
+	let com = dkgs[2].commitments.get(&0);
+	assert!(com.is_some());
+	assert_eq!(dkgs[0].dealer.secret_commit().unwrap().string(), com.unwrap().Commit().string());
+
+	assert!(dkgs[2].finished());
+}
 
 // func TestSetTimeout(t *testing.T) {
 // 	dkgs = dkgGen()
@@ -543,7 +508,7 @@ fn TestDKGNewDistKeyGenerator() {
 // 			if !dkg.verifiers[resp.Index].EnoughApprovals() {
 // 				// ignore messages about ourself
 // 				if resp.Response.Index == dkg.index {
-// 					continue
+// 					continuek
 // 				}
 // 				j, err := dkg.ProcessResponse(resp)
 // 				require.Nil(t, err)

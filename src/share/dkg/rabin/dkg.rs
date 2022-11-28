@@ -126,7 +126,7 @@ pub struct SecretCommits<SUITE: Suite> {
 impl<SUITE: Suite> SecretCommits<SUITE> {
 
     /// Hash returns the hash value of this struct used in the signature process.
-    fn hash(&self, s: SUITE) -> Result<Vec<u8>> {
+    pub fn hash(&self, s: SUITE) -> Result<Vec<u8>> {
         let mut h = s.hash();
         h.update("secretcommits".as_bytes());
         h.write_u32::<LittleEndian>(self.index)?;
@@ -164,7 +164,7 @@ where
 {
 
     /// Hash returns the hash value of this struct used in the signature process.
-    fn hash(&self, s: SUITE) -> Result<Vec<u8>> {
+    pub fn hash(&self, s: SUITE) -> Result<Vec<u8>> {
         let mut h = s.hash();
         h.update("commitcomplaint".as_bytes());
         h.write_u32::<LittleEndian>(self.index)?;
@@ -179,7 +179,7 @@ where
 /// ReconstructCommits holds the information given by a participant who reveals
 /// the deal received from a peer that has received a ComplaintCommits.
 #[derive(Clone)]
-struct ReconstructCommits<SUITE: Suite> {
+pub struct ReconstructCommits<SUITE: Suite> {
 	/// Id of the session
 	pub session_id: Vec<u8>,
 	/// Index of the verifier who received the deal
@@ -195,7 +195,7 @@ struct ReconstructCommits<SUITE: Suite> {
 impl<SUITE: Suite> ReconstructCommits<SUITE> {
 
     /// Hash returns the hash value of this struct used in the signature process.
-    fn hash(&self, s: SUITE) -> Result<Vec<u8>> {
+    pub fn hash(&self, s: SUITE) -> Result<Vec<u8>> {
         let mut h = s.hash();
         h.update("reconstructcommits".as_bytes());
         h.write_u32::<LittleEndian>(self.index)?;
@@ -216,15 +216,15 @@ where
 	suite: SUITE,
 
 	pub index: u32,
-	long:  <SUITE::POINT as Point>::SCALAR,
-	pubb:   SUITE::POINT,
+	pub long:  <SUITE::POINT as Point>::SCALAR,
+	pub pubb:   SUITE::POINT,
 
-	participants: Vec<SUITE::POINT>,
+	pub participants: Vec<SUITE::POINT>,
 
 	t: usize,
 
-	dealer:    vss::Dealer<SUITE>,
-	verifiers: HashMap<u32, vss::Verifier<SUITE>>,
+	pub dealer:    vss::Dealer<SUITE>,
+	pub verifiers: HashMap<u32, vss::Verifier<SUITE>>,
 
 	/// list of commitments to each secret polynomial
 	pub commitments: HashMap<u32, PubPoly<SUITE>>,
@@ -233,8 +233,8 @@ where
 	/// The key is index of the dealer. Once there are enough ReconstructCommits
 	/// struct, this dkg will re-construct the polynomial and stores it into the
 	/// list of commitments.
-	pending_reconstruct: HashMap<u32, Vec<ReconstructCommits<SUITE>>>,
-	reconstructed:      HashMap<u32, bool>
+	pub pending_reconstruct: HashMap<u32, Vec<ReconstructCommits<SUITE>>>,
+	pub reconstructed:      HashMap<u32, bool>
 }
 
 /// NewDistKeyGenerator returns a DistKeyGenerator out of the suite,
@@ -390,7 +390,7 @@ where
 
     /// ProcessJustification takes a justification and validates it. It returns an
     /// error in case the justification is wrong.
-    fn process_justification(&mut self, j: Justification<SUITE>) -> Result<()> {
+    pub fn process_justification(&mut self, j: &Justification<SUITE>) -> Result<()> {
         if !self.verifiers.contains_key(&j.index) {
             bail!("dkg: Justification received but no deal for it");
         }
@@ -528,7 +528,7 @@ where
     // ProcessSecretCommits() from other participants in QUAL. It returns the
     // ReconstructCommits message that must be  broadcasted to every other participant
     // in QUAL so the polynomial in question can be reconstructed.
-    fn process_complaint_commits(&mut self, cc: ComplaintCommits<SUITE>) -> Result<ReconstructCommits<SUITE>> {
+    pub fn process_complaint_commits(&mut self, cc: &ComplaintCommits<SUITE>) -> Result<ReconstructCommits<SUITE>> {
         let issuer = match find_pub(&self.participants, cc.index as usize) {
             Some(issuer) => issuer,
             None => bail!("dkg: commitcomplaint with unknown issuer"),
@@ -540,7 +540,7 @@ where
         }
 
         let msg = cc.hash(self.suite)?;
-        let sig = cc.signature.expect("there should be a signature");
+        let sig = cc.signature.clone().expect("there should be a signature");
         schnorr::Verify(self.suite, &issuer, &msg, &sig)?;
 
         if !self.verifiers.contains_key(&cc.dealer_index) {
@@ -572,7 +572,7 @@ where
 
         self.commitments.remove(&cc.dealer_index);
         let mut rc = ReconstructCommits::<SUITE>{
-            session_id:   cc.deal.session_id,
+            session_id:   cc.deal.session_id.clone(),
             index:       self.index,
             dealer_index: cc.dealer_index,
             share:       deal.sec_share,
@@ -593,7 +593,7 @@ where
     /// along any others. If there are enough messages to recover the coefficients of
     /// the public polynomials of the malicious dealer in question, then the
     /// polynomial is recovered.
-    fn process_reconstruct_commits(&mut self, rs: ReconstructCommits<SUITE>) -> Result<()> {
+    pub fn process_reconstruct_commits(&mut self, rs: &ReconstructCommits<SUITE>) -> Result<()> {
         if self.reconstructed.contains_key(&rs.dealer_index) {
             // commitments already reconstructed, no need for other shares
             return Ok(())
@@ -610,6 +610,9 @@ where
         let msg = rs.hash(self.suite)?;
         schnorr::Verify(self.suite, &pubb, &msg, &rs.signature.clone().expect("dkg: signature should not be none"))?;
     
+        if !self.pending_reconstruct.contains_key(&rs.dealer_index) {
+            self.pending_reconstruct.insert(rs.dealer_index, vec![]);
+        }
         let arr = self.pending_reconstruct.get_mut(&rs.dealer_index).unwrap();
         // check if packet is already received or not
         // or if the session ID does not match the others

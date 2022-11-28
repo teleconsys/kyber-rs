@@ -350,12 +350,12 @@ where
 {
     /// PlaintextDeal returns the plaintext version of the deal destined for peer i.
     /// Use this only for testing.
-    fn PlaintextDeal(&self, i: usize) -> Result<Deal<SUITE>> {
+    pub fn PlaintextDeal(&mut self, i: usize) -> Result<&mut Deal<SUITE>> {
         if i >= self.deals.len() {
             bail!("dealer: PlaintextDeal given wrong index");
         }
-        let d = &self.deals[i];
-        Ok(d.clone())
+        let d = &mut self.deals[i];
+        Ok(d)
     }
 
     /// EncryptedDeal returns the encryption of the deal that must be given to the
