@@ -212,7 +212,7 @@ pub fn verify_with_checks(public_key: &[u8], msg: &[u8], sig: &[u8]) -> Result<(
 
 /// Verify uses a public key, a message and a signature. It will return nil if
 /// sig is a valid signature for msg created by key public, or an error otherwise.
-pub fn verify(public: &EdPoint, msg: &[u8], sig: &[u8]) -> Result<()> {
+pub fn verify<POINT: Point>(public: &POINT, msg: &[u8], sig: &[u8]) -> Result<()> {
     let p_buf = public.marshal_binary()?;
     // if err != nil {
     // 	return fmt.Errorf("error unmarshalling public key: %s", err)

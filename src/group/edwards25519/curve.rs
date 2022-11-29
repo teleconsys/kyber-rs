@@ -1,5 +1,5 @@
-use crate::group::edwards25519::Point as EdPoint;
-use crate::group::edwards25519::Scalar as EdScalar;
+use crate::group::edwards25519::Point;
+use crate::group::edwards25519::Scalar;
 use crate::group::Group;
 use crate::util::key::Generator;
 use crate::util::random;
@@ -14,7 +14,7 @@ use sha2::{Digest, Sha512};
 pub struct Curve {}
 
 impl Group for Curve {
-    type POINT = EdPoint;
+    type POINT = Point;
 
     /// Return the name of the curve, "Ed25519".
     fn string(&self) -> String {
@@ -26,12 +26,12 @@ impl Group for Curve {
     /// method, interpreting the bytes as a little-endian integer, in order to remain
     /// compatible with other Ed25519 implementations, and with the standard implementation
     /// of the EdDSA signature.
-    fn scalar(&self) -> EdScalar {
-        EdScalar::default()
+    fn scalar(&self) -> Scalar {
+        Scalar::default()
     }
 
-    fn point(&self) -> EdPoint {
-        EdPoint::default()
+    fn point(&self) -> Point {
+        Point::default()
     }
 }
 
@@ -54,7 +54,7 @@ impl Curve {
     /// NewKeyAndSeedWithInput returns a formatted Ed25519 key (avoid subgroup attack by
     /// requiring it to be a multiple of 8). It also returns the input and the digest used
     /// to generate the key.
-    pub fn new_key_and_seed_with_input(self, buffer: &[u8]) -> (EdScalar, &[u8], Vec<u8>) {
+    pub fn new_key_and_seed_with_input(self, buffer: &[u8]) -> (Scalar, &[u8], Vec<u8>) {
         let mut hasher = Sha512::new();
         hasher.update(buffer);
 
@@ -75,7 +75,7 @@ impl Curve {
     pub fn new_key_and_seed<S: crate::cipher::Stream>(
         self,
         stream: &mut S,
-    ) -> Result<(EdScalar, Vec<u8>, Vec<u8>)> {
+    ) -> Result<(Scalar, Vec<u8>, Vec<u8>)> {
         let mut buffer = vec![0u8; 32];
         random::bytes(&mut buffer, stream)?;
         let (sc, buff, digest) = self.new_key_and_seed_with_input(&buffer);
@@ -85,11 +85,11 @@ impl Curve {
 }
 
 impl Generator for Curve {
-    type SCALAR = EdScalar;
+    type SCALAR = Scalar;
 
     /// NewKey returns a formatted Ed25519 key (avoiding subgroup attack by requiring
     /// it to be a multiple of 8). NewKey implements the kyber/util/key.Generator interface.
-    fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> Result<EdScalar> {
+    fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> Result<Scalar> {
         let (secret, _, _) = self.new_key_and_seed(stream)?;
         Ok(secret)
     }

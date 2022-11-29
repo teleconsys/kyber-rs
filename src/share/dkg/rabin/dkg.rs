@@ -43,11 +43,12 @@ use std::collections::HashMap;
 use byteorder::{WriteBytesExt, LittleEndian};
 use serde::{Serialize, de::DeserializeOwned};
 
-use crate::{share::{poly::{PriShare, PubPoly, RecoverPriPoly}, vss}, Point, Suite, Scalar, group::{ScalarCanCheckCanonical, PointCanCheckCanonicalAndSmallOrder}, encoding::{Marshaling, BinaryMarshaler}, sign::schnorr};
+use crate::{share::{poly::{PriShare, PubPoly, RecoverPriPoly}, vss}, Point, Suite, Scalar, group::{ScalarCanCheckCanonical, PointCanCheckCanonicalAndSmallOrder}, encoding::{Marshaling, BinaryMarshaler}, sign::{schnorr, dss}};
 
 use anyhow::{Result, bail};
 
 /// DistKeyShare holds the share of a distributed key for a participant.
+#[derive(Clone)]
 pub struct DistKeyShare<POINT: Point> {
 	/// Coefficients of the public polynomial holding the public key
 	pub commits: Vec<POINT>,
@@ -60,7 +61,9 @@ impl<POINT: Point> DistKeyShare<POINT> {
     pub fn public(&self) -> POINT {
         return self.commits[0].clone()
     }
+}
 
+impl<POINT: Point> dss::DistKeyShare<POINT> for DistKeyShare<POINT> {
     /// PriShare implements the dss.DistKeyShare interface so either pedersen or
     /// rabin dkg can be used with dss.
     fn pri_share(&self) -> PriShare<POINT::SCALAR> {
