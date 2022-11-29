@@ -244,7 +244,7 @@ where
 /// the longterm secret key, the list of participants, and the
 /// threshold t parameter. It returns an error if the secret key's
 /// commitment can't be found in the list of participants.
-pub fn new_dist_key_generator<SUITE: Suite>(suite: SUITE, longterm: <SUITE::POINT as Point>::SCALAR, participants: Vec<SUITE::POINT>, t: usize) -> Result<DistKeyGenerator<SUITE>> 
+pub fn new_dist_key_generator<SUITE: Suite>(suite: SUITE, longterm: <SUITE::POINT as Point>::SCALAR, participants: &[SUITE::POINT], t: usize) -> Result<DistKeyGenerator<SUITE>> 
 where
     <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned + ScalarCanCheckCanonical,
     SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
@@ -277,7 +277,7 @@ where
 		suite:              suite,
 		long:               longterm,
 		pubb:               pubb,
-		participants:       participants,
+		participants:       participants.to_vec(),
 		index:              index,
 	})
 }

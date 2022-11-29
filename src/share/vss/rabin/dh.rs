@@ -26,7 +26,7 @@ pub const KEY_SIZE: usize = 128;
 pub fn context<SUITE: Suite>(
     suite: &SUITE,
     dealer: &SUITE::POINT,
-    verifiers: &Vec<SUITE::POINT>,
+    verifiers: &[SUITE::POINT],
 ) -> [u8; KEY_SIZE] {
     let mut h = suite.xof(Some("vss-dealer".as_bytes()));
     dealer.marshal_to(&mut h).unwrap();

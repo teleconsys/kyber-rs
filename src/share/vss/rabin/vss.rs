@@ -277,7 +277,7 @@ pub fn NewDealer<SUITE: Suite>(
     suite: SUITE,
     longterm: <SUITE::POINT as Point>::SCALAR,
     secret: <SUITE::POINT as Point>::SCALAR,
-    verifiers: Vec<SUITE::POINT>,
+    verifiers: &[SUITE::POINT],
     t: usize,
 ) -> Result<Dealer<SUITE>>
 where
@@ -285,11 +285,11 @@ where
     SUITE::POINT: Serialize + DeserializeOwned,
     // STREAM: Stream,
 {
-    if !validT(t, &verifiers) {
+    if !validT(t, verifiers) {
         bail!("dealer: t {} invalid", t);
     }
 
-    let H = deriveH(suite, &verifiers);
+    let H = deriveH(suite, verifiers);
     let f = NewPriPoly(suite, t, Some(secret.clone()), suite.random_stream());
     let g = NewPriPoly(suite, t, None, suite.random_stream());
     let d_pubb = suite.point().mul(&longterm, None);
@@ -307,7 +307,7 @@ where
     let aggregator = newAggregator(
         suite,
         d_pubb.clone(),
-        verifiers.clone(),
+        verifiers.to_vec(),
         commitments.clone(),
         t,
         &session_id,
@@ -332,7 +332,7 @@ where
         suite: suite,
         long: longterm,
         secret: secret,
-        verifiers: verifiers,
+        verifiers: verifiers.to_vec(),
         pubb: d_pubb,
         secret_commits,
         hkdf_context,
@@ -978,11 +978,11 @@ pub fn minimum_t(n: usize) -> usize {
     return (n + 1) / 2;
 }
 
-fn validT<POINT: Point>(t: usize, verifiers: &Vec<POINT>) -> bool {
+fn validT<POINT: Point>(t: usize, verifiers: &[POINT]) -> bool {
     return t >= 2 && t <= verifiers.len() && (t as u32) as i64 == t as i64;
 }
 
-fn deriveH<SUITE: Suite>(suite: SUITE, verifiers: &Vec<SUITE::POINT>) -> SUITE::POINT {
+fn deriveH<SUITE: Suite>(suite: SUITE, verifiers: &[SUITE::POINT]) -> SUITE::POINT {
     let mut b = vec![];
     for v in verifiers {
         v.marshal_to(&mut b).unwrap();
@@ -998,8 +998,8 @@ pub(crate) fn findPub<POINT: Point>(verifiers: &Vec<POINT>, idx: usize) -> Optio
 pub(crate) fn sessionID<SUITE: Suite>(
     suite: &SUITE,
     dealer: &SUITE::POINT,
-    verifiers: &Vec<SUITE::POINT>,
-    commitments: &Vec<SUITE::POINT>,
+    verifiers: &[SUITE::POINT],
+    commitments: &[SUITE::POINT],
     t: usize,
 ) -> Result<Vec<u8>> {
     let mut h = suite.hash();

@@ -136,7 +136,7 @@ fn TestVSSDealerNew() {
         test_data.suite,
         test_data.dealer_sec.clone(),
         test_data.secret.clone(),
-        test_data.verifiers_pub.clone(),
+        &test_data.verifiers_pub,
         goodT,
     )
     .unwrap();
@@ -147,7 +147,7 @@ fn TestVSSDealerNew() {
                 test_data.suite,
                 test_data.dealer_sec.clone(),
                 test_data.secret.clone(),
-                test_data.verifiers_pub.clone(),
+                &test_data.verifiers_pub,
                 badT as usize,
             )
             .is_err(),
@@ -754,7 +754,7 @@ fn TestVSSSessionID() {
         test_data.suite.clone(),
         test_data.dealer_sec.clone(),
         test_data.secret.clone(),
-        test_data.verifiers_pub.clone(),
+        &test_data.verifiers_pub,
         test_data.vss_threshold.clone(),
     )
     .unwrap();
@@ -863,7 +863,7 @@ where
         test_data.suite,
         test_data.dealer_sec,
         test_data.secret,
-        test_data.verifiers_pub,
+        &test_data.verifiers_pub,
         test_data.vss_threshold,
     )
     .unwrap();

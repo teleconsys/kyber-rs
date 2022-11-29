@@ -55,7 +55,7 @@ where
     SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder{
 	let mut dkgs = Vec::with_capacity(t.nb_participants);
 	for i in 0..t.nb_participants{
-		let dkg= new_dist_key_generator(t.suite, t.part_sec[i].clone(), t.part_pubs.clone(), t.nb_participants/2+1).unwrap();
+		let dkg= new_dist_key_generator(t.suite, t.part_sec[i].clone(), &t.part_pubs, t.nb_participants/2+1).unwrap();
 		dkgs.push(dkg);
 	}
 	return dkgs
@@ -65,12 +65,12 @@ where
 fn TestDKGNewDistKeyGenerator() {
     let t = new_test_data::<SuiteEd25519>();
 	let long = t.part_sec[0].clone();
-	let mut dkg = new_dist_key_generator(t.suite, long, t.part_pubs.clone(), t.nb_participants/2+1).unwrap();
+	let mut dkg = new_dist_key_generator(t.suite, long, &t.part_pubs, t.nb_participants/2+1).unwrap();
 	// quick testing here; easier.
 	dkg.secret_commits().unwrap_err();
 
 	let sec = genPair();
-	let res = new_dist_key_generator(t.suite, sec.0, t.part_pubs, t.nb_participants/2+1);
+	let res = new_dist_key_generator(t.suite, sec.0, &t.part_pubs, t.nb_participants/2+1);
     if res.is_ok() {
         panic!("this should fail")
     }
