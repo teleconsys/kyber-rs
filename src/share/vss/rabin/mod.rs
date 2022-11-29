@@ -6,3 +6,4 @@ mod vss;
 mod vss_test;
 
 pub use vss::Suite;
+pub use vss::*;

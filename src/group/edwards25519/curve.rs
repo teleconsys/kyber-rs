@@ -10,7 +10,7 @@ use sha2::{Digest, Sha512};
 /// Curve represents the Ed25519 group.
 /// There are no parameters and no initialization is required
 /// because it supports only this one specific curve.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Curve {}
 
 impl Group for Curve {

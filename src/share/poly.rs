@@ -43,7 +43,7 @@ impl<SCALAR: Scalar> Default for PriShare<SCALAR> {
 
 impl<SCALAR: Scalar> PriShare<SCALAR> {
     /// Hash returns the hash representation of this share
-    fn Hash<HASHFACTORY: HashFactory>(&self, s: HASHFACTORY) -> Result<Vec<u8>> {
+    pub fn hash<HASHFACTORY: HashFactory>(&self, s: HASHFACTORY) -> Result<Vec<u8>> {
     	let mut h = s.hash();
         self.v.marshal_to(&mut h)?;
         h.write_u32::<LittleEndian>(self.i as u32)?;
@@ -51,7 +51,7 @@ impl<SCALAR: Scalar> PriShare<SCALAR> {
     }
 
 
-    fn String(&self) -> String {
+    pub fn string(&self) -> String {
         format!("{{{}:{}}}", self.i, self.v.to_string())
     }
 
@@ -326,8 +326,8 @@ pub fn RecoverPriPoly<GROUP: Group>(g: &GROUP, shares: &[Option<PriShare<<GROUP:
     //den := g.Scalar()
 	// Notations follow the Wikipedia article on Lagrange interpolation
 	// https://en.wikipedia.org/wiki/Lagrange_polynomial
-	for (j, _) in x.iter().enumerate() {
-		let mut basis = lagrangeBasis(g, j, x.clone());
+	for j in x.keys() {
+		let mut basis = lagrangeBasis(g, j.clone(), x.clone());
         for (i, _) in basis.coeffs.clone().iter().enumerate() {
             basis.coeffs[i] = basis.coeffs[i].clone() * y[&j].clone();
         };
