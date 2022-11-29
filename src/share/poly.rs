@@ -326,8 +326,8 @@ pub fn RecoverPriPoly<GROUP: Group>(g: &GROUP, shares: &[Option<PriShare<<GROUP:
     //den := g.Scalar()
 	// Notations follow the Wikipedia article on Lagrange interpolation
 	// https://en.wikipedia.org/wiki/Lagrange_polynomial
-	for (j, _) in x.iter().enumerate() {
-		let mut basis = lagrangeBasis(g, j, x.clone());
+	for j in x.keys() {
+		let mut basis = lagrangeBasis(g, j.clone(), x.clone());
         for (i, _) in basis.coeffs.clone().iter().enumerate() {
             basis.coeffs[i] = basis.coeffs[i].clone() * y[&j].clone();
         };
