@@ -232,7 +232,7 @@ fn TestDKGSecretCommits() {
 
 	let mut sc = dkgs[0].secret_commits().unwrap();
 	let msg = sc.hash(t.suite).unwrap();
-	schnorr::Verify(t.suite, &dkgs[0].pubb, &msg, &sc.clone().signature.unwrap()).unwrap();
+	schnorr::Verify(t.suite, &dkgs[0].pubb, &msg, &sc.clone().signature).unwrap();
 
 	// wrong index
 	let good_idx = sc.index;
@@ -249,7 +249,7 @@ fn TestDKGSecretCommits() {
 
 	// invalid sig
 	let good_sig = sc.signature.clone();
-	sc.signature = Some(random_bytes(good_sig.clone().unwrap().len()));
+	sc.signature = random_bytes(good_sig.clone().len());
 	let res = dkgs[1].process_secret_commits(&sc);
 	assert!(res.is_err());
 	sc.signature = good_sig;
@@ -267,7 +267,7 @@ fn TestDKGSecretCommits() {
 	let msg = sc.hash(t.suite).unwrap();
 	let sig = schnorr::Sign(&t.suite, &dkgs[0].long, &msg).unwrap();
 	let good_sig = sc.signature.clone();
-	sc.signature = Some(sig);
+	sc.signature = sig;
 	let cc = dkgs[1].process_secret_commits(&sc).unwrap();
 	assert!(cc.is_some());
 	sc.commitments[0] = good_point;
@@ -301,12 +301,12 @@ fn TestDKGComplaintCommits() {
 		index: scs[0].index.clone(),
 		session_id: scs[0].session_id.clone(),
 		commitments: scs[0].commitments.clone(),
-		signature: None
+		signature: Vec::new()
 	};
 	//goodScCommit := scs[0].Commitments[0]
 	wrong_sc.commitments[0] = t.suite.point().null();
 	let msg = wrong_sc.hash(t.suite).unwrap();
-	wrong_sc.signature = Some(schnorr::Sign(&t.suite, &dkgs[0].long, &msg).unwrap());
+	wrong_sc.signature = schnorr::Sign(&t.suite, &dkgs[0].long, &msg).unwrap();
 
 	let mut cc = dkgs[1].process_secret_commits(&wrong_sc).unwrap().unwrap();
 
@@ -319,7 +319,7 @@ fn TestDKGComplaintCommits() {
 
 	// invalid signature
 	let good_sig = cc.signature.clone();
-	cc.signature = Some(random_bytes(cc.signature.unwrap().len()));
+	cc.signature = random_bytes(cc.signature.len());
 	let res = dkgs[2].process_complaint_commits(&cc);
 	assert!(res.is_err());
 	cc.signature = good_sig;
@@ -408,10 +408,10 @@ fn TestDKGReconstructCommits() {
 		dealer_index: 0,
 		share:       dkgs[1].verifiers.get(&0).unwrap().deal().unwrap().sec_share,
 		session_id:   dkgs[1].verifiers.get(&0).unwrap().deal().unwrap().session_id,
-		signature: None
+		signature: Vec::new()
 	};
 	let msg = rc.hash(t.suite).unwrap();
-	rc.signature = Some(schnorr::Sign(&t.suite, &dkgs[1].long, &msg).unwrap());
+	rc.signature = schnorr::Sign(&t.suite, &dkgs[1].long, &msg).unwrap();
 
 	// reconstructed already set
 	dkgs[2].reconstructed.insert(0, true);
@@ -430,7 +430,7 @@ fn TestDKGReconstructCommits() {
 
 	// invalid sig
 	let good_sig = rc.signature.clone();
-	rc.signature = Some(random_bytes(good_sig.clone().unwrap().len()));
+	rc.signature = random_bytes(good_sig.clone().len());
 	assert!(dkgs[2].process_reconstruct_commits(&rc).is_err());
 	rc.signature = good_sig;
 
@@ -456,10 +456,10 @@ fn TestDKGReconstructCommits() {
 			index:       dkg.index,
 			dealer_index: 0,
 			share:       dkg.verifiers.get(&0).unwrap().deal().unwrap().sec_share,
-			signature: None
+			signature: Vec::new()
 		};
 		let msg = rc.hash(t.suite).unwrap();
-		rc.signature = Some(schnorr::Sign(&t.suite,& dkg.long, &msg).unwrap());
+		rc.signature = schnorr::Sign(&t.suite,& dkg.long, &msg).unwrap();
 
 		rcs.push(rc);
 	}
