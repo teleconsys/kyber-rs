@@ -11,8 +11,7 @@ pub mod scalar_test;
 mod suite;
 pub mod test_scalars;
 
+pub use curve::Curve;
 pub use point::Point;
 pub use scalar::Scalar;
 pub use suite::SuiteEd25519;
-pub use curve::Curve;
-

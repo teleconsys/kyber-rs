@@ -209,14 +209,12 @@ impl group::Scalar for Scalar {
     }
 
     fn neg(mut self, a: &Self) -> Self {
-    	let mut z = Scalar::default();
-    	z = z.zero();
-    	sc_sub(&mut self.v, &z.v, &a.v);
-    	return self
+        let mut z = Scalar::default();
+        z = z.zero();
+        sc_sub(&mut self.v, &z.v, &a.v);
+        return self;
     }
 }
-
-
 
 impl Marshaling for Scalar {
     fn marshal_to(&self, w: &mut impl std::io::Write) -> anyhow::Result<()> {

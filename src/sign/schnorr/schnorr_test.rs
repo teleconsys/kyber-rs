@@ -1,6 +1,6 @@
 use crate::{group::edwards25519::SuiteEd25519, sign::eddsa, util::key};
 
-use super::{Sign, Verify};
+use super::{sign, verify};
 
 #[test]
 fn test_schnorr_signature() {
@@ -8,15 +8,15 @@ fn test_schnorr_signature() {
     let suite = SuiteEd25519::new_blake_sha256ed25519();
     let kp = key::new_key_pair(suite).unwrap();
 
-    let s = Sign(&suite, &kp.private, msg).unwrap();
+    let s = sign(&suite, &kp.private, msg).unwrap();
 
-    Verify(suite, &kp.public, msg, &s).unwrap();
+    verify(suite, &kp.public, msg, &s).unwrap();
 
     // wrong size
     let mut larger = s.clone();
     let mut piece: Vec<u8> = vec![0x01, 0x02];
     larger.append(&mut piece);
-    Verify(suite, &kp.public, msg, &larger).unwrap_err();
+    verify(suite, &kp.public, msg, &larger).unwrap_err();
 
     // wrong challenge
     let wrong_encoding: Vec<u8> = vec![
@@ -26,17 +26,17 @@ fn test_schnorr_signature() {
     let mut wr_chall = [0u8; 64];
     wr_chall[..32].copy_from_slice(&wrong_encoding);
     wr_chall[32..].copy_from_slice(&s[32..]);
-    Verify(suite, &kp.public, msg, &wr_chall).unwrap_err();
+    verify(suite, &kp.public, msg, &wr_chall).unwrap_err();
 
     // wrong response
     let mut wr_resp = [0u8; 64];
     wr_resp[32..].copy_from_slice(&wrong_encoding);
     wr_resp[..32].copy_from_slice(&s[..32]);
-    Verify(suite, &kp.public, msg, &wr_resp).unwrap_err();
+    verify(suite, &kp.public, msg, &wr_resp).unwrap_err();
 
     // wrong public key
     let wr_pk = key::new_key_pair(suite).unwrap();
-    Verify(suite, &&wr_pk.public, msg, &s).unwrap_err();
+    verify(suite, &&wr_pk.public, msg, &s).unwrap_err();
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn test_eddsa_compatibility() {
     let suite = SuiteEd25519::new_blake_sha256ed25519();
     let kp = key::new_key_pair(suite).unwrap();
 
-    let s = Sign(&suite, &kp.private, msg).unwrap();
+    let s = sign(&suite, &kp.private, msg).unwrap();
 
     eddsa::verify(&kp.public, msg, &s).unwrap();
 }
@@ -95,9 +95,9 @@ fn test_schnorr_malleability() {
     let suite = SuiteEd25519::new_blake_sha256ed25519();
     let kp = key::new_key_pair(suite).unwrap();
 
-    let mut s = Sign(&suite, &kp.private, msg).unwrap();
+    let mut s = sign(&suite, &kp.private, msg).unwrap();
 
-    Verify(suite, &kp.public, msg, &s).unwrap();
+    verify(suite, &kp.public, msg, &s).unwrap();
 
     // Add l to signature
     for i in 0..32 {
@@ -106,5 +106,5 @@ fn test_schnorr_malleability() {
         c >>= 8
     }
     eddsa::verify(&kp.public, msg, &s).unwrap_err();
-    Verify(suite, &kp.public, msg, &s).unwrap_err();
+    verify(suite, &kp.public, msg, &s).unwrap_err();
 }

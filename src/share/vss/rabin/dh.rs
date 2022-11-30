@@ -10,13 +10,13 @@ use sha2::Sha256;
 use crate::{encoding::Marshaling, Point, Suite};
 
 /// dhExchange computes the shared key from a private key and a public key
-pub fn dhExchange<'a, SUITE: Suite>(
+pub fn dh_exchange<'a, SUITE: Suite>(
     suite: SUITE,
-    ownPrivate: <SUITE::POINT as Point>::SCALAR,
-    remotePublic: SUITE::POINT,
+    own_private: <SUITE::POINT as Point>::SCALAR,
+    remote_public: SUITE::POINT,
 ) -> SUITE::POINT {
     let sk = suite.point();
-    sk.mul(&ownPrivate, Some(&remotePublic))
+    sk.mul(&own_private, Some(&remote_public))
 }
 
 // KEY_SIZE is arbitrary, make it long enough to seed the XOF

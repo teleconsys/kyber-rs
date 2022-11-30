@@ -1,15 +1,12 @@
-use std::{fs::File, str::Split};
-
 use crate::{
     cipher::cipher,
     encoding::{BinaryMarshaler, BinaryUnmarshaler},
-    group::edwards25519::{self, SuiteEd25519},
+    group::edwards25519::SuiteEd25519,
     sign::eddsa::{verify_with_checks, EdDSA},
     util::random,
-    Random, Suite,
+    Random,
 };
 use anyhow::Result;
-use scanner_rust::Scanner;
 
 use super::verify;
 

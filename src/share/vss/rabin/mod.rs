@@ -1,5 +1,6 @@
 mod a;
 pub mod dh;
+#[cfg(test)]
 mod dh_test;
 mod vss;
 #[cfg(test)]
