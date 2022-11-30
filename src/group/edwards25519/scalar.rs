@@ -74,16 +74,16 @@ impl ScalarCanCheckCanonical for Scalar {
             return true;
         }
 
-        let (_, mut L) = PRIME_ORDER.to_bytes_be();
-        L.reverse();
+        let (_, mut l) = PRIME_ORDER.to_bytes_be();
+        l.reverse();
 
         let mut c = 0u8;
         let mut n = 1u8;
         for i in (0..=31).rev() {
             // subtraction might lead to an underflow which needs
             // to be accounted for in the right shift
-            c |= (((sb[i] as u16) - (L[i] as u16)) >> 8) as u8 & n;
-            n &= (((sb[i] as u16) ^ (L[i] as u16) - 1) >> 8) as u8;
+            c |= (((sb[i] as u16) - (l[i] as u16)) >> 8) as u8 & n;
+            n &= (((sb[i] as u16) ^ (l[i] as u16) - 1) >> 8) as u8;
         }
 
         c != 0
@@ -124,7 +124,7 @@ impl ToString for Scalar {
     }
 }
 
-use std::ops::{self, Shr};
+use std::ops;
 impl_op_ex!(*|a: &Scalar, b: &Scalar| -> Scalar {
     let mut v = [0 as u8; 32];
     sc_mul(&mut v, &a.v, &b.v);
@@ -2020,7 +2020,7 @@ fn sc_mul(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32]) {
     s[31] = (s11 >> 17) as u8;
 }
 
-pub(crate) fn newScalarInt(i: BigInt) -> Scalar {
+pub(crate) fn new_scalar_int(i: BigInt) -> Scalar {
     let s = Scalar::default();
     s.set_int(&Int::new_int(i, FULL_ORDER.clone()))
 }

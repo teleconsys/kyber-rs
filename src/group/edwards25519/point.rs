@@ -11,24 +11,24 @@ use crate::{
 use super::{
     constants::{BASEEXT, COFACTOR_SCALAR, NULL_POINT, PRIME_ORDER_SCALAR, WEAK_KEYS},
     ge::{
-        geScalarMult, geScalarMultBase, CachedGroupElement, CompletedGroupElement,
+        ge_scalar_mult, ge_scalar_mult_base, CachedGroupElement, CompletedGroupElement,
         ExtendedGroupElement,
     },
-    ge_mult_vartime::geScalarMultVartime,
+    ge_mult_vartime::ge_scalar_mult_vartime,
     Scalar,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Point {
     ge: ExtendedGroupElement,
-    varTime: bool,
+    var_time: bool,
 }
 
 impl Default for Point {
     fn default() -> Self {
         Self {
             ge: ExtendedGroupElement::default(),
-            varTime: false,
+            var_time: false,
         }
     }
 }
@@ -36,13 +36,13 @@ impl Default for Point {
 impl BinaryMarshaler for Point {
     fn marshal_binary(&self) -> Result<Vec<u8>> {
         let mut b = [0 as u8; 32];
-        self.ge.ToBytes(&mut b);
+        self.ge.to_bytes(&mut b);
         Ok(b.to_vec())
     }
 }
 impl BinaryUnmarshaler for Point {
     fn unmarshal_binary(&mut self, data: &[u8]) -> Result<()> {
-        if !self.ge.FromBytes(data) {
+        if !self.ge.from_bytes(data) {
             return Err(Error::msg("invalid Ed25519 curve point"));
         }
         Ok(())
@@ -63,8 +63,8 @@ impl PartialEq for Point {
     /// Equality test for two Points on the same curve
     fn eq(&self, other: &Self) -> bool {
         let (mut b1, mut b2) = ([0u8; 32], [0u8; 32]);
-        self.ge.ToBytes(&mut b1);
-        other.ge.ToBytes(&mut b2);
+        self.ge.to_bytes(&mut b1);
+        other.ge.to_bytes(&mut b2);
 
         for i in 0..b1.len() {
             if b1[i] != b2[i] {
@@ -82,8 +82,8 @@ impl group::Point for Point {
     fn equal(&self, p2: &Self) -> bool {
         let mut b1 = [0 as u8; 32];
         let mut b2 = [0 as u8; 32];
-        self.ge.ToBytes(&mut b1);
-        p2.ge.ToBytes(&mut b2);
+        self.ge.to_bytes(&mut b1);
+        p2.ge.to_bytes(&mut b2);
         for i in 0..b1.len() {
             if b1[i] != b2[i] {
                 return false;
@@ -94,7 +94,7 @@ impl group::Point for Point {
 
     /// Set to the neutral element, which is (0,1) for twisted Edwards curves.
     fn null(mut self) -> Self {
-        self.ge.Zero();
+        self.ge.zero();
         self
     }
 
@@ -141,7 +141,7 @@ impl group::Point for Point {
                 b[1..1 + dl].copy_from_slice(&data.unwrap()[0..dl]);
             }
             // Try to decode
-            if !self.ge.FromBytes(&b) {
+            if !self.ge.from_bytes(&b) {
                 // invalid point, retry
                 continue;
             }
@@ -189,9 +189,9 @@ impl group::Point for Point {
         let mut t2 = CachedGroupElement::default();
         let mut r = CompletedGroupElement::default();
 
-        p2.ge.ToCached(&mut t2);
-        r.Add(&p1.ge, &t2);
-        r.ToExtended(&mut self.ge);
+        p2.ge.to_cached(&mut t2);
+        r.add(&p1.ge, &t2);
+        r.to_extended(&mut self.ge);
 
         self
     }
@@ -210,13 +210,13 @@ impl group::Point for Point {
 
         match p {
             None => {
-                geScalarMultBase(&mut self.ge, &mut a);
+                ge_scalar_mult_base(&mut self.ge, &mut a);
             }
-            Some(A) => {
-                if self.varTime {
-                    geScalarMultVartime(&mut self.ge, &mut a, &mut A.clone().ge);
+            Some(a_caps) => {
+                if self.var_time {
+                    ge_scalar_mult_vartime(&mut self.ge, &mut a, &mut a_caps.clone().ge);
                 } else {
-                    geScalarMult(&mut self.ge, &mut a, &mut A.clone().ge);
+                    ge_scalar_mult(&mut self.ge, &mut a, &mut a_caps.clone().ge);
                 }
             }
         }
@@ -291,7 +291,7 @@ impl PointCanCheckCanonicalAndSmallOrder for Point {
 impl Point {
     pub fn string(&self) -> String {
         let mut b = [0u8; 32];
-        self.ge.ToBytes(&mut b);
+        self.ge.to_bytes(&mut b);
         return hex::encode(b);
     }
 
