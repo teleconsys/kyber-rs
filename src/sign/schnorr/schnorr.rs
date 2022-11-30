@@ -1,4 +1,4 @@
-use std::io::{Read, Write};
+use std::io::Write;
 
 use crate::{
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling},
@@ -21,27 +21,27 @@ where
 /// Sign creates a Sign signature from a msg and a private key. This
 /// signature can be verified with VerifySchnorr. It's also a valid EdDSA
 /// signature when using the edwards25519 Group.
-pub fn Sign<SUITE: Suite>(
+pub fn sign<SUITE: Suite>(
     s: &SUITE,
     private: &<SUITE::POINT as Point>::SCALAR,
     msg: &[u8],
 ) -> Result<Vec<u8>> {
     // create random secret k and public point commitment R
     let k = s.scalar().pick(&mut s.random_stream());
-    let R = s.point().mul(&k, None);
+    let r = s.point().mul(&k, None);
 
     // create hash(public || R || message)
     let public = s.point().mul(&private, None);
-    let h = hash(s, &public, &R, msg)?;
+    let h = hash(s, &public, &r, msg)?;
 
     // compute response s = k + x*h
     let xh = private.clone() * h;
-    let S = k + xh;
+    let s = k + xh;
 
     // return R || s
     let mut b = vec![];
-    R.marshal_to(&mut b)?;
-    S.marshal_to(&mut b)?;
+    r.marshal_to(&mut b)?;
+    s.marshal_to(&mut b)?;
     Ok(b)
 }
 
@@ -50,35 +50,35 @@ pub fn Sign<SUITE: Suite>(
 /// key public, or an error otherwise. Compared to `Verify`, it performs
 /// additional checks around the canonicality and ensures the public key
 /// does not have a small order when using `edwards25519` group.
-fn VerifyWithChecks<GROUP>(g: GROUP, pubb: &[u8], msg: &[u8], sig: &[u8]) -> Result<()>
+fn verify_with_checks<GROUP>(g: GROUP, pubb: &[u8], msg: &[u8], sig: &[u8]) -> Result<()>
 where
     <GROUP::POINT as Point>::SCALAR: Scalar + ScalarCanCheckCanonical,
     GROUP::POINT: Point + PointCanCheckCanonicalAndSmallOrder,
     GROUP: Group,
 {
-    let mut R = g.point();
+    let mut r = g.point();
     let mut s = g.scalar();
-    let pointSize = R.marshal_size();
-    let scalarSize = s.marshal_size();
-    let sigSize = scalarSize + pointSize;
-    if sig.len() != sigSize {
+    let point_size = r.marshal_size();
+    let scalar_size = s.marshal_size();
+    let sig_size = scalar_size + point_size;
+    if sig.len() != sig_size {
         bail!(
             "schnorr: signature of invalid length {} instead of {}",
             sig.len(),
-            sigSize
+            sig_size
         );
     }
-    R.unmarshal_binary(&sig[..pointSize])?;
-    if !R.is_canonical(&sig[..pointSize]) {
+    r.unmarshal_binary(&sig[..point_size])?;
+    if !r.is_canonical(&sig[..point_size]) {
         bail!("R is not canonical");
     }
-    if R.has_small_order() {
+    if r.has_small_order() {
         bail!("R has small order");
     }
-    if !g.scalar().is_canonical(&sig[pointSize..]) {
+    if !g.scalar().is_canonical(&sig[point_size..]) {
         bail!("signature is not canonical");
     }
-    s.unmarshal_binary(&sig[pointSize..])?;
+    s.unmarshal_binary(&sig[point_size..])?;
 
     let mut public = g.point();
     public
@@ -91,15 +91,15 @@ where
         bail!("public key has small order");
     }
     // recompute hash(public || R || msg)
-    let h = hash(&g, &public, &R, msg)?;
+    let h = hash(&g, &public, &r, msg)?;
 
     // compute S = g^s
-    let S = g.point().mul(&s, None);
+    let s_caps = g.point().mul(&s, None);
     // compute RAh = R + A^h
-    let Ah = g.point().mul(&h, Some(&public));
-    let RAs = g.point().add(&R, &Ah);
+    let ah = g.point().mul(&h, Some(&public));
+    let ras = g.point().add(&r, &ah);
 
-    if !S.equal(&RAs) {
+    if !s_caps.equal(&ras) {
         bail!("schnorr: invalid signature");
     }
 
@@ -108,7 +108,7 @@ where
 
 /// Verify verifies a given Schnorr signature. It returns nil iff the
 /// given signature is valid.
-pub fn Verify<GROUP: Group>(g: GROUP, public: &GROUP::POINT, msg: &[u8], sig: &[u8]) -> Result<()>
+pub fn verify<GROUP: Group>(g: GROUP, public: &GROUP::POINT, msg: &[u8], sig: &[u8]) -> Result<()>
 where
     <GROUP::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
     GROUP::POINT: PointCanCheckCanonicalAndSmallOrder,
@@ -116,7 +116,7 @@ where
     let p_buf = public
         .marshal_binary()
         .map_err(|op| Error::msg(format!("error unmarshalling public key: {}", op)))?;
-    return VerifyWithChecks(g, &p_buf, msg, sig);
+    return verify_with_checks(g, &p_buf, msg, sig);
 }
 
 fn hash<GROUP: Group>(

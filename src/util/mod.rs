@@ -1,2 +1,2 @@
-pub mod random;
 pub mod key;
+pub mod random;

@@ -1,5 +1,6 @@
 pub mod poly;
-mod vss;
+#[cfg(test)]
 mod poly_test;
+mod vss;
 pub use vss::Suite;
-mod dkg;
+pub mod dkg;

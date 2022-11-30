@@ -1,53 +1,49 @@
-// Package vss implements the verifiable secret sharing scheme from the
-// paper "Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold
-// Scheme for Implicit Certificates".
-// VSS enables a dealer to share a secret securely and verifiably among n
-// participants out of which at least t are required for its reconstruction.
-// The verifiability of the process prevents a
-// malicious dealer from influencing the outcome to his advantage as each
-// verifier can check the validity of the received share. The protocol has the
-// following steps:
-//
-//   1) The dealer send a Deal to every verifiers using `Deals()`. Each deal must
-//   be sent securely to one verifier whose public key is at the same index than
-//   the index of the Deal.
-//
-//   2) Each verifier processes the Deal with `ProcessDeal`.
-//   This function returns a Response which can be twofold:
-//   - an approval, to confirm a correct deal
-//   - a complaint to announce an incorrect deal notifying others that the
-//     dealer might be malicious.
-//	 All Responses must be broadcasted to every verifiers and the dealer.
-//   3) The dealer can respond to each complaint by a justification revealing the
-//   share he originally sent out to the accusing verifier. This is done by
-//   calling `ProcessResponse` on the `Dealer`.
-//   4) The verifiers refuse the shared secret and abort the protocol if there
-//   are at least t complaints OR if a Justification is wrong. The verifiers
-//   accept the shared secret if there are at least t approvals at which point
-//   any t out of n verifiers can reveal their shares to reconstruct the shared
-//   secret.
-
+/// Package vss implements the verifiable secret sharing scheme from the
+/// paper "Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold
+/// Scheme for Implicit Certificates".
+/// VSS enables a dealer to share a secret securely and verifiably among n
+/// participants out of which at least t are required for its reconstruction.
+/// The verifiability of the process prevents a
+/// malicious dealer from influencing the outcome to his advantage as each
+/// verifier can check the validity of the received share. The protocol has the
+/// following steps:
+///
+///   1) The dealer send a Deal to every verifiers using `Deals()`. Each deal must
+///   be sent securely to one verifier whose public key is at the same index than
+///   the index of the Deal.
+///
+///   2) Each verifier processes the Deal with `ProcessDeal`.
+///   This function returns a Response which can be twofold:
+///   - an approval, to confirm a correct deal
+///   - a complaint to announce an incorrect deal notifying others that the
+///     dealer might be malicious.
+///	 All Responses must be broadcasted to every verifiers and the dealer.
+///   3) The dealer can respond to each complaint by a justification revealing the
+///   share he originally sent out to the accusing verifier. This is done by
+///   calling `ProcessResponse` on the `Dealer`.
+///   4) The verifiers refuse the shared secret and abort the protocol if there
+///   are at least t complaints OR if a Justification is wrong. The verifiers
+///   accept the shared secret if there are at least t approvals at which point
+///   any t out of n verifiers can reveal their shares to reconstruct the shared
+///   secret.
 use core::fmt;
 use std::collections::HashMap;
-use std::marker::PhantomData;
 
 use crate::encoding::{self, unmarshal_binary, BinaryMarshaler, Marshaling};
 use crate::group::{HashFactory, PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical};
-use crate::share::poly::{self, NewPriPoly, PriShare, PubPoly};
+use crate::share::poly::{self, new_pri_poly, PriShare, PubPoly};
 use crate::share::vss::rabin::dh::AEAD;
 use crate::sign::schnorr;
-use crate::{share, Scalar};
+use crate::Scalar;
 use crate::{Group, Point, Random, XOFFactory};
 
-use anyhow::__private::kind::TraitKind;
 use anyhow::{bail, Error, Ok, Result};
 use byteorder::{LittleEndian, WriteBytesExt};
-use digest::DynDigest;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
-use super::dh::{context, dhExchange};
+use super::dh::{context, dh_exchange};
 
 /// Suite defines the capabilities required by the vss package.
 pub trait Suite: Group + HashFactory + XOFFactory + Random + Clone + Copy {}
@@ -79,7 +75,7 @@ where
 
 impl<SUITE: Suite> Deref for Dealer<SUITE>
 where
-    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
     type Target = Aggregator<SUITE>;
@@ -91,7 +87,7 @@ where
 
 impl<SUITE: Suite> DerefMut for Dealer<SUITE>
 where
-    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -139,24 +135,17 @@ where
     <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
-    fn decode(s: SUITE, buff: &[u8]) -> Result<Deal<SUITE>> {
-        // constructors := make(protobuf.Constructors)
-        // var point kyber.Point
-        // var secret kyber.Scalar
-        // constructors[reflect.TypeOf(&point).Elem()] = func() interface{} { return s.Point() }
-        // constructors[reflect.TypeOf(&secret).Elem()] = func() interface{} { return s.Scalar() }
-        // return protobuf.DecodeWithConstructors(buff, d, constructors)
+    fn decode(buff: &[u8]) -> Result<Deal<SUITE>> {
         let mut d = Deal::default();
         unmarshal_binary(&mut d, buff)?;
         Ok(d)
     }
 }
 
-impl<SUITE> BinaryMarshaler for Deal<SUITE>
+impl<SUITE: Suite> BinaryMarshaler for Deal<SUITE>
 where
     <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
     SUITE::POINT: Point + Serialize + DeserializeOwned,
-    SUITE: Suite,
 {
     fn marshal_binary(&self) -> Result<Vec<u8>> {
         encoding::marshal_binary(self)
@@ -179,8 +168,7 @@ pub struct EncryptedDeal<POINT: Point + Serialize> {
     pub(crate) cipher: Vec<u8>,
 }
 
-impl<POINT: Point + Serialize> BinaryMarshaler for EncryptedDeal<POINT>
-{
+impl<POINT: Point + Serialize> BinaryMarshaler for EncryptedDeal<POINT> {
     fn marshal_binary(&self) -> Result<Vec<u8>> {
         encoding::marshal_binary(self)
     }
@@ -213,14 +201,12 @@ impl Default for Response {
 
 impl Response {
     /// Hash returns the Hash representation of the Response
-    pub fn hash<SUITE: Suite>(&self, s: SUITE) -> Result<Vec<u8>> {
+    pub fn hash<SUITE: Suite>(&self, s: &SUITE) -> Result<Vec<u8>> {
         let mut h = s.hash();
         h.write("response".as_bytes())?;
         h.write(&self.session_id)?;
         h.write_u32::<LittleEndian>(self.index)?;
         h.write_u32::<LittleEndian>(self.approved as u32)?;
-        // binary.Write(h, binary.LittleEndian, self.index);
-        // binary.Write(h, binary.LittleEndian, self.approved);
         Ok(h.finalize().to_vec())
     }
 }
@@ -259,10 +245,6 @@ where
         let buff = self.deal.marshal_binary()?;
         h.update(&buff);
 
-        // _ = binary.Write(h, binary.LittleEndian, j.Index)
-        // buff, _ := protobuf.Encode(j.Deal)
-        // _, _ = h.Write(buff)
-
         Ok(h.finalize().to_vec())
     }
 }
@@ -273,50 +255,49 @@ where
 /// RECOMMENDED to use a threshold higher or equal than what the method
 /// MinimumT() returns, otherwise it breaks the security assumptions of the whole
 /// scheme. It returns an error if the t is inferior or equal to 2.
-pub fn NewDealer<SUITE: Suite>(
+pub fn new_dealer<SUITE: Suite>(
     suite: SUITE,
     longterm: <SUITE::POINT as Point>::SCALAR,
     secret: <SUITE::POINT as Point>::SCALAR,
-    verifiers: Vec<SUITE::POINT>,
+    verifiers: &[SUITE::POINT],
     t: usize,
 ) -> Result<Dealer<SUITE>>
 where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
-    // STREAM: Stream,
 {
-    if !validT(t, &verifiers) {
+    if !valid_t(t, verifiers) {
         bail!("dealer: t {} invalid", t);
     }
 
-    let H = deriveH(suite, &verifiers);
-    let f = NewPriPoly(suite, t, Some(secret.clone()), suite.random_stream());
-    let g = NewPriPoly(suite, t, None, suite.random_stream());
+    let h = derive_h(suite, verifiers);
+    let f = new_pri_poly(suite, t, Some(secret.clone()), suite.random_stream());
+    let g = new_pri_poly(suite, t, None, suite.random_stream());
     let d_pubb = suite.point().mul(&longterm, None);
 
     // Compute public polynomial coefficients
-    let F = f.Commit(Some(&suite.point().base()));
-    let (_, secret_commits) = F.Info();
-    let G = g.Commit(Some(&H));
+    let f_caps = f.commit(Some(&suite.point().base()));
+    let (_, secret_commits) = f_caps.info();
+    let g_caps = g.commit(Some(&h));
 
-    let C = F.Add(&G)?;
-    let (_, commitments) = C.Info();
+    let c = f_caps.add(&g_caps)?;
+    let (_, commitments) = c.info();
 
-    let session_id = sessionID(&suite, &d_pubb, &verifiers, &commitments, t)?;
+    let session_id = session_id(&suite, &d_pubb, &verifiers, &commitments, t)?;
 
-    let aggregator = newAggregator(
-        suite,
-        d_pubb.clone(),
-        verifiers.clone(),
-        commitments.clone(),
+    let aggregator = new_aggregator(
+        &suite,
+        &d_pubb,
+        &verifiers,
+        &commitments,
         t,
         &session_id,
     );
     // C = F + G
     let mut deals: Vec<Deal<SUITE>> = vec![];
     for i in 0..verifiers.len() {
-        let fi = f.Eval(i);
-        let gi = g.Eval(i);
+        let fi = f.eval(i);
+        let gi = g.eval(i);
         deals.push(Deal {
             session_id: session_id.clone(),
             sec_share: fi,
@@ -332,7 +313,7 @@ where
         suite: suite,
         long: longterm,
         secret: secret,
-        verifiers: verifiers,
+        verifiers: verifiers.to_vec(),
         pubb: d_pubb,
         secret_commits,
         hkdf_context,
@@ -345,12 +326,12 @@ where
 
 impl<SUITE: Suite> Dealer<SUITE>
 where
-    <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical + Serialize + DeserializeOwned,
-    SUITE::POINT: PointCanCheckCanonicalAndSmallOrder + Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
 {
     /// PlaintextDeal returns the plaintext version of the deal destined for peer i.
     /// Use this only for testing.
-    pub fn PlaintextDeal(&mut self, i: usize) -> Result<&mut Deal<SUITE>> {
+    pub fn plaintext_deal(&mut self, i: usize) -> Result<&mut Deal<SUITE>> {
         if i >= self.deals.len() {
             bail!("dealer: PlaintextDeal given wrong index");
         }
@@ -365,18 +346,18 @@ where
     /// ephemeral key and the verifier's public key.
     /// This shared key is then fed into a HKDF whose output is the key to a AEAD
     /// (AES256-GCM) scheme to encrypt the deal.
-    pub fn EncryptedDeal(&self, i: usize) -> Result<EncryptedDeal<SUITE::POINT>> {
-        let vPub = findPub(&self.verifiers, i)
+    pub fn encrypted_deal(&self, i: usize) -> Result<EncryptedDeal<SUITE::POINT>> {
+        let v_pub = find_pub(&self.verifiers, i)
             .ok_or(Error::msg("dealer: wrong index to generate encrypted deal"))?;
         // gen ephemeral key
-        let dhSecret = self.suite.scalar().pick(&mut self.suite.random_stream());
-        let dhPublic = self.suite.point().mul(&dhSecret, None);
+        let dh_secret = self.suite.scalar().pick(&mut self.suite.random_stream());
+        let dh_public = self.suite.point().mul(&dh_secret, None);
         // signs the public key
-        let dhPublicBuff = dhPublic.marshal_binary()?;
-        let signature = schnorr::Sign(&self.suite, &self.long, &dhPublicBuff)?;
+        let dh_public_buff = dh_public.marshal_binary()?;
+        let signature = schnorr::sign(&self.suite, &self.long, &dh_public_buff)?;
 
         // AES128-GCM
-        let pre = dhExchange(self.suite, dhSecret, vPub);
+        let pre = dh_exchange(self.suite, dh_secret, v_pub);
         let gcm = AEAD::new(pre, &self.hkdf_context)?;
 
         let nonce = [0u8; AEAD::nonce_size()];
@@ -384,9 +365,9 @@ where
         let deal_buf = self.deals[i].marshal_binary()?;
         let encrypted = gcm.seal(None, &nonce, &deal_buf, Some(&self.hkdf_context))?;
         return Ok(EncryptedDeal {
-            dhkey: dhPublic,
+            dhkey: dh_public,
             signature,
-            nonce: nonce.try_into().unwrap(),
+            nonce: nonce.to_vec(),
             cipher: encrypted,
         });
     }
@@ -399,7 +380,7 @@ where
         let mut deals = vec![];
         // var err error
         for i in 0..self.verifiers.len() {
-            let deal = self.EncryptedDeal(i)?;
+            let deal = self.encrypted_deal(i)?;
             deals.push(deal);
         }
         Ok(deals)
@@ -409,7 +390,11 @@ where
     /// it returns a Justification. This Justification must be broadcasted to every
     /// participants. If it's an invalid complaint, it returns an error about the
     /// complaint. The verifiers will also ignore an invalid Complaint.
-    pub fn process_response(&mut self, r: &Response) -> Result<Option<Justification<SUITE>>> {
+    pub fn process_response(&mut self, r: &Response) -> Result<Option<Justification<SUITE>>>
+    where
+        SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
+        <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
+    {
         self.aggregator.verify_response(r)?;
 
         if r.approved {
@@ -425,7 +410,7 @@ where
         };
 
         let msg = &j.clone().hash(self.suite)?;
-        let sig = schnorr::Sign(&self.suite, &self.long, msg)?;
+        let sig = schnorr::sign(&self.suite, &self.long, msg)?;
         j.signature = sig;
 
         Ok(Some(j))
@@ -465,7 +450,7 @@ where
     /// it calls cleanVerifiers which will take care of all Verifiers who have not
     /// responded until now.
     pub fn set_timeout(&mut self) {
-        self.aggregator.cleanVerifiers();
+        self.aggregator.clean_verifiers();
     }
 
     /// deal_certified returns true if there has been less than t complaints, all
@@ -500,11 +485,11 @@ where
 /// The security parameter t of the secret sharing scheme is automatically set to
 /// a default safe value. If a different t value is required, it is possible to set
 /// it with `verifier.SetT()`.
-pub fn NewVerifier<SUITE: Suite>(
-    suite: SUITE,
-    longterm: <SUITE::POINT as Point>::SCALAR,
-    dealer_key: SUITE::POINT,
-    verifiers: Vec<SUITE::POINT>,
+pub fn new_verifier<SUITE: Suite>(
+    suite: &SUITE,
+    longterm: &<SUITE::POINT as Point>::SCALAR,
+    dealer_key: &SUITE::POINT,
+    verifiers: &[SUITE::POINT],
 ) -> Result<Verifier<SUITE>>
 where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
@@ -524,12 +509,12 @@ where
     if !ok {
         bail!("vss: public key not found in the list of verifiers");
     }
-    let c = context(&suite, &dealer_key, &verifiers);
+    let c = context(suite, dealer_key, verifiers);
     Ok(Verifier {
-        suite,
-        longterm,
-        dealer: dealer_key,
-        verifiers,
+        suite: *suite,
+        longterm: longterm.clone(),
+        dealer: dealer_key.clone(),
+        verifiers: verifiers.to_vec(),
         pubb,
         index,
         hkdfContext: Vec::from(c),
@@ -561,9 +546,8 @@ where
 
 impl<SUITE: Suite> Verifier<SUITE>
 where
-    <SUITE::POINT as Point>::SCALAR:
-        Scalar + ScalarCanCheckCanonical + Serialize + DeserializeOwned,
-    SUITE::POINT: Point + PointCanCheckCanonicalAndSmallOrder + Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
 {
     /// process_encrypted_deal decrypt the deal received from the Dealer.
     /// If the deal is valid, i.e. the verifier can verify its shares
@@ -574,7 +558,11 @@ where
     /// broadcasted to every other participants including the dealer.
     /// If the deal has already been received, or the signature generation of the
     /// response failed, it returns an error without any responses.
-    pub fn process_encrypted_deal(&mut self, e: &EncryptedDeal<SUITE::POINT>) -> Result<Response> {
+    pub fn process_encrypted_deal(&mut self, e: &EncryptedDeal<SUITE::POINT>) -> Result<Response>
+    where
+        SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
+        <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
+    {
         let d = self.decryptDeal(e)?;
         if d.sec_share.i != self.index {
             bail!("vss: verifier got wrong index from deal");
@@ -582,7 +570,7 @@ where
 
         let t = d.t;
 
-        let sid = sessionID(
+        let sid = session_id(
             &self.suite,
             &self.dealer,
             &self.verifiers,
@@ -591,11 +579,11 @@ where
         )?;
 
         if self.aggregator.is_none() {
-            self.aggregator = Some(newAggregator(
-                self.suite,
-                self.dealer.clone(),
-                self.verifiers.clone(),
-                d.commitments.clone(),
+            self.aggregator = Some(new_aggregator(
+                &self.suite,
+                &self.dealer,
+                &self.verifiers,
+                &d.commitments,
                 t,
                 &d.session_id,
             ));
@@ -622,28 +610,32 @@ where
             }
         }
 
-        r.signature = schnorr::Sign(
+        r.signature = schnorr::sign(
             &self.suite,
             &self.longterm.clone(),
-            r.hash(self.suite)?.as_slice(),
+            r.hash(&self.suite)?.as_slice(),
         )?;
 
-        self.aggregator.as_mut().unwrap().add_response(r.clone())?;
+        self.aggregator.as_mut().unwrap().add_response(&r)?;
         Ok(r)
     }
 
-    pub fn decryptDeal(&self, e: &EncryptedDeal<SUITE::POINT>) -> Result<Deal<SUITE>> {
-        let ephBuff = e.dhkey.marshal_binary()?;
+    pub fn decryptDeal(&self, e: &EncryptedDeal<SUITE::POINT>) -> Result<Deal<SUITE>>
+    where
+        SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
+        <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
+    {
+        let eph_buff = e.dhkey.marshal_binary()?;
         // verify signature
-        schnorr::Verify(
+        schnorr::verify(
             self.suite,
             &self.dealer.clone(),
-            ephBuff.as_slice(),
+            eph_buff.as_slice(),
             &e.signature,
         )?;
 
         // compute shared key and AES526-GCM cipher
-        let pre = dhExchange(self.suite, self.longterm.clone(), e.dhkey.clone());
+        let pre = dh_exchange(self.suite, self.longterm.clone(), e.dhkey.clone());
         let gcm = AEAD::new(pre, &self.hkdfContext)?;
         let decrypted = gcm.open(
             None,
@@ -651,14 +643,18 @@ where
             &e.cipher,
             Some(self.hkdfContext.as_slice()),
         )?;
-        Deal::decode(self.suite, &decrypted)
+        Deal::decode(&decrypted)
     }
 
     /// ProcessResponse analyzes the given response. If it's a valid complaint, the
     /// verifier should expect to see a Justification from the Dealer. It returns an
     /// error if it's not a valid response.
     /// Call `v.DealCertified()` to check if the whole protocol is finished.
-    pub fn process_response(&mut self, resp: &Response) -> Result<()> {
+    pub fn process_response(&mut self, resp: &Response) -> Result<()>
+    where
+        SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
+        <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
+    {
         match &mut self.aggregator {
             Some(aggregator) => aggregator.verify_response(resp),
             None => bail!("no aggregator for verifier"),
@@ -714,9 +710,9 @@ where
     /// SetTimeout tells this verifier to consider this moment the maximum time limit.
     /// it calls cleanVerifiers which will take care of all Verifiers who have not
     /// responded until now.
-    pub fn SetTimeout(&mut self) {
+    pub fn set_timeout(&mut self) {
         if let Some(a) = self.aggregator.as_mut() {
-            a.cleanVerifiers()
+            a.clean_verifiers()
         }
     }
 }
@@ -741,11 +737,11 @@ where
     pub(crate) bad_dealer: bool,
 }
 
-fn newAggregator<SUITE: Suite>(
-    suite: SUITE,
-    dealer: SUITE::POINT,
-    verifiers: Vec<SUITE::POINT>,
-    commitments: Vec<SUITE::POINT>,
+fn new_aggregator<SUITE: Suite>(
+    suite: &SUITE,
+    dealer: &SUITE::POINT,
+    verifiers: &[SUITE::POINT],
+    commitments: &[SUITE::POINT],
     t: usize,
     sid: &[u8],
 ) -> Aggregator<SUITE>
@@ -754,10 +750,10 @@ where
     SUITE::POINT: Serialize + DeserializeOwned,
 {
     Aggregator {
-        suite: suite,
-        dealer: dealer,
-        verifiers: verifiers,
-        commits: commitments,
+        suite: *suite,
+        dealer: dealer.clone(),
+        verifiers: verifiers.to_vec(),
+        commits: commitments.to_vec(),
         t,
         sid: sid.clone().to_vec(),
         responses: HashMap::new(),
@@ -794,8 +790,8 @@ impl fmt::Display for DealAlreadyProcessedError {
 
 impl<SUITE: Suite> Aggregator<SUITE>
 where
-    <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical + Serialize + DeserializeOwned,
-    SUITE::POINT: PointCanCheckCanonicalAndSmallOrder + Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
 {
     /// verify_deal analyzes the deal and returns an error if it's incorrect. If
     /// inclusion is true, it also returns an error if it the second time this struct
@@ -810,7 +806,7 @@ where
             self.deal = Some(d.clone());
         }
 
-        if !validT(d.t, &self.verifiers) {
+        if !valid_t(d.t, &self.verifiers) {
             return Err(VerifyDealError::TextError(
                 "vss: invalid t received in Deal".to_string(),
             ));
@@ -829,21 +825,21 @@ where
                 "vss: not the same index for f and g share in Deal".to_string(),
             ));
         }
-        if fi.i < 0 || fi.i >= self.verifiers.len() {
+        if fi.i >= self.verifiers.len() {
             return Err(VerifyDealError::TextError(
                 "vss: index out of bounds in Deal".to_string(),
             ));
         }
         // compute fi * G + gi * H
         let fig = self.suite.point().base().mul(&fi.v, None);
-        let H = deriveH(self.suite, &self.verifiers);
-        let gih = self.suite.point().mul(&gi.v, Some(&H));
+        let h = derive_h(self.suite, &self.verifiers);
+        let gih = self.suite.point().mul(&gi.v, Some(&h));
         let ci = self.suite.point().add(&fig, &gih);
 
-        let commitPoly = PubPoly::new(&self.suite, None, d.commitments.clone());
+        let commit_poly = PubPoly::new(&self.suite, None, &d.commitments);
 
-        let pubShare = commitPoly.Eval(fi.i);
-        if ci != pubShare.v {
+        let pub_share = commit_poly.eval(fi.i);
+        if ci != pub_share.v {
             return Err(VerifyDealError::TextError(
                 "vss: share does not verify against commitments in Deal".to_string(),
             ));
@@ -853,7 +849,7 @@ where
 
     /// cleanVerifiers checks the aggregator's response array and creates a StatusComplaint
     /// response for all verifiers who have no response in the array.
-    pub fn cleanVerifiers(&mut self) {
+    pub fn clean_verifiers(&mut self) {
         for i in 0..self.verifiers.len() {
             if !self.responses.contains_key(&(i as u32)) {
                 self.responses.insert(
@@ -869,25 +865,29 @@ where
         }
     }
 
-    pub fn verify_response(&mut self, r: &Response) -> Result<()> {
+    pub fn verify_response(&mut self, r: &Response) -> Result<()>
+    where
+        SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
+        <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
+    {
         if r.session_id != self.sid {
             bail!("vss: receiving inconsistent sessionID in response")
         }
 
-        let public = findPub(&self.verifiers, r.index as usize);
+        let public = find_pub(&self.verifiers, r.index as usize);
         if public.is_none() {
             bail!("vss: index out of bounds in response")
         }
 
-        let msg = r.hash(self.suite)?;
+        let msg = r.hash(&self.suite)?;
 
-        schnorr::Verify(self.suite, &public.unwrap(), &msg, &r.signature)?;
+        schnorr::verify(self.suite, &public.unwrap(), &msg, &r.signature)?;
 
-        self.add_response(r.clone())
+        self.add_response(&r)
     }
 
     fn verify_justification(&mut self, j: &Justification<SUITE>) -> Result<()> {
-        let pubb = findPub(&self.verifiers, j.index as usize);
+        let pubb = find_pub(&self.verifiers, j.index as usize);
         if pubb.is_none() {
             bail!("vss: index out of bounds in justification")
         }
@@ -916,14 +916,14 @@ where
         return verification.map_err(|e| Error::msg(e.to_string()));
     }
 
-    pub fn add_response(&mut self, r: Response) -> Result<()> {
-        if findPub(&self.verifiers, r.index as usize).is_none() {
+    pub fn add_response(&mut self, r: &Response) -> Result<()> {
+        if find_pub(&self.verifiers, r.index as usize).is_none() {
             bail!("vss: index out of bounds in Complaint");
         }
         if self.responses.get(&(r.index as u32)).is_some() {
             bail!("vss: already existing response from same origin")
         }
-        self.responses.insert(r.index, r);
+        self.responses.insert(r.index, r.clone());
         Ok(())
     }
 
@@ -957,7 +957,8 @@ where
 
     /// UnsafeSetResponseDKG is an UNSAFE bypass method to allow DKG to use VSS
     /// that works on basis of approval only.
-    pub fn unsafe_set_response_dkg(&mut self, idx: u32, approval: bool) -> Result<()> {
+    #[allow(unused_must_use)]
+    pub fn unsafe_set_response_dkg(&mut self, idx: u32, approval: bool) {
         let r = Response {
             session_id: self.sid.clone(),
             index: idx,
@@ -965,7 +966,7 @@ where
             signature: vec![],
         };
 
-        self.add_response(r)
+        self.add_response(&r);
     }
 }
 
@@ -978,11 +979,11 @@ pub fn minimum_t(n: usize) -> usize {
     return (n + 1) / 2;
 }
 
-fn validT<POINT: Point>(t: usize, verifiers: &Vec<POINT>) -> bool {
+fn valid_t<POINT: Point>(t: usize, verifiers: &[POINT]) -> bool {
     return t >= 2 && t <= verifiers.len() && (t as u32) as i64 == t as i64;
 }
 
-fn deriveH<SUITE: Suite>(suite: SUITE, verifiers: &Vec<SUITE::POINT>) -> SUITE::POINT {
+fn derive_h<SUITE: Suite>(suite: SUITE, verifiers: &[SUITE::POINT]) -> SUITE::POINT {
     let mut b = vec![];
     for v in verifiers {
         v.marshal_to(&mut b).unwrap();
@@ -991,15 +992,15 @@ fn deriveH<SUITE: Suite>(suite: SUITE, verifiers: &Vec<SUITE::POINT>) -> SUITE::
     base
 }
 
-pub(crate) fn findPub<POINT: Point>(verifiers: &Vec<POINT>, idx: usize) -> Option<POINT> {
+pub(crate) fn find_pub<POINT: Point>(verifiers: &Vec<POINT>, idx: usize) -> Option<POINT> {
     verifiers.get(idx).map(|x| x.clone())
 }
 
-pub(crate) fn sessionID<SUITE: Suite>(
+pub(crate) fn session_id<SUITE: Suite>(
     suite: &SUITE,
     dealer: &SUITE::POINT,
-    verifiers: &Vec<SUITE::POINT>,
-    commitments: &Vec<SUITE::POINT>,
+    verifiers: &[SUITE::POINT],
+    commitments: &[SUITE::POINT],
     t: usize,
 ) -> Result<Vec<u8>> {
     let mut h = suite.hash();
@@ -1021,7 +1022,7 @@ pub(crate) fn sessionID<SUITE: Suite>(
 /// RecoverSecret recovers the secret shared by a Dealer by gathering at least t
 /// Deals from the verifiers. It returns an error if there is not enough Deals or
 /// if all Deals don't have the same SessionID.
-pub fn RecoverSecret<SUITE: Suite>(
+pub fn recover_secret<SUITE: Suite>(
     suite: SUITE,
     deals: Vec<Deal<SUITE>>,
     n: usize,

@@ -12,23 +12,23 @@ use serde::{Deserialize, Serialize};
 use super::{
     constants::{BASE, D, D2, SQRT_M1},
     fe::{
-        feAdd, feCMove, feCopy, feFromBytes, feInvert, feIsNegative, feIsNonZero, feMul, feNeg,
-        feOne, fePow22523, feSquare, feSquare2, feSub, feToBytes, feZero, FieldElement,
+        fe_add, fe_c_move, fe_copy, fe_from_bytes, fe_invert, fe_is_negative, fe_is_non_zero, fe_mul, fe_neg,
+        fe_one, fe_pow22523, fe_square, fe_square2, fe_sub, fe_to_bytes, fe_zero, FieldElement,
     },
 };
 
 pub struct ProjectiveGroupElement {
-    X: FieldElement,
-    Y: FieldElement,
-    Z: FieldElement,
+    x: FieldElement,
+    y: FieldElement,
+    z: FieldElement,
 }
 
 impl Default for ProjectiveGroupElement {
     fn default() -> Self {
         Self {
-            X: Default::default(),
-            Y: Default::default(),
-            Z: Default::default(),
+            x: Default::default(),
+            y: Default::default(),
+            z: Default::default(),
         }
     }
 }
@@ -40,20 +40,20 @@ impl ProjectiveGroupElement {
     // 	feOne(&p.Z)
     // }
 
-    fn Double(&self, r: &mut CompletedGroupElement) {
+    fn double(&self, r: &mut CompletedGroupElement) {
         let mut t0 = FieldElement::default();
 
-        feSquare(&mut r.X, &self.X);
-        feSquare(&mut r.Z, &self.Y);
-        feSquare2(&mut r.T, &self.Z);
-        feAdd(&mut r.Y, &self.X, &self.Y);
-        feSquare(&mut t0, &r.Y);
-        feAdd(&mut r.Y, &r.Z, &r.X);
-        let r_z = r.Z.clone();
-        feSub(&mut r.Z, &r_z, &r.X);
-        feSub(&mut r.X, &t0, &r.Y);
-        let r_t = r.T.clone();
-        feSub(&mut r.T, &r_t, &r.Z);
+        fe_square(&mut r.x, &self.x);
+        fe_square(&mut r.z, &self.y);
+        fe_square2(&mut r.t, &self.z);
+        fe_add(&mut r.y, &self.x, &self.y);
+        fe_square(&mut t0, &r.y);
+        fe_add(&mut r.y, &r.z, &r.x);
+        let r_z = r.z.clone();
+        fe_sub(&mut r.z, &r_z, &r.x);
+        fe_sub(&mut r.x, &t0, &r.y);
+        let r_t = r.t.clone();
+        fe_sub(&mut r.t, &r_t, &r.z);
     }
 
     // func (p *projectiveGroupElement) ToBytes(s *[32]byte) {
@@ -74,15 +74,15 @@ fn test_from_bytes() {
         19, 80, 57, 234, 7, 56, 227, 90, 220, 227, 87, 78, 223,
     ];
     let mut el = ExtendedGroupElement::default();
-    assert!(el.FromBytes(&arr));
+    assert!(el.from_bytes(&arr));
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct ExtendedGroupElement {
-    pub X: FieldElement,
-    pub Y: FieldElement,
-    pub Z: FieldElement,
-    pub T: FieldElement,
+    pub x: FieldElement,
+    pub y: FieldElement,
+    pub z: FieldElement,
+    pub t: FieldElement,
 }
 
 impl ExtendedGroupElement {
@@ -93,38 +93,38 @@ impl ExtendedGroupElement {
     // 	feNeg(&p.T, &s.T)
     // }
 
-    fn Double(&mut self, r: &mut CompletedGroupElement) {
+    fn double(&mut self, r: &mut CompletedGroupElement) {
         let mut q = ProjectiveGroupElement::default();
-        self.ToProjective(&mut q);
-        q.Double(r);
+        self.to_projective(&mut q);
+        q.double(r);
     }
 
-    pub fn ToCached(&self, r: &mut CachedGroupElement) {
-        feAdd(&mut r.yPlusX, &self.Y, &self.X);
-        feSub(&mut r.yMinusX, &self.Y, &self.X);
-        feCopy(&mut r.Z, &self.Z);
-        feMul(&mut r.T2d, &self.T, &D2);
+    pub fn to_cached(&self, r: &mut CachedGroupElement) {
+        fe_add(&mut r.y_plus_x, &self.y, &self.x);
+        fe_sub(&mut r.y_minus_x, &self.y, &self.x);
+        fe_copy(&mut r.z, &self.z);
+        fe_mul(&mut r.t2d, &self.t, &D2);
     }
 
-    fn ToProjective(&self, r: &mut ProjectiveGroupElement) {
-        feCopy(&mut r.X, &self.X);
-        feCopy(&mut r.Y, &self.Y);
-        feCopy(&mut r.Z, &self.Z);
+    fn to_projective(&self, r: &mut ProjectiveGroupElement) {
+        fe_copy(&mut r.x, &self.x);
+        fe_copy(&mut r.y, &self.y);
+        fe_copy(&mut r.z, &self.z);
     }
 
-    pub fn ToBytes(&self, s: &mut [u8; 32]) {
+    pub fn to_bytes(&self, s: &mut [u8; 32]) {
         let mut recip = FieldElement::default();
         let mut x = FieldElement::default();
         let mut y = FieldElement::default();
 
-        feInvert(&mut recip, &self.Z);
-        feMul(&mut x, &self.X, &recip);
-        feMul(&mut y, &self.Y, &recip);
-        feToBytes(s, &y);
-        s[31] ^= feIsNegative(&x) << 7;
+        fe_invert(&mut recip, &self.z);
+        fe_mul(&mut x, &self.x, &recip);
+        fe_mul(&mut y, &self.y, &recip);
+        fe_to_bytes(s, &y);
+        s[31] ^= fe_is_negative(&x) << 7;
     }
 
-    pub fn FromBytes(&mut self, s: &[u8]) -> bool {
+    pub fn from_bytes(&mut self, s: &[u8]) -> bool {
         // println!("{:#?}", s);
         let mut u = FieldElement::default();
         let mut v = FieldElement::default();
@@ -135,50 +135,50 @@ impl ExtendedGroupElement {
         if s.len() != 32 {
             return false;
         }
-        feFromBytes(&mut self.Y, s);
-        feOne(&mut self.Z);
-        feSquare(&mut u, &self.Y);
-        feMul(&mut v, &u, &D);
+        fe_from_bytes(&mut self.y, s);
+        fe_one(&mut self.z);
+        fe_square(&mut u, &self.y);
+        fe_mul(&mut v, &u, &D);
         let u_clone = u.clone();
-        feSub(&mut u, &u_clone, &self.Z); // y = y^2-1
+        fe_sub(&mut u, &u_clone, &self.z); // y = y^2-1
         let v_clone = v.clone();
-        feAdd(&mut v, &v_clone, &self.Z); // v = dy^2+1
+        fe_add(&mut v, &v_clone, &self.z); // v = dy^2+1
 
-        feSquare(&mut v3, &v);
+        fe_square(&mut v3, &v);
         let v3_clone = v3.clone();
-        feMul(&mut v3, &v3_clone, &v); // v3 = v^3
-        feSquare(&mut self.X, &v3);
-        let self_x_clone = self.X.clone();
-        feMul(&mut self.X, &self_x_clone, &v);
-        let self_x_clone = self.X.clone();
-        feMul(&mut self.X, &self_x_clone, &u); // x = uv^7
+        fe_mul(&mut v3, &v3_clone, &v); // v3 = v^3
+        fe_square(&mut self.x, &v3);
+        let self_x_clone = self.x.clone();
+        fe_mul(&mut self.x, &self_x_clone, &v);
+        let self_x_clone = self.x.clone();
+        fe_mul(&mut self.x, &self_x_clone, &u); // x = uv^7
 
-        let self_x_clone = self.X.clone();
-        fePow22523(&mut self.X, &self_x_clone); // x = (uv^7)^((q-5)/8)
-        let self_x_clone = self.X.clone();
-        feMul(&mut self.X, &self_x_clone, &v3);
-        let self_x_clone = self.X.clone();
-        feMul(&mut self.X, &self_x_clone, &u); // x = uv^3(uv^7)^((q-5)/8)
+        let self_x_clone = self.x.clone();
+        fe_pow22523(&mut self.x, &self_x_clone); // x = (uv^7)^((q-5)/8)
+        let self_x_clone = self.x.clone();
+        fe_mul(&mut self.x, &self_x_clone, &v3);
+        let self_x_clone = self.x.clone();
+        fe_mul(&mut self.x, &self_x_clone, &u); // x = uv^3(uv^7)^((q-5)/8)
 
-        feSquare(&mut vxx, &self.X);
+        fe_square(&mut vxx, &self.x);
         let vxx_clone = vxx.clone();
-        feMul(&mut vxx, &vxx_clone, &v);
-        feSub(&mut check, &vxx, &u); // vx^2-u
-        if feIsNonZero(&check) == 1 {
-            feAdd(&mut check, &vxx, &u); // vx^2+u
-            if feIsNonZero(&check) == 1 {
+        fe_mul(&mut vxx, &vxx_clone, &v);
+        fe_sub(&mut check, &vxx, &u); // vx^2-u
+        if fe_is_non_zero(&check) == 1 {
+            fe_add(&mut check, &vxx, &u); // vx^2+u
+            if fe_is_non_zero(&check) == 1 {
                 return false;
             }
-            let self_x_clone = self.X.clone();
-            feMul(&mut self.X, &self_x_clone, &SQRT_M1)
+            let self_x_clone = self.x.clone();
+            fe_mul(&mut self.x, &self_x_clone, &SQRT_M1)
         }
 
-        if feIsNegative(&self.X) != (s[31] >> 7) {
-            let self_x_clone = self.X.clone();
-            feNeg(&mut self.X, &self_x_clone);
+        if fe_is_negative(&self.x) != (s[31] >> 7) {
+            let self_x_clone = self.x.clone();
+            fe_neg(&mut self.x, &self_x_clone);
         }
 
-        feMul(&mut self.T, &self.X, &self.Y);
+        fe_mul(&mut self.t, &self.x, &self.y);
         true
     }
 
@@ -190,56 +190,56 @@ impl ExtendedGroupElement {
     // 		p.T.String() + ",\n}"
     // }
 
-    pub fn Zero(&mut self) {
-        feZero(&mut self.X);
-        feOne(&mut self.Y);
-        feOne(&mut self.Z);
-        feZero(&mut self.T);
+    pub fn zero(&mut self) {
+        fe_zero(&mut self.x);
+        fe_one(&mut self.y);
+        fe_one(&mut self.z);
+        fe_zero(&mut self.t);
     }
 }
 
 impl Default for ExtendedGroupElement {
     fn default() -> Self {
         Self {
-            X: Default::default(),
-            Y: Default::default(),
-            Z: Default::default(),
-            T: Default::default(),
+            x: Default::default(),
+            y: Default::default(),
+            z: Default::default(),
+            t: Default::default(),
         }
     }
 }
 
 pub struct CompletedGroupElement {
-    X: FieldElement,
-    Y: FieldElement,
-    Z: FieldElement,
-    T: FieldElement,
+    x: FieldElement,
+    y: FieldElement,
+    z: FieldElement,
+    t: FieldElement,
 }
 
 impl CompletedGroupElement {
-    pub fn ToProjective(&self, r: &mut ProjectiveGroupElement) {
-        feMul(&mut r.X, &self.X, &self.T);
-        feMul(&mut r.Y, &self.Y, &self.Z);
-        feMul(&mut r.Z, &self.Z, &self.T);
+    pub fn to_projective(&self, r: &mut ProjectiveGroupElement) {
+        fe_mul(&mut r.x, &self.x, &self.t);
+        fe_mul(&mut r.y, &self.y, &self.z);
+        fe_mul(&mut r.z, &self.z, &self.t);
     }
 
-    pub fn Add(&mut self, p: &ExtendedGroupElement, q: &CachedGroupElement) {
+    pub fn add(&mut self, p: &ExtendedGroupElement, q: &CachedGroupElement) {
         let mut t0 = FieldElement::default();
 
-        feAdd(&mut self.X, &p.Y, &p.X);
-        feSub(&mut self.Y, &p.Y, &p.X);
-        feMul(&mut self.Z, &self.X, &q.yPlusX);
-        let self_y = self.Y.clone();
-        feMul(&mut self.Y, &self_y, &q.yMinusX);
-        feMul(&mut self.T, &q.T2d, &p.T);
-        feMul(&mut self.X, &p.Z, &q.Z);
-        feAdd(&mut t0, &self.X, &self.X);
-        feSub(&mut self.X, &self.Z, &self.Y);
-        let self_y = self.Y.clone();
-        feAdd(&mut self.Y, &self.Z, &self_y);
-        feAdd(&mut self.Z, &t0, &self.T);
-        let self_t = self.T.clone();
-        feSub(&mut self.T, &t0, &self_t);
+        fe_add(&mut self.x, &p.y, &p.x);
+        fe_sub(&mut self.y, &p.y, &p.x);
+        fe_mul(&mut self.z, &self.x, &q.y_plus_x);
+        let self_y = self.y.clone();
+        fe_mul(&mut self.y, &self_y, &q.y_minus_x);
+        fe_mul(&mut self.t, &q.t2d, &p.t);
+        fe_mul(&mut self.x, &p.z, &q.z);
+        fe_add(&mut t0, &self.x, &self.x);
+        fe_sub(&mut self.x, &self.z, &self.y);
+        let self_y = self.y.clone();
+        fe_add(&mut self.y, &self.z, &self_y);
+        fe_add(&mut self.z, &t0, &self.t);
+        let self_t = self.t.clone();
+        fe_sub(&mut self.t, &t0, &self_t);
     }
 
     // func (c *completedGroupElement) Sub(p *extendedGroupElement, q *cachedGroupElement) {
@@ -273,76 +273,76 @@ impl CompletedGroupElement {
     // 	feAdd(&c.T, &t0, &c.T)
     // }
 
-    pub fn MixedAdd(&mut self, p: &mut ExtendedGroupElement, q: &mut PreComputedGroupElement) {
+    pub fn mixed_add(&mut self, p: &mut ExtendedGroupElement, q: &mut PreComputedGroupElement) {
         let mut t0 = FieldElement::default();
 
-        feAdd(&mut self.X, &p.Y, &p.X);
-        feSub(&mut self.Y, &p.Y, &p.X);
-        feMul(&mut self.Z, &self.X, &q.yPlusX);
-        let self_y = self.Y.clone();
-        feMul(&mut self.Y, &self_y, &q.yMinusX);
-        feMul(&mut self.T, &q.xy2d, &p.T);
-        feAdd(&mut t0, &p.Z, &p.Z);
-        feSub(&mut self.X, &self.Z, &self.Y);
-        let self_y = self.Y.clone();
-        feAdd(&mut self.Y, &self.Z, &self_y);
-        feAdd(&mut self.Z, &t0, &self.T);
-        let self_t = self.T.clone();
-        feSub(&mut self.T, &t0, &self_t);
+        fe_add(&mut self.x, &p.y, &p.x);
+        fe_sub(&mut self.y, &p.y, &p.x);
+        fe_mul(&mut self.z, &self.x, &q.y_plus_x);
+        let self_y = self.y.clone();
+        fe_mul(&mut self.y, &self_y, &q.y_minus_x);
+        fe_mul(&mut self.t, &q.xy2d, &p.t);
+        fe_add(&mut t0, &p.z, &p.z);
+        fe_sub(&mut self.x, &self.z, &self.y);
+        let self_y = self.y.clone();
+        fe_add(&mut self.y, &self.z, &self_y);
+        fe_add(&mut self.z, &t0, &self.t);
+        let self_t = self.t.clone();
+        fe_sub(&mut self.t, &t0, &self_t);
     }
 
-    pub fn ToExtended(&self, r: &mut ExtendedGroupElement) {
-        feMul(&mut r.X, &self.X, &self.T);
-        feMul(&mut r.Y, &self.Y, &self.Z);
-        feMul(&mut r.Z, &self.Z, &self.T);
-        feMul(&mut r.T, &self.X, &self.Y);
+    pub fn to_extended(&self, r: &mut ExtendedGroupElement) {
+        fe_mul(&mut r.x, &self.x, &self.t);
+        fe_mul(&mut r.y, &self.y, &self.z);
+        fe_mul(&mut r.z, &self.z, &self.t);
+        fe_mul(&mut r.t, &self.x, &self.y);
     }
 }
 
 impl Default for CompletedGroupElement {
     fn default() -> Self {
         Self {
-            X: Default::default(),
-            Y: Default::default(),
-            Z: Default::default(),
-            T: Default::default(),
+            x: Default::default(),
+            y: Default::default(),
+            z: Default::default(),
+            t: Default::default(),
         }
     }
 }
 
 pub struct PreComputedGroupElement {
-    pub yPlusX: FieldElement,
-    pub yMinusX: FieldElement,
+    pub y_plus_x: FieldElement,
+    pub y_minus_x: FieldElement,
     pub xy2d: FieldElement,
 }
 
 impl PreComputedGroupElement {
-    fn Zero(&mut self) {
-        feOne(&mut self.yPlusX);
-        feOne(&mut self.yMinusX);
-        feZero(&mut self.xy2d);
+    fn zero(&mut self) {
+        fe_one(&mut self.y_plus_x);
+        fe_one(&mut self.y_minus_x);
+        fe_zero(&mut self.xy2d);
     }
 
     /// Set to u conditionally based on b
-    fn CMove(&mut self, u: &PreComputedGroupElement, b: i32) {
-        feCMove(&mut self.yPlusX, &u.yPlusX, b);
-        feCMove(&mut self.yMinusX, &u.yMinusX, b);
-        feCMove(&mut self.xy2d, &u.xy2d, b);
+    fn cmove(&mut self, u: &PreComputedGroupElement, b: i32) {
+        fe_c_move(&mut self.y_plus_x, &u.y_plus_x, b);
+        fe_c_move(&mut self.y_minus_x, &u.y_minus_x, b);
+        fe_c_move(&mut self.xy2d, &u.xy2d, b);
     }
 
     /// Set to negative of t
-    fn Neg(&mut self, t: &PreComputedGroupElement) {
-        feCopy(&mut self.yPlusX, &t.yMinusX);
-        feCopy(&mut self.yMinusX, &t.yPlusX);
-        feNeg(&mut self.xy2d, &t.xy2d);
+    fn neg(&mut self, t: &PreComputedGroupElement) {
+        fe_copy(&mut self.y_plus_x, &t.y_minus_x);
+        fe_copy(&mut self.y_minus_x, &t.y_plus_x);
+        fe_neg(&mut self.xy2d, &t.xy2d);
     }
 }
 
 impl Default for PreComputedGroupElement {
     fn default() -> Self {
         Self {
-            yPlusX: Default::default(),
-            yMinusX: Default::default(),
+            y_plus_x: Default::default(),
+            y_minus_x: Default::default(),
             xy2d: Default::default(),
         }
     }
@@ -350,44 +350,44 @@ impl Default for PreComputedGroupElement {
 
 #[derive(Clone, Copy)]
 pub struct CachedGroupElement {
-    yPlusX: FieldElement,
-    yMinusX: FieldElement,
-    Z: FieldElement,
-    T2d: FieldElement,
+    y_plus_x: FieldElement,
+    y_minus_x: FieldElement,
+    z: FieldElement,
+    t2d: FieldElement,
 }
 
 impl CachedGroupElement {
-    fn Zero(&mut self) {
-        feOne(&mut self.yPlusX);
-        feOne(&mut self.yMinusX);
-        feOne(&mut self.Z);
-        feZero(&mut self.T2d);
+    fn zero(&mut self) {
+        fe_one(&mut self.y_plus_x);
+        fe_one(&mut self.y_minus_x);
+        fe_one(&mut self.z);
+        fe_zero(&mut self.t2d);
     }
 
     // Set to u conditionally based on b
-    fn CMove(&mut self, u: &CachedGroupElement, b: i32) {
-        feCMove(&mut self.yPlusX, &u.yPlusX, b);
-        feCMove(&mut self.yMinusX, &u.yMinusX, b);
-        feCMove(&mut self.Z, &u.Z, b);
-        feCMove(&mut self.T2d, &u.T2d, b);
+    fn cmove(&mut self, u: &CachedGroupElement, b: i32) {
+        fe_c_move(&mut self.y_plus_x, &u.y_plus_x, b);
+        fe_c_move(&mut self.y_minus_x, &u.y_minus_x, b);
+        fe_c_move(&mut self.z, &u.z, b);
+        fe_c_move(&mut self.t2d, &u.t2d, b);
     }
 
     // Set to negative of t
-    fn Neg(&mut self, t: &CachedGroupElement) {
-        feCopy(&mut self.yPlusX, &t.yMinusX);
-        feCopy(&mut self.yMinusX, &t.yPlusX);
-        feCopy(&mut self.Z, &t.Z);
-        feNeg(&mut self.T2d, &t.T2d);
+    fn neg(&mut self, t: &CachedGroupElement) {
+        fe_copy(&mut self.y_plus_x, &t.y_minus_x);
+        fe_copy(&mut self.y_minus_x, &t.y_plus_x);
+        fe_copy(&mut self.z, &t.z);
+        fe_neg(&mut self.t2d, &t.t2d);
     }
 }
 
 impl Default for CachedGroupElement {
     fn default() -> Self {
         Self {
-            yPlusX: Default::default(),
-            yMinusX: Default::default(),
-            Z: Default::default(),
-            T2d: Default::default(),
+            y_plus_x: Default::default(),
+            y_minus_x: Default::default(),
+            z: Default::default(),
+            t2d: Default::default(),
         }
     }
 }
@@ -452,17 +452,17 @@ fn negative(b: i32) -> i32 {
     (b >> 31) & 1
 }
 
-fn selectPreComputed(t: &mut PreComputedGroupElement, pos: usize, b: i32) {
-    let mut minusT = PreComputedGroupElement::default();
-    let bNegative = negative(b);
-    let bAbs = b - (((-bNegative) & b) << 1);
+fn select_pre_computed(t: &mut PreComputedGroupElement, pos: usize, b: i32) {
+    let mut minus_t = PreComputedGroupElement::default();
+    let b_negative = negative(b);
+    let b_abs = b - (((-b_negative) & b) << 1);
 
-    t.Zero();
+    t.zero();
     for i in 0..8 {
-        t.CMove(&BASE[pos][i], equal(bAbs, i as i32 + 1));
+        t.cmove(&BASE[pos][i], equal(b_abs, i as i32 + 1));
     }
-    minusT.Neg(t);
-    t.CMove(&minusT, bNegative);
+    minus_t.neg(t);
+    t.cmove(&minus_t, b_negative);
 }
 
 /// geScalarMultBase computes h = a*B, where
@@ -471,7 +471,7 @@ fn selectPreComputed(t: &mut PreComputedGroupElement, pos: usize, b: i32) {
 ///
 /// Preconditions:
 ///   a[31] <= 127
-pub fn geScalarMultBase(h: &mut ExtendedGroupElement, a: &mut [u8; 32]) {
+pub fn ge_scalar_mult_base(h: &mut ExtendedGroupElement, a: &mut [u8; 32]) {
     let mut e = [0 as i8; 64];
 
     for (i, v) in a.iter().enumerate() {
@@ -490,47 +490,47 @@ pub fn geScalarMultBase(h: &mut ExtendedGroupElement, a: &mut [u8; 32]) {
     e[63] += carry;
     // each e[i] is between -8 and 8.
 
-    h.Zero();
+    h.zero();
     let mut t = PreComputedGroupElement::default();
     let mut r = CompletedGroupElement::default();
     for i in (1..64).filter(|x| x % 2 != 0) {
-        selectPreComputed(&mut t, i / 2, (e[i as usize]) as i32);
-        r.MixedAdd(h, &mut t);
-        r.ToExtended(h);
+        select_pre_computed(&mut t, i / 2, (e[i as usize]) as i32);
+        r.mixed_add(h, &mut t);
+        r.to_extended(h);
     }
 
     let mut s = ProjectiveGroupElement::default();
 
-    h.Double(&mut r);
-    r.ToProjective(&mut s);
-    s.Double(&mut r);
-    r.ToProjective(&mut s);
-    s.Double(&mut r);
-    r.ToProjective(&mut s);
-    s.Double(&mut r);
-    r.ToExtended(h);
+    h.double(&mut r);
+    r.to_projective(&mut s);
+    s.double(&mut r);
+    r.to_projective(&mut s);
+    s.double(&mut r);
+    r.to_projective(&mut s);
+    s.double(&mut r);
+    r.to_extended(h);
 
     for i in (0..64).filter(|x| x % 2 == 0) {
-        selectPreComputed(&mut t, i / 2, e[i as usize] as i32);
-        r.MixedAdd(h, &mut t);
-        r.ToExtended(h);
+        select_pre_computed(&mut t, i / 2, e[i as usize] as i32);
+        r.mixed_add(h, &mut t);
+        r.to_extended(h);
     }
 }
 
-fn selectCached(c: &mut CachedGroupElement, Ai: &[CachedGroupElement; 8], b: i32) {
-    let bNegative = negative(b);
-    let bAbs = b - (((-bNegative) & b) << 1);
+fn select_cached(c: &mut CachedGroupElement, ai: &[CachedGroupElement; 8], b: i32) {
+    let b_negative = negative(b);
+    let b_abs = b - (((-b_negative) & b) << 1);
 
     // in constant-time pick cached multiplier for exponent 0 through 8
-    c.Zero();
+    c.zero();
     for i in 0..8 {
-        c.CMove(&Ai[i], equal(bAbs, i as i32 + 1))
+        c.cmove(&ai[i], equal(b_abs, i as i32 + 1))
     }
 
     // in constant-time compute negated version, conditionally use it
-    let mut minusC = CachedGroupElement::default();
-    minusC.Neg(c);
-    c.CMove(&minusC, bNegative)
+    let mut minus_c = CachedGroupElement::default();
+    minus_c.neg(c);
+    c.cmove(&minus_c, b_negative)
 }
 
 /// geScalarMult computes h = a*B, where
@@ -539,7 +539,7 @@ fn selectCached(c: &mut CachedGroupElement, Ai: &[CachedGroupElement; 8], b: i32
 ///
 /// Preconditions:
 ///   a[31] <= 127
-pub fn geScalarMult(h: &mut ExtendedGroupElement, a: &mut [u8; 32], A: &mut ExtendedGroupElement) {
+pub fn ge_scalar_mult(h: &mut ExtendedGroupElement, a: &mut [u8; 32], a_caps: &mut ExtendedGroupElement) {
     let mut t = CompletedGroupElement::default();
     let mut u = ExtendedGroupElement::default();
     let mut r = ProjectiveGroupElement::default();
@@ -564,35 +564,35 @@ pub fn geScalarMult(h: &mut ExtendedGroupElement, a: &mut [u8; 32], A: &mut Exte
     // each e[i] is between -8 and 8.
 
     // compute cached array of multiples of A from 1A through 8A
-    let mut Ai = [CachedGroupElement::default(); 8]; // A,1A,2A,3A,4A,5A,6A,7A
-    A.ToCached(&mut Ai[0]);
+    let mut ai = [CachedGroupElement::default(); 8]; // A,1A,2A,3A,4A,5A,6A,7A
+    a_caps.to_cached(&mut ai[0]);
     for i in 0..7 {
-        t.Add(A, &Ai[i]);
-        t.ToExtended(&mut u);
-        u.ToCached(&mut Ai[i + 1]);
+        t.add(a_caps, &ai[i]);
+        t.to_extended(&mut u);
+        u.to_cached(&mut ai[i + 1]);
     }
 
     // special case for exponent nybble i == 63
-    u.Zero();
-    selectCached(&mut c, &Ai, (e[63]) as i32);
-    t.Add(&u, &c);
+    u.zero();
+    select_cached(&mut c, &ai, (e[63]) as i32);
+    t.add(&u, &c);
 
     for i in (0..63).rev() {
         // t <<= 4
-        t.ToProjective(&mut r);
-        r.Double(&mut t);
-        t.ToProjective(&mut r);
-        r.Double(&mut t);
-        t.ToProjective(&mut r);
-        r.Double(&mut t);
-        t.ToProjective(&mut r);
-        r.Double(&mut t);
+        t.to_projective(&mut r);
+        r.double(&mut t);
+        t.to_projective(&mut r);
+        r.double(&mut t);
+        t.to_projective(&mut r);
+        r.double(&mut t);
+        t.to_projective(&mut r);
+        r.double(&mut t);
 
         // Add next nybble
-        t.ToExtended(&mut u);
-        selectCached(&mut c, &Ai, (e[i]) as i32);
-        t.Add(&u, &c);
+        t.to_extended(&mut u);
+        select_cached(&mut c, &ai, (e[i]) as i32);
+        t.add(&u, &c);
     }
 
-    t.ToExtended(h);
+    t.to_extended(h);
 }

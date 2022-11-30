@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate impl_ops;
 
-mod cipher;
+pub mod cipher;
 pub mod encoding;
 pub mod group;
 pub mod random;

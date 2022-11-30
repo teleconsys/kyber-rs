@@ -1,1 +1,3 @@
-mod rabin;
+pub mod rabin;
+
+pub use rabin::*;

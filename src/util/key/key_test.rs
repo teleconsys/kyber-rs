@@ -1,28 +1,13 @@
-// package key
-
-// import (
-// 	"crypto/cipher"
-// 	"testing"
-
-// 	"go.dedis.ch/kyber/v3"
-// 	"go.dedis.ch/kyber/v3/group/edwards25519"
-// )
-
-use core::panic;
-use super::Generator;
-use crate::{Scalar, Point};
-
-use crate::cipher::cipher;
-use crate::{group::edwards25519::{SuiteEd25519, Scalar as EdScalar}, Group};
+use crate::{group::edwards25519::SuiteEd25519, Group, Point};
 
 use super::new_key_pair;
 
 #[test]
 fn test_new_key_pair() {
-	let suite = SuiteEd25519::new_blake_sha256ed25519();
-	let keypair = new_key_pair(suite).unwrap();
-	let public = suite.point().mul(&keypair.private, None);
-   
+    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let keypair = new_key_pair(suite).unwrap();
+    let public = suite.point().mul(&keypair.private, None);
+
     assert_eq!(public, keypair.public);
 }
 
