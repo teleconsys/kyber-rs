@@ -4,7 +4,6 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::{
     group::{
         edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
-        PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical,
     },
     share::{
         dkg::{DistKeyShare, ReconstructCommits, SecretCommits},
@@ -50,8 +49,8 @@ fn new_test_data() -> TestData<SuiteEd25519> {
 fn dkg_gen<SUITE: Suite>(t: &TestData<SUITE>) -> Vec<DistKeyGenerator<SUITE>>
 where
     <SUITE::POINT as Point>::SCALAR:
-        Scalar + Serialize + DeserializeOwned + ScalarCanCheckCanonical,
-    SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder,
+        Scalar + Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
 {
     let mut dkgs = Vec::with_capacity(t.nb_participants);
     for i in 0..t.nb_participants {
@@ -248,7 +247,7 @@ fn test_dkg_secret_commits() {
     let mut dkgs = full_exchange(&t);
 
     let mut sc = dkgs[0].secret_commits().unwrap();
-    let msg = sc.hash(t.suite).unwrap();
+    let msg = sc.hash(&t.suite).unwrap();
     schnorr::verify(t.suite, &dkgs[0].pubb, &msg, &sc.clone().signature).unwrap();
 
     // wrong index
@@ -281,7 +280,7 @@ fn test_dkg_secret_commits() {
     // wrong commitments
     let good_point = sc.commitments[0].clone();
     sc.commitments[0] = t.suite.point().null();
-    let msg = sc.hash(t.suite).unwrap();
+    let msg = sc.hash(&t.suite).unwrap();
     let sig = schnorr::sign(&t.suite, &dkgs[0].long, &msg).unwrap();
     let good_sig = sc.signature.clone();
     sc.signature = sig;
@@ -322,7 +321,7 @@ fn test_dkg_complaint_commits() {
     };
     //goodScCommit := scs[0].Commitments[0]
     wrong_sc.commitments[0] = t.suite.point().null();
-    let msg = wrong_sc.hash(t.suite).unwrap();
+    let msg = wrong_sc.hash(&t.suite).unwrap();
     wrong_sc.signature = schnorr::sign(&t.suite, &dkgs[0].long, &msg).unwrap();
 
     let mut cc = dkgs[1].process_secret_commits(&wrong_sc).unwrap().unwrap();
@@ -432,7 +431,7 @@ fn test_dkg_reconstruct_commits() {
             .session_id,
         signature: Vec::new(),
     };
-    let msg = rc.hash(t.suite).unwrap();
+    let msg = rc.hash(&t.suite).unwrap();
     rc.signature = schnorr::sign(&t.suite, &dkgs[1].long, &msg).unwrap();
 
     // reconstructed already set
@@ -480,7 +479,7 @@ fn test_dkg_reconstruct_commits() {
             share: dkg.verifiers.get(&0).unwrap().deal().unwrap().sec_share,
             signature: Vec::new(),
         };
-        let msg = rc.hash(t.suite).unwrap();
+        let msg = rc.hash(&t.suite).unwrap();
         rc.signature = schnorr::sign(&t.suite, &dkg.long, &msg).unwrap();
 
         rcs.push(rc);

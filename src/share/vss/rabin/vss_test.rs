@@ -136,10 +136,10 @@ fn test_vss_verifier_new() {
     let test_data = new_test_data();
     let rand_idx = rand::thread_rng().gen::<usize>() % test_data.verifiers_pub.len();
     let v = new_verifier(
-        test_data.suite,
-        test_data.verifiers_sec[rand_idx].clone(),
-        test_data.dealer_pub.clone(),
-        test_data.verifiers_pub.clone(),
+        &test_data.suite,
+        &test_data.verifiers_sec[rand_idx],
+        &test_data.dealer_pub,
+        &test_data.verifiers_pub,
     )
     .unwrap();
     assert_eq!(rand_idx, v.index);
@@ -149,10 +149,10 @@ fn test_vss_verifier_new() {
         .scalar()
         .pick(&mut test_data.suite.random_stream());
     assert!(new_verifier(
-        test_data.suite.clone(),
-        wrong_key,
-        test_data.dealer_pub.clone(),
-        test_data.verifiers_pub
+        &test_data.suite,
+        &wrong_key,
+        &test_data.dealer_pub,
+        &test_data.verifiers_pub
     )
     .is_err());
 }
@@ -349,7 +349,7 @@ fn test_vss_verifier_receive_deal() {
     schnorr::verify(
         test_data.suite,
         &v.pubb,
-        &resp.hash(test_data.suite).unwrap(),
+        &resp.hash(&test_data.suite).unwrap(),
         &resp.signature,
     )
     .unwrap();
@@ -553,7 +553,7 @@ fn test_vss_aggregator_verify_response() {
     let sig = schnorr::sign(
         &test_data.suite,
         &v.longterm,
-        &resp.hash(test_data.suite).unwrap(),
+        &resp.hash(&test_data.suite).unwrap(),
     )
     .unwrap();
     resp.signature = sig;
@@ -633,11 +633,11 @@ fn test_vss_aggregator_add_complaint() {
         ..Default::default()
     };
     // ok
-    assert!(aggr.add_response(c.clone()).is_ok());
+    assert!(aggr.add_response(&c).is_ok());
     assert_eq!(aggr.responses[&idx], c);
 
     // response already there
-    assert!(aggr.add_response(c).is_err());
+    assert!(aggr.add_response(&c).is_err());
     aggr.responses.remove(&idx);
 }
 
@@ -845,10 +845,10 @@ where
     let mut verifiers = vec![];
     for i in 0..NB_VERIFIERS {
         let v = new_verifier(
-            test_data.suite.clone(),
-            test_data.verifiers_sec[i].clone(),
-            test_data.dealer_pub.clone(),
-            test_data.verifiers_pub.clone(),
+            &test_data.suite,
+            &test_data.verifiers_sec[i],
+            &test_data.dealer_pub,
+            &test_data.verifiers_pub,
         )
         .unwrap();
         verifiers.push(v);

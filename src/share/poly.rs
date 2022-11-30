@@ -391,11 +391,11 @@ where
 
 impl<GROUP: Group> PubPoly<GROUP> {
     /// NewPubPoly creates a new public commitment polynomial.
-    pub fn new(g: &GROUP, b: Option<GROUP::POINT>, commits: Vec<GROUP::POINT>) -> PubPoly<GROUP> {
+    pub fn new(g: &GROUP, b: Option<GROUP::POINT>, commits: &[GROUP::POINT]) -> PubPoly<GROUP> {
         return PubPoly {
             g: g.clone(),
             b,
-            commits,
+            commits: commits.to_vec(),
         };
     }
 }
@@ -587,7 +587,7 @@ pub fn recover_pub_poly<GROUP: Group>(
         bail!("share: not enough good public shares to reconstruct secret commitment");
     }
 
-    let mut acc_poly = PubPoly::new(&g, None, vec![]);
+    let mut acc_poly = PubPoly::new(&g, None, &vec![]);
 
     for (j, _) in x.iter().enumerate() {
         let basis = lagrange_basis(&g, j, x.clone());

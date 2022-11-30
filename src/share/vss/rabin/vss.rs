@@ -75,7 +75,7 @@ where
 
 impl<SUITE: Suite> Deref for Dealer<SUITE>
 where
-    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
     type Target = Aggregator<SUITE>;
@@ -87,7 +87,7 @@ where
 
 impl<SUITE: Suite> DerefMut for Dealer<SUITE>
 where
-    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -201,14 +201,12 @@ impl Default for Response {
 
 impl Response {
     /// Hash returns the Hash representation of the Response
-    pub fn hash<SUITE: Suite>(&self, s: SUITE) -> Result<Vec<u8>> {
+    pub fn hash<SUITE: Suite>(&self, s: &SUITE) -> Result<Vec<u8>> {
         let mut h = s.hash();
         h.write("response".as_bytes())?;
         h.write(&self.session_id)?;
         h.write_u32::<LittleEndian>(self.index)?;
         h.write_u32::<LittleEndian>(self.approved as u32)?;
-        // binary.Write(h, binary.LittleEndian, self.index);
-        // binary.Write(h, binary.LittleEndian, self.approved);
         Ok(h.finalize().to_vec())
     }
 }
@@ -246,10 +244,6 @@ where
         h.write_u32::<LittleEndian>(self.index)?;
         let buff = self.deal.marshal_binary()?;
         h.update(&buff);
-
-        // _ = binary.Write(h, binary.LittleEndian, j.Index)
-        // buff, _ := protobuf.Encode(j.Deal)
-        // _, _ = h.Write(buff)
 
         Ok(h.finalize().to_vec())
     }
@@ -292,10 +286,10 @@ where
     let session_id = session_id(&suite, &d_pubb, &verifiers, &commitments, t)?;
 
     let aggregator = new_aggregator(
-        suite,
-        d_pubb.clone(),
-        verifiers.to_vec(),
-        commitments.clone(),
+        &suite,
+        &d_pubb,
+        &verifiers,
+        &commitments,
         t,
         &session_id,
     );
@@ -373,7 +367,7 @@ where
         return Ok(EncryptedDeal {
             dhkey: dh_public,
             signature,
-            nonce: nonce.try_into().unwrap(),
+            nonce: nonce.to_vec(),
             cipher: encrypted,
         });
     }
@@ -492,10 +486,10 @@ where
 /// a default safe value. If a different t value is required, it is possible to set
 /// it with `verifier.SetT()`.
 pub fn new_verifier<SUITE: Suite>(
-    suite: SUITE,
-    longterm: <SUITE::POINT as Point>::SCALAR,
-    dealer_key: SUITE::POINT,
-    verifiers: Vec<SUITE::POINT>,
+    suite: &SUITE,
+    longterm: &<SUITE::POINT as Point>::SCALAR,
+    dealer_key: &SUITE::POINT,
+    verifiers: &[SUITE::POINT],
 ) -> Result<Verifier<SUITE>>
 where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
@@ -515,12 +509,12 @@ where
     if !ok {
         bail!("vss: public key not found in the list of verifiers");
     }
-    let c = context(&suite, &dealer_key, &verifiers);
+    let c = context(suite, dealer_key, verifiers);
     Ok(Verifier {
-        suite,
-        longterm,
-        dealer: dealer_key,
-        verifiers,
+        suite: *suite,
+        longterm: longterm.clone(),
+        dealer: dealer_key.clone(),
+        verifiers: verifiers.to_vec(),
         pubb,
         index,
         hkdfContext: Vec::from(c),
@@ -586,10 +580,10 @@ where
 
         if self.aggregator.is_none() {
             self.aggregator = Some(new_aggregator(
-                self.suite,
-                self.dealer.clone(),
-                self.verifiers.clone(),
-                d.commitments.clone(),
+                &self.suite,
+                &self.dealer,
+                &self.verifiers,
+                &d.commitments,
                 t,
                 &d.session_id,
             ));
@@ -619,10 +613,10 @@ where
         r.signature = schnorr::sign(
             &self.suite,
             &self.longterm.clone(),
-            r.hash(self.suite)?.as_slice(),
+            r.hash(&self.suite)?.as_slice(),
         )?;
 
-        self.aggregator.as_mut().unwrap().add_response(r.clone())?;
+        self.aggregator.as_mut().unwrap().add_response(&r)?;
         Ok(r)
     }
 
@@ -744,10 +738,10 @@ where
 }
 
 fn new_aggregator<SUITE: Suite>(
-    suite: SUITE,
-    dealer: SUITE::POINT,
-    verifiers: Vec<SUITE::POINT>,
-    commitments: Vec<SUITE::POINT>,
+    suite: &SUITE,
+    dealer: &SUITE::POINT,
+    verifiers: &[SUITE::POINT],
+    commitments: &[SUITE::POINT],
     t: usize,
     sid: &[u8],
 ) -> Aggregator<SUITE>
@@ -756,10 +750,10 @@ where
     SUITE::POINT: Serialize + DeserializeOwned,
 {
     Aggregator {
-        suite: suite,
-        dealer: dealer,
-        verifiers: verifiers,
-        commits: commitments,
+        suite: *suite,
+        dealer: dealer.clone(),
+        verifiers: verifiers.to_vec(),
+        commits: commitments.to_vec(),
         t,
         sid: sid.clone().to_vec(),
         responses: HashMap::new(),
@@ -842,7 +836,7 @@ where
         let gih = self.suite.point().mul(&gi.v, Some(&h));
         let ci = self.suite.point().add(&fig, &gih);
 
-        let commit_poly = PubPoly::new(&self.suite, None, d.commitments.clone());
+        let commit_poly = PubPoly::new(&self.suite, None, &d.commitments);
 
         let pub_share = commit_poly.eval(fi.i);
         if ci != pub_share.v {
@@ -885,11 +879,11 @@ where
             bail!("vss: index out of bounds in response")
         }
 
-        let msg = r.hash(self.suite)?;
+        let msg = r.hash(&self.suite)?;
 
         schnorr::verify(self.suite, &public.unwrap(), &msg, &r.signature)?;
 
-        self.add_response(r.clone())
+        self.add_response(&r)
     }
 
     fn verify_justification(&mut self, j: &Justification<SUITE>) -> Result<()> {
@@ -922,14 +916,14 @@ where
         return verification.map_err(|e| Error::msg(e.to_string()));
     }
 
-    pub fn add_response(&mut self, r: Response) -> Result<()> {
+    pub fn add_response(&mut self, r: &Response) -> Result<()> {
         if find_pub(&self.verifiers, r.index as usize).is_none() {
             bail!("vss: index out of bounds in Complaint");
         }
         if self.responses.get(&(r.index as u32)).is_some() {
             bail!("vss: already existing response from same origin")
         }
-        self.responses.insert(r.index, r);
+        self.responses.insert(r.index, r.clone());
         Ok(())
     }
 
@@ -972,7 +966,7 @@ where
             signature: vec![],
         };
 
-        self.add_response(r);
+        self.add_response(&r);
     }
 }
 

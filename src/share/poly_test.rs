@@ -423,7 +423,7 @@ fn test_refresh_dkg() {
     }
 
     // Check that the private DKG shares verify against the public DKG commits
-    let dkg_pub_poly = PubPoly::new(&g, None, dkg_commits.clone());
+    let dkg_pub_poly = PubPoly::new(&g, None, &dkg_commits);
     for i in 0..n {
         assert!(dkg_pub_poly.check(&dkg_shares[i]));
     }
@@ -512,7 +512,7 @@ fn test_refresh_dkg() {
     }
 
     // Check that the refreshed private DKG shares verify against the refreshed public DKG commits
-    let q = PubPoly::new(&g, None, new_dkg_commits);
+    let q = PubPoly::new(&g, None, &new_dkg_commits);
     for i in 0..n {
         assert!(q.check(&new_dkg_shares[i].clone().unwrap()));
     }

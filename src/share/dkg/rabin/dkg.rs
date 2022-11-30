@@ -130,7 +130,7 @@ pub struct SecretCommits<SUITE: Suite> {
 
 impl<SUITE: Suite> SecretCommits<SUITE> {
     /// Hash returns the hash value of this struct used in the signature process.
-    pub fn hash(&self, s: SUITE) -> Result<Vec<u8>> {
+    pub fn hash(&self, s: &SUITE) -> Result<Vec<u8>> {
         let mut h = s.hash();
         h.update("secretcommits".as_bytes());
         h.write_u32::<LittleEndian>(self.index)?;
@@ -165,7 +165,7 @@ where
     SUITE::POINT: Serialize + DeserializeOwned,
 {
     /// Hash returns the hash value of this struct used in the signature process.
-    pub fn hash(&self, s: SUITE) -> Result<Vec<u8>> {
+    pub fn hash(&self, s: &SUITE) -> Result<Vec<u8>> {
         let mut h = s.hash();
         h.update("commitcomplaint".as_bytes());
         h.write_u32::<LittleEndian>(self.index)?;
@@ -194,12 +194,12 @@ pub struct ReconstructCommits<SUITE: Suite> {
 
 impl<SUITE: Suite> ReconstructCommits<SUITE> {
     /// Hash returns the hash value of this struct used in the signature process.
-    pub fn hash(&self, s: SUITE) -> Result<Vec<u8>> {
+    pub fn hash(&self, s: &SUITE) -> Result<Vec<u8>> {
         let mut h = s.hash();
         h.update("reconstructcommits".as_bytes());
         h.write_u32::<LittleEndian>(self.index)?;
         h.write_u32::<LittleEndian>(self.dealer_index)?;
-        let share_buff = self.share.hash(s)?;
+        let share_buff = self.share.hash(*s)?;
         h.update(&share_buff);
         Ok(h.finalize().to_vec())
     }
@@ -353,10 +353,10 @@ where
 
         // verifier receiving the dealer's deal
         let mut ver = vss::new_verifier(
-            self.suite,
-            self.long.clone(),
-            pubb,
-            self.participants.clone(),
+            &self.suite,
+            &self.long,
+            &pubb,
+            &self.participants,
         )?;
 
         let resp = ver.process_encrypted_deal(&dd.deal)?;
@@ -493,7 +493,7 @@ where
             session_id: self.dealer.session_id(),
             signature: Vec::new(),
         };
-        let msg = sc.hash(self.suite)?;
+        let msg = sc.hash(&self.suite)?;
         let sig = schnorr::sign(&self.suite, &self.long, &msg)?;
 
         sc.signature = sig;
@@ -503,7 +503,7 @@ where
             PubPoly::new(
                 &self.suite,
                 Some(self.suite.point().base()),
-                sc.clone().commitments,
+                &sc.commitments,
             ),
         );
         Ok(sc)
@@ -541,14 +541,14 @@ where
             bail!("dkg: secretcommits received with wrong session id")
         }
 
-        let msg = sc.hash(self.suite)?;
+        let msg = sc.hash(&self.suite)?;
         schnorr::verify(self.suite, &pubb, &msg, &sc.signature.clone())?;
 
         let deal = v.deal().expect("dkg: deal should exists");
         let poly = PubPoly::new(
             &self.suite,
             Some(self.suite.point().base()),
-            sc.commitments.clone(),
+            &sc.commitments,
         );
         if !poly.check(&deal.sec_share) {
             let mut cc = ComplaintCommits::<SUITE> {
@@ -558,7 +558,7 @@ where
                 signature: Vec::new(),
             };
 
-            let msg = cc.hash(self.suite)?;
+            let msg = cc.hash(&self.suite)?;
             cc.signature = schnorr::sign(&self.suite, &self.long, &msg)?;
             return Ok(Some(cc));
         }
@@ -588,7 +588,7 @@ where
             bail!("dkg: complaintcommit from non-qual member")
         }
 
-        let msg = cc.hash(self.suite)?;
+        let msg = cc.hash(&self.suite)?;
         let sig = cc.signature.clone();
         schnorr::verify(self.suite, &issuer, &msg, &sig)?;
 
@@ -628,7 +628,7 @@ where
             signature: Vec::new(),
         };
 
-        let msg = rc.hash(self.suite)?;
+        let msg = rc.hash(&self.suite)?;
         rc.signature = schnorr::sign(&self.suite, &self.long, &msg)?;
 
         if !self.pending_reconstruct.contains_key(&cc.dealer_index) {
@@ -663,7 +663,7 @@ where
             None => bail!("dkg: reconstruct commits with invalid verifier index"),
         };
 
-        let msg = rs.hash(self.suite)?;
+        let msg = rs.hash(&self.suite)?;
         schnorr::verify(self.suite, &pubb, &msg, &rs.signature.clone())?;
 
         if !self.pending_reconstruct.contains_key(&rs.dealer_index) {
