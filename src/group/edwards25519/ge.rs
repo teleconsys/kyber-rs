@@ -12,8 +12,9 @@ use serde::{Deserialize, Serialize};
 use super::{
     constants::{BASE, D, D2, SQRT_M1},
     fe::{
-        fe_add, fe_c_move, fe_copy, fe_from_bytes, fe_invert, fe_is_negative, fe_is_non_zero, fe_mul, fe_neg,
-        fe_one, fe_pow22523, fe_square, fe_square2, fe_sub, fe_to_bytes, fe_zero, FieldElement,
+        fe_add, fe_c_move, fe_copy, fe_from_bytes, fe_invert, fe_is_negative, fe_is_non_zero,
+        fe_mul, fe_neg, fe_one, fe_pow22523, fe_square, fe_square2, fe_sub, fe_to_bytes, fe_zero,
+        FieldElement,
     },
 };
 
@@ -539,7 +540,11 @@ fn select_cached(c: &mut CachedGroupElement, ai: &[CachedGroupElement; 8], b: i3
 ///
 /// Preconditions:
 ///   a[31] <= 127
-pub fn ge_scalar_mult(h: &mut ExtendedGroupElement, a: &mut [u8; 32], a_caps: &mut ExtendedGroupElement) {
+pub fn ge_scalar_mult(
+    h: &mut ExtendedGroupElement,
+    a: &mut [u8; 32],
+    a_caps: &mut ExtendedGroupElement,
+) {
     let mut t = CompletedGroupElement::default();
     let mut u = ExtendedGroupElement::default();
     let mut r = ProjectiveGroupElement::default();

@@ -162,7 +162,7 @@ pub trait AllowsVarTime {
 /// Any implementation is also expected to satisfy
 /// the standard homomorphism properties that Diffie-Hellman
 /// and the associated body of public-key cryptography are based on.
-pub trait Group: Clone {
+pub trait Group: Clone + Default {
     type POINT: Point;
 
     fn string(&self) -> String;

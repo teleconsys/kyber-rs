@@ -46,7 +46,7 @@ use std::ops::{Deref, DerefMut};
 use super::dh::{context, dh_exchange};
 
 /// Suite defines the capabilities required by the vss package.
-pub trait Suite: Group + HashFactory + XOFFactory + Random + Clone + Copy {}
+pub trait Suite: Group + HashFactory + XOFFactory + Random + Clone + Default + Copy {}
 
 /// Dealer encapsulates for creating and distributing the shares and for
 /// replying to any Responses.
@@ -71,6 +71,28 @@ where
     // list of deals this Dealer has generated
     pub(crate) deals: Vec<Deal<SUITE>>,
     pub(crate) aggregator: Aggregator<SUITE>,
+}
+
+impl<SUITE: Suite> Default for Dealer<SUITE>
+where
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
+{
+    fn default() -> Self {
+        Self {
+            suite: Default::default(),
+            long: Default::default(),
+            pubb: Default::default(),
+            secret: Default::default(),
+            secret_commits: Default::default(),
+            verifiers: Default::default(),
+            hkdf_context: Default::default(),
+            t: Default::default(),
+            session_id: Default::default(),
+            deals: Default::default(),
+            aggregator: Default::default(),
+        }
+    }
 }
 
 impl<SUITE: Suite> Deref for Dealer<SUITE>
@@ -285,14 +307,7 @@ where
 
     let session_id = session_id(&suite, &d_pubb, &verifiers, &commitments, t)?;
 
-    let aggregator = new_aggregator(
-        &suite,
-        &d_pubb,
-        &verifiers,
-        &commitments,
-        t,
-        &session_id,
-    );
+    let aggregator = new_aggregator(&suite, &d_pubb, &verifiers, &commitments, t, &session_id);
     // C = F + G
     let mut deals: Vec<Deal<SUITE>> = vec![];
     for i in 0..verifiers.len() {
@@ -735,6 +750,26 @@ where
     pub(crate) deal: Option<Deal<SUITE>>,
     pub(crate) t: usize,
     pub(crate) bad_dealer: bool,
+}
+
+impl<SUITE: Suite> Default for Aggregator<SUITE>
+where
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
+{
+    fn default() -> Self {
+        Self {
+            suite: Default::default(),
+            dealer: Default::default(),
+            verifiers: Default::default(),
+            commits: Default::default(),
+            responses: Default::default(),
+            sid: Default::default(),
+            deal: Default::default(),
+            t: Default::default(),
+            bad_dealer: Default::default(),
+        }
+    }
 }
 
 fn new_aggregator<SUITE: Suite>(

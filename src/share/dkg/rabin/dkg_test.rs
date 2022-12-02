@@ -2,9 +2,7 @@ use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    group::{
-        edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
-    },
+    group::edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
     share::{
         dkg::{DistKeyShare, ReconstructCommits, SecretCommits},
         poly::recover_secret,
@@ -48,8 +46,7 @@ fn new_test_data() -> TestData<SuiteEd25519> {
 
 fn dkg_gen<SUITE: Suite>(t: &TestData<SUITE>) -> Vec<DistKeyGenerator<SUITE>>
 where
-    <SUITE::POINT as Point>::SCALAR:
-        Scalar + Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
     let mut dkgs = Vec::with_capacity(t.nb_participants);

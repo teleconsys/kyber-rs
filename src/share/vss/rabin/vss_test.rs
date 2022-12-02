@@ -6,7 +6,7 @@ use crate::{
     group::edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
     share::vss::{
         dh::{self, context, dh_exchange},
-        find_pub, recover_secret, session_id, new_verifier, Response,
+        find_pub, new_verifier, recover_secret, session_id, Response,
     },
     sign::schnorr,
     Group, Point, Random, Scalar, Suite,

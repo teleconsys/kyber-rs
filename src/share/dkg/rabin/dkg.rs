@@ -42,8 +42,8 @@ use crate::{
     encoding::{BinaryMarshaler, Marshaling},
     group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
     share::{
-        poly::{PriShare, PubPoly, recover_pri_poly},
-        vss,
+        poly::{recover_pri_poly, PriShare, PubPoly},
+        vss::{self, Dealer},
     },
     sign::{dss, schnorr},
     Point, Scalar, Suite,
@@ -85,6 +85,7 @@ impl<POINT: Point> dss::DistKeyShare<POINT> for DistKeyShare<POINT> {
 /// Dealer.
 ///  NOTE: Doing that in vss.go would be possible but then the Dealer is always
 ///  assumed to be a member of the participants. It's only the case here.
+#[derive(Clone)]
 pub struct Deal<POINT: Point + Serialize> {
     /// Index of the Dealer in the list of participants
     pub index: u32,
@@ -94,6 +95,7 @@ pub struct Deal<POINT: Point + Serialize> {
 
 /// Response holds the Response from another participant as well as the index of
 /// the target Dealer.
+#[derive(Clone)]
 pub struct Response {
     /// Index of the Dealer for which this response is for
     pub index: u32,
@@ -103,6 +105,7 @@ pub struct Response {
 
 /// Justification holds the Justification from a Dealer as well as the index of
 /// the Dealer in question.
+#[derive(Clone)]
 pub struct Justification<SUITE: Suite>
 where
     <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
@@ -143,6 +146,7 @@ impl<SUITE: Suite> SecretCommits<SUITE> {
 
 /// ComplaintCommits is sent if the secret commitments revealed by a peer are not
 /// valid.
+#[derive(Clone)]
 pub struct ComplaintCommits<SUITE: Suite>
 where
     <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
@@ -208,7 +212,7 @@ impl<SUITE: Suite> ReconstructCommits<SUITE> {
 /// DistKeyGenerator is the struct that runs the DKG protocol.
 pub struct DistKeyGenerator<SUITE: Suite>
 where
-    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
     suite: SUITE,
@@ -233,6 +237,28 @@ where
     /// list of commitments.
     pub pending_reconstruct: HashMap<u32, Vec<ReconstructCommits<SUITE>>>,
     pub reconstructed: HashMap<u32, bool>,
+}
+
+impl<SUITE: Suite> Default for DistKeyGenerator<SUITE>
+where
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
+{
+    fn default() -> Self {
+        Self {
+            suite: Default::default(),
+            index: Default::default(),
+            long: Default::default(),
+            pubb: Default::default(),
+            participants: Default::default(),
+            t: Default::default(),
+            dealer: Default::default(),
+            verifiers: Default::default(),
+            commitments: Default::default(),
+            pending_reconstruct: Default::default(),
+            reconstructed: Default::default(),
+        }
+    }
 }
 
 /// NewDistKeyGenerator returns a DistKeyGenerator out of the suite,
@@ -352,12 +378,7 @@ where
         }
 
         // verifier receiving the dealer's deal
-        let mut ver = vss::new_verifier(
-            &self.suite,
-            &self.long,
-            &pubb,
-            &self.participants,
-        )?;
+        let mut ver = vss::new_verifier(&self.suite, &self.long, &pubb, &self.participants)?;
 
         let resp = ver.process_encrypted_deal(&dd.deal)?;
 
@@ -430,7 +451,7 @@ where
     /// Certified returns true if at least t deals are certified (see
     /// vss.Verifier.DealCertified()). If the distribution is certified, the protocol
     /// can continue using d.SecretCommits().
-    fn certified(&self) -> bool {
+    pub fn certified(&self) -> bool {
         return self.qual().len() >= self.t;
     }
 
@@ -645,43 +666,43 @@ where
     /// along any others. If there are enough messages to recover the coefficients of
     /// the public polynomials of the malicious dealer in question, then the
     /// polynomial is recovered.
-    pub fn process_reconstruct_commits(&mut self, rs: &ReconstructCommits<SUITE>) -> Result<()>
+    pub fn process_reconstruct_commits(&mut self, rc: &ReconstructCommits<SUITE>) -> Result<()>
     where
         SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
         <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
     {
-        if self.reconstructed.contains_key(&rs.dealer_index) {
+        if self.reconstructed.contains_key(&rc.dealer_index) {
             // commitments already reconstructed, no need for other shares
             return Ok(());
         }
-        if self.commitments.contains_key(&rs.dealer_index) {
+        if self.commitments.contains_key(&rc.dealer_index) {
             bail!("dkg: commitments not invalidated by any complaints")
         }
 
-        let pubb = match find_pub(&self.participants, rs.index as usize) {
+        let pubb = match find_pub(&self.participants, rc.index as usize) {
             Some(public) => public,
             None => bail!("dkg: reconstruct commits with invalid verifier index"),
         };
 
-        let msg = rs.hash(&self.suite)?;
-        schnorr::verify(self.suite, &pubb, &msg, &rs.signature.clone())?;
+        let msg = rc.hash(&self.suite)?;
+        schnorr::verify(self.suite, &pubb, &msg, &rc.signature.clone())?;
 
-        if !self.pending_reconstruct.contains_key(&rs.dealer_index) {
-            self.pending_reconstruct.insert(rs.dealer_index, vec![]);
+        if !self.pending_reconstruct.contains_key(&rc.dealer_index) {
+            self.pending_reconstruct.insert(rc.dealer_index, vec![]);
         }
-        let arr = self.pending_reconstruct.get_mut(&rs.dealer_index).unwrap();
+        let arr = self.pending_reconstruct.get_mut(&rc.dealer_index).unwrap();
         // check if packet is already received or not
         // or if the session ID does not match the others
         for r in arr.iter() {
-            if r.index == rs.index {
+            if r.index == rc.index {
                 return Ok(());
             }
-            if r.session_id != rs.session_id {
+            if r.session_id != rc.session_id {
                 bail!("dkg: reconstruct commits invalid session id")
             }
         }
         // add it to list of pending shares
-        arr.push(rs.clone());
+        arr.push(rc.clone());
 
         // check if we can reconstruct commitments
         if arr.len() >= self.t {
@@ -696,12 +717,12 @@ where
             // there are more just before
             let pri = recover_pri_poly(&self.suite, &shares, self.t, self.participants.len())?;
             self.commitments.insert(
-                rs.dealer_index,
+                rc.dealer_index,
                 pri.commit(Some(&self.suite.point().base())),
             );
             // note it has been reconstructed.
-            self.reconstructed.insert(rs.dealer_index, true);
-            self.pending_reconstruct.remove(&rs.dealer_index);
+            self.reconstructed.insert(rc.dealer_index, true);
+            self.pending_reconstruct.remove(&rc.dealer_index);
         }
         Ok(())
     }

@@ -1,10 +1,12 @@
 use crate::{
     group::edwards25519,
-    share::poly::{coefficients_to_pri_poly, PriShare, recover_pub_poly},
+    share::poly::{coefficients_to_pri_poly, recover_pub_poly, PriShare},
     Group, Point, Random, Scalar,
 };
 
-use super::poly::{recover_secret, new_pri_poly, PubPoly, PubShare, recover_commit, recover_pri_poly};
+use super::poly::{
+    new_pri_poly, recover_commit, recover_pri_poly, recover_secret, PubPoly, PubShare,
+};
 
 #[test]
 fn test_secret_recovery() {
@@ -447,7 +449,8 @@ fn test_refresh_dkg() {
         sub_pub_shares.push(sub_pub_polys[i].shares(n));
 
         assert_eq!(
-            g.point().mul(&sub_pri_shares[i][0].clone().unwrap().v, None),
+            g.point()
+                .mul(&sub_pri_shares[i][0].clone().unwrap().v, None),
             sub_pub_shares[i][0].as_ref().unwrap().v
         )
     }

@@ -67,6 +67,12 @@ pub struct PriPoly<GROUP: Group> {
     pub coeffs: Vec<<GROUP::POINT as Point>::SCALAR>,
 }
 
+impl<GROUP: Group> Default for PriPoly<GROUP>{
+    fn default() -> Self {
+        Self { g: Default::default(), coeffs: Default::default() }
+    }
+}
+
 /// NewPriPoly creates a new secret sharing polynomial using the provided
 /// cryptographic group, the secret sharing threshold t, and the secret to be
 /// shared s. If s is nil, a new s is chosen using the provided randomness
