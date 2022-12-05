@@ -1,121 +1,130 @@
-// /// Package dkg implements a general distributed key generation (DKG) framework.
-// /// This package serves two functionalities: (1) to run a fresh new DKG from
-// /// scratch and (2) to reshare old shares to a potentially distinct new set of
-// /// nodes (the "resharing" protocol). The former protocol is described in "A
-// /// threshold cryptosystem without a trusted party" by Torben Pryds Pedersen.
-// /// https://dl.acm.org/citation.cfm?id=1754929. The latter protocol is
-// /// implemented in "Verifiable Secret Redistribution for Threshold Signing
-// /// Schemes", by T. Wong et
-// /// al.(https://www.cs.cmu.edu/~wing/publications/Wong-Wing02b.pdf)
-// /// For an example how to use it please have a look at examples/dkg_test.go
+use std::collections::HashMap;
 
-// // Suite wraps the functionalities needed by the dkg package
-// type Suite vss.Suite
+use serde::{Serialize, de::DeserializeOwned};
 
-// // Config holds all required information to run a fresh DKG protocol or a
-// // resharing protocol. In the case of a new fresh DKG protocol, one must fill
-// // the following fields: Suite, Longterm, NewNodes, Threshold (opt). In the case
-// // of a resharing protocol, one must fill the following: Suite, Longterm,
-// // OldNodes, NewNodes. If the node using this config is creating new shares
-// // (i.e. it belongs to the current group), the Share field must be filled in
-// // with the current share of the node. If the node using this config is a new
-// // addition and thus has no current share, the PublicCoeffs field be must be
-// // filled in.
-// type Config struct {
-// 	Suite Suite
+use crate::{Suite, Point, share::{self, vss}};
 
-// 	// Longterm is the longterm secret key.
-// 	Longterm kyber.Scalar
+use super::structs::DistKeyShare;
 
-// 	// Current group of share holders. It will be nil for new DKG. These nodes
-// 	// will have invalid shares after the protocol has been run. To be able to issue
-// 	// new shares to a new group, the group member's public key must be inside this
-// 	// list and in the Share field. Keys can be disjoint or not with respect to the
-// 	// NewNodes list.
-// 	OldNodes []kyber.Point
+/// Package dkg implements a general distributed key generation (DKG) framework.
+/// This package serves two functionalities: (1) to run a fresh new DKG from
+/// scratch and (2) to reshare old shares to a potentially distinct new set of
+/// nodes (the "resharing" protocol). The former protocol is described in "A
+/// threshold cryptosystem without a trusted party" by Torben Pryds Pedersen.
+/// https://dl.acm.org/citation.cfm?id=1754929. The latter protocol is
+/// implemented in "Verifiable Secret Redistribution for Threshold Signing
+/// Schemes", by T. Wong et
+/// al.(https://www.cs.cmu.edu/~wing/publications/Wong-Wing02b.pdf)
+/// For an example how to use it please have a look at examples/dkg_test.go
 
-// 	// PublicCoeffs are the coefficients of the distributed polynomial needed
-// 	// during the resharing protocol. The first coefficient is the key. It is
-// 	// required for new share holders.  It should be nil for a new DKG.
-// 	PublicCoeffs []kyber.Point
+/// Config holds all required information to run a fresh DKG protocol or a
+/// resharing protocol. In the case of a new fresh DKG protocol, one must fill
+/// the following fields: Suite, Longterm, NewNodes, Threshold (opt). In the case
+/// of a resharing protocol, one must fill the following: Suite, Longterm,
+/// OldNodes, NewNodes. If the node using this config is creating new shares
+/// (i.e. it belongs to the current group), the Share field must be filled in
+/// with the current share of the node. If the node using this config is a new
+/// addition and thus has no current share, the PublicCoeffs field be must be
+/// filled in.
+pub struct Config<SUITE: Suite> {
+	suite: SUITE,
 
-// 	// Expected new group of share holders. These public-key designated nodes
-// 	// will be in possession of new shares after the protocol has been run. To be a
-// 	// receiver of a new share, one's public key must be inside this list. Keys
-// 	// can be disjoint or not with respect to the OldNodes list.
-// 	NewNodes []kyber.Point
+	/// Longterm is the longterm secret key.
+	longterm: <SUITE::POINT as Point>::SCALAR,
 
-// 	// Share to refresh. It must be nil for a new node wishing to
-// 	// join or create a group. To be able to issue new fresh shares to a new group,
-// 	// one's share must be specified here, along with the public key inside the
-// 	// OldNodes field.
-// 	Share *DistKeyShare
+	/// Current group of share holders. It will be nil for new DKG. These nodes
+	/// will have invalid shares after the protocol has been run. To be able to issue
+	/// new shares to a new group, the group member's public key must be inside this
+	/// list and in the Share field. Keys can be disjoint or not with respect to the
+	/// NewNodes list.
+	old_nodes: Vec<SUITE::POINT>,
 
-// 	// The threshold to use in order to reconstruct the secret with the produced
-// 	// shares. This threshold is with respect to the number of nodes in the
-// 	// NewNodes list. If unspecified, default is set to
-// 	// `vss.MinimumT(len(NewNodes))`. This threshold indicates the degree of the
-// 	// polynomials used to create the shares, and the minimum number of
-// 	// verification required for each deal.
-// 	Threshold int
+	/// PublicCoeffs are the coefficients of the distributed polynomial needed
+	/// during the resharing protocol. The first coefficient is the key. It is
+	/// required for new share holders.  It should be nil for a new DKG.
+	public_coeffs: Vec<SUITE::POINT>,
 
-// 	// OldThreshold holds the threshold value that was used in the previous
-// 	// configuration. This field MUST be specified when doing resharing, but is
-// 	// not needed when doing a fresh DKG. This value is required to gather a
-// 	// correct number of valid deals before creating the distributed key share.
-// 	// NOTE: this field is always required (instead of taking the default when
-// 	// absent) when doing a resharing to avoid a downgrade attack, where a resharing
-// 	// the number of deals required is less than what it is supposed to be.
-// 	OldThreshold int
+	/// Expected new group of share holders. These public-key designated nodes
+	/// will be in possession of new shares after the protocol has been run. To be a
+	/// receiver of a new share, one's public key must be inside this list. Keys
+	/// can be disjoint or not with respect to the OldNodes list.
+	new_nodes: Vec<SUITE::POINT>,
 
-// 	// Reader is an optional field that can hold a user-specified entropy source.
-// 	// If it is set, Reader's data will be combined with random data from crypto/rand
-// 	// to create a random stream which will pick the dkg's secret coefficient. Otherwise,
-// 	// the random stream will only use crypto/rand's entropy.
-// 	Reader io.Reader
+	/// Share to refresh. It must be nil for a new node wishing to
+	/// join or create a group. To be able to issue new fresh shares to a new group,
+	/// one's share must be specified here, along with the public key inside the
+	/// OldNodes field.
+	share: DistKeyShare<SUITE::POINT>,
 
-// 	// When UserReaderOnly it set to true, only the user-specified entropy source
-// 	// Reader will be used. This should only be used in tests, allowing reproducibility.
-// 	UserReaderOnly bool
-// }
+	/// The threshold to use in order to reconstruct the secret with the produced
+	/// shares. This threshold is with respect to the number of nodes in the
+	/// NewNodes list. If unspecified, default is set to
+	/// `vss.MinimumT(len(NewNodes))`. This threshold indicates the degree of the
+	/// polynomials used to create the shares, and the minimum number of
+	/// verification required for each deal.
+	threshold: usize,
 
-// // DistKeyGenerator is the struct that runs the DKG protocol.
-// type DistKeyGenerator struct {
-// 	// config driving the behavior of DistKeyGenerator
-// 	c     *Config
-// 	suite Suite
+	/// OldThreshold holds the threshold value that was used in the previous
+	/// configuration. This field MUST be specified when doing resharing, but is
+	/// not needed when doing a fresh DKG. This value is required to gather a
+	/// correct number of valid deals before creating the distributed key share.
+	/// NOTE: this field is always required (instead of taking the default when
+	/// absent) when doing a resharing to avoid a downgrade attack, where a resharing
+	/// the number of deals required is less than what it is supposed to be.
+	old_threshold: usize,
 
-// 	long   kyber.Scalar
-// 	pub    kyber.Point
-// 	dpub   *share.PubPoly
-// 	dealer *vss.Dealer
-// 	// verifiers indexed by dealer index
-// 	verifiers map[uint32]*vss.Verifier
-// 	// performs the part of the response verification for old nodes
-// 	oldAggregators map[uint32]*vss.Aggregator
-// 	// index in the old list of nodes
-// 	oidx int
-// 	// index in the new list of nodes
-// 	nidx int
-// 	// old threshold used in the previous DKG
-// 	oldT int
-// 	// new threshold to use in this round
-// 	newT int
-// 	// indicates whether we are in the re-sharing protocol or basic DKG
-// 	isResharing bool
-// 	// indicates whether we are able to issue shares or not
-// 	canIssue bool
-// 	// Indicates whether we are able to receive a new share or not
-// 	canReceive bool
-// 	// indicates whether the node holding the pub key is present in the new list
-// 	newPresent bool
-// 	// indicates whether the node is present in the old list
-// 	oldPresent bool
-// 	// already processed our own deal
-// 	processed bool
-// 	// did the timeout / period / already occured or not
-// 	timeout bool
-// }
+	// /// Reader is an optional field that can hold a user-specified entropy source.
+	// /// If it is set, Reader's data will be combined with random data from crypto/rand
+	// /// to create a random stream which will pick the dkg's secret coefficient. Otherwise,
+	// /// the random stream will only use crypto/rand's entropy.
+	// Reader io.Reader
+
+	/// When UserReaderOnly it set to true, only the user-specified entropy source
+	/// Reader will be used. This should only be used in tests, allowing reproducibility.
+	user_reader_only: bool
+}
+
+// DistKeyGenerator is the struct that runs the DKG protocol.
+pub struct DistKeyGenerator<SUITE:Suite> 
+where 
+SUITE::POINT: Serialize + DeserializeOwned,
+<SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned
+{
+	/// config driving the behavior of DistKeyGenerator
+	c:     Config<SUITE>,
+	suite: SUITE,
+
+	long:   <SUITE::POINT as Point>::SCALAR,
+	pubb:    SUITE::POINT,
+	dpub:   share::poly::PubPoly<SUITE>,
+	dealer: vss::pedersen::vss::Dealer<SUITE>,
+	/// verifiers indexed by dealer index
+	verifiers: HashMap<u32, vss::pedersen::vss::Verifier<SUITE>>,
+	/// performs the part of the response verification for old nodes
+	old_aggregators: HashMap<u32, vss::pedersen::vss::Aggregator<SUITE>>,
+	/// index in the old list of nodes
+	oidx: usize,
+	/// index in the new list of nodes
+	nidx: usize,
+	/// old threshold used in the previous DKG
+	old_t: usize,
+	/// new threshold to use in this round
+	new_t: usize,
+	/// indicates whether we are in the re-sharing protocol or basic DKG
+	is_resharing: bool,
+	/// indicates whether we are able to issue shares or not
+	can_issue: bool,
+	/// Indicates whether we are able to receive a new share or not
+	can_receive: bool,
+	/// indicates whether the node holding the pub key is present in the new list
+	new_present: bool,
+	/// indicates whether the node is present in the old list
+	old_present: bool,
+	/// already processed our own deal
+	processed: bool,
+	/// did the timeout / period / already occured or not
+	timeout: bool
+}
 
 // // NewDistKeyHandler takes a Config and returns a DistKeyGenerator that is able
 // // to drive the DKG or resharing protocol.

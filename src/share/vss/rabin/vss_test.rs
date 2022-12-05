@@ -1,15 +1,14 @@
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
-use vss::rabin::dh::{context, dh_exchange, KEY_SIZE};
 
 use crate::{
     encoding::BinaryMarshaler,
     group::edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
-    share::vss::{
-        self, find_pub, new_verifier, recover_secret, session_id, suite::Suite, Response,
-    },
+    share::vss::rabin::{vss::{
+        find_pub, new_verifier, recover_secret, session_id, Response,
+    }, dh::{context, dh_exchange, KEY_SIZE}},
     sign::schnorr,
-    Group, Point, Random, Scalar,
+    Group, Point, Random, Scalar, Suite,
 };
 
 use super::{minimum_t, new_dealer, Dealer, Verifier};

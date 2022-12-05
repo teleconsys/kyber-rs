@@ -345,7 +345,7 @@ fn test_dkg_complaint_commits() {
 
     // deal does not verify
     let good_deal = cc.deal;
-    cc.deal = vss::Deal {
+    cc.deal = vss::rabin::vss::Deal {
         session_id: good_deal.session_id.clone(),
         sec_share: good_deal.sec_share.clone(),
         rnd_share: good_deal.rnd_share.clone(),

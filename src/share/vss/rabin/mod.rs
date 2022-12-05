@@ -1,4 +1,4 @@
-mod vss;
+pub mod vss;
 #[cfg(test)]
 mod vss_test;
 mod dh;
