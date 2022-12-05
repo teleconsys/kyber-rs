@@ -10,7 +10,7 @@ use sha2::Sha256;
 use crate::{encoding::Marshaling, share::vss::suite::Suite, Point};
 
 /// dhExchange computes the shared key from a private key and a public key
-pub fn dh_exchange<'a, SUITE: Suite>(
+pub fn dh_exchange<SUITE: Suite>(
     suite: SUITE,
     own_private: <SUITE::POINT as Point>::SCALAR,
     remote_public: SUITE::POINT,
