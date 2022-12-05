@@ -11,7 +11,7 @@ use crate::{
         self,
         poly::{new_pri_poly, PriShare},
         vss::{
-            dh::{context, dh_exchange, AEAD},
+            pedersen::dh::{context, dh_exchange, AEAD},
             suite::Suite,
         },
     },
@@ -48,6 +48,28 @@ where
     // list of deals this Dealer has generated
     pub(crate) deals: Vec<Deal<SUITE>>,
     pub(crate) aggregator: Aggregator<SUITE>,
+}
+
+impl<SUITE: Suite> Deref for Dealer<SUITE>
+where
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
+{
+    type Target = Aggregator<SUITE>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.aggregator
+    }
+}
+
+impl<SUITE: Suite> DerefMut for Dealer<SUITE>
+where
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.aggregator
+    }
 }
 
 /// Deal encapsulates the verifiable secret share and is sent by the dealer to a verifier.
@@ -159,10 +181,10 @@ impl Response {
 
 /// StatusComplaint is a constant value meaning that a verifier issues
 /// a Complaint against its Dealer.
-const STATUS_COMPLAINT: bool = false;
+pub const STATUS_COMPLAINT: bool = false;
 /// StatusApproval is a constant value meaning that a verifier agrees with
 /// the share it received.
-const STATUS_APPROVAL: bool = true;
+pub const STATUS_APPROVAL: bool = true;
 
 /// Justification is a message that is broadcasted by the Dealer in response to
 /// a Complaint. It contains the original Complaint as well as the shares
@@ -359,7 +381,7 @@ where
     /// SecretCommit returns the commitment of the secret being shared by this
     /// dealer. This function is only to be called once the deal has enough approvals
     /// and is verified otherwise it returns nil.
-    fn secret_commit(&self) -> Option<SUITE::POINT> {
+    pub fn secret_commit(&self) -> Option<SUITE::POINT> {
         if !self.aggregator.deal_certified() {
             return None;
         }
@@ -386,7 +408,7 @@ where
     /// SetTimeout marks the end of a round, invalidating any missing (or future) response
     /// for this DKG protocol round. The caller is expected to call this after a long timeout
     /// so each DKG node can still compute its share if enough Deals are valid.
-    fn set_timeout(&mut self) {
+    pub fn set_timeout(&mut self) {
         self.aggregator.timeout = true
     }
 
@@ -394,7 +416,7 @@ where
     /// private polynomial can be saved and then later on used to generate new
     /// shares.  This information SHOULD STAY PRIVATE and thus MUST never be given
     /// to any third party.
-    fn private_poly(&self) -> share::poly::PriPoly<SUITE> {
+    pub fn private_poly(&self) -> share::poly::PriPoly<SUITE> {
         return self.secret_poly.clone();
     }
 }
@@ -496,7 +518,7 @@ where
     /// broadcasted to every other participants including the dealer.
     /// If the deal has already been received, or the signature generation of the
     /// response failed, it returns an error without any responses.
-    fn process_encrypted_deal(&mut self, e: EncryptedDeal<SUITE::POINT>) -> Result<Response>
+    pub fn process_encrypted_deal(&mut self, e: &EncryptedDeal<SUITE::POINT>) -> Result<Response>
     where
         SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
         <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
@@ -558,7 +580,7 @@ where
         Ok(r)
     }
 
-    fn decrypt_deal(&self, e: EncryptedDeal<SUITE::POINT>) -> Result<Deal<SUITE>>
+    pub fn decrypt_deal(&self, e: &EncryptedDeal<SUITE::POINT>) -> Result<Deal<SUITE>>
     where
         SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
         <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
@@ -611,7 +633,7 @@ where
 
     /// Deal returns the Deal that this verifier has received. It returns
     /// nil if the deal is not certified or there is not enough approvals.
-    fn deal(&self) -> Option<Deal<SUITE>> {
+    pub fn deal(&self) -> Option<Deal<SUITE>> {
         if !self.deal_certified() {
             return None;
         }
@@ -622,7 +644,7 @@ where
     /// something went wrong during the verification. If it is the case, that
     /// probably means the Dealer is acting maliciously. In order to be sure, call
     /// `v.DealCertified()`.
-    fn process_justification(&mut self, dr: Justification<SUITE>) -> Result<()> {
+    pub fn process_justification(&mut self, dr: &Justification<SUITE>) -> Result<()> {
         match &mut self.aggregator {
             Some(a) => a.verify_justification(dr),
             None => bail!("missing aggregator"),
@@ -651,7 +673,7 @@ where
     /// after a long timeout so each verifier can still deem its share valid if
     /// enough deals were approved. One should call `DealCertified()` after this
     /// method in order to know if the deal is valid or the protocol should abort.
-    fn set_timeout(&mut self) {
+    pub fn set_timeout(&mut self) {
         if let Some(a) = self.aggregator.as_mut() {
             a.timeout = true;
         }
@@ -819,7 +841,7 @@ where
         }
 
         let fi = &d.sec_share;
-        if fi.i < 0 || fi.i >= self.verifiers.len() {
+        if fi.i >= self.verifiers.len() {
             return Err(VerifyDealError::TextError(
                 "vss: index out of bounds in Deal".to_string(),
             ));
@@ -879,7 +901,7 @@ where
         self.add_response(&r)
     }
 
-    fn verify_justification(&mut self, j: Justification<SUITE>) -> Result<()> {
+    fn verify_justification(&mut self, j: &Justification<SUITE>) -> Result<()> {
         let pubb = find_pub(&self.verifiers, j.index as usize);
         if pubb.is_none() {
             bail!("vss: index out of bounds in justification")
@@ -938,7 +960,7 @@ where
     /// possible to retrieve the secret).
     /// If the caller previously called `SetTimeout` and `DealCertified()` returns
     /// false, the protocol MUST abort as the deal is not and never will be validated.
-    fn deal_certified(&self) -> bool {
+    pub fn deal_certified(&self) -> bool {
         let mut absent_verifiers = 0usize;
         let mut approvals = 0usize;
         let mut is_complaint = false;

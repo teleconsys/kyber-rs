@@ -1,6 +1,6 @@
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
-use vss::dh::{context, dh_exchange, KEY_SIZE};
+use vss::rabin::dh::{context, dh_exchange, KEY_SIZE};
 
 use crate::{
     encoding::BinaryMarshaler,
@@ -450,7 +450,7 @@ fn test_vss_aggregator_verify_justification() {
     assert!(result.is_err());
     match &v.aggregator {
         Some(a) => assert!(a.bad_dealer),
-        None => panic!("missing aggregtor"),
+        None => panic!("missing aggregator"),
     }
 
     j.deal.sec_share.v = good_v;
