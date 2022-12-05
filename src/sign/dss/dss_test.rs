@@ -173,7 +173,7 @@ fn get_dss<SUITE: Suite, DKS: DistKeyShare<SUITE::POINT>>(
     return dss;
 }
 
-fn gen_dist_secret<SUITE: crate::share::Suite>(
+fn gen_dist_secret<SUITE: crate::share::vss::suite::Suite>(
     part_sec: &[<SUITE::POINT as Point>::SCALAR],
     part_pubs: &[SUITE::POINT],
     suite: SUITE,

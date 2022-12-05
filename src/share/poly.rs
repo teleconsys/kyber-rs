@@ -60,6 +60,7 @@ impl<SCALAR: Scalar> PriShare<SCALAR> {
 }
 
 /// PriPoly represents a secret sharing polynomial.
+#[derive(Clone)]
 pub struct PriPoly<GROUP: Group> {
     /// Cryptographic group
     g: GROUP,

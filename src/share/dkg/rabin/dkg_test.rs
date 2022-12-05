@@ -6,10 +6,10 @@ use crate::{
     share::{
         dkg::{DistKeyShare, ReconstructCommits, SecretCommits},
         poly::recover_secret,
-        vss,
+        vss::{self, suite::Suite},
     },
     sign::schnorr,
-    Group, Point, Random, Scalar, Suite,
+    Group, Point, Random, Scalar, 
 };
 
 use super::{new_dist_key_generator, DistKeyGenerator};

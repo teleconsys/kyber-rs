@@ -7,7 +7,7 @@ use digest::{generic_array::GenericArray, OutputSizeUser};
 use hkdf::{hmac::Hmac, Hkdf, HmacImpl};
 use sha2::Sha256;
 
-use crate::{encoding::Marshaling, Point, Suite};
+use crate::{encoding::Marshaling, Point, share::vss::suite::Suite};
 
 /// dhExchange computes the shared key from a private key and a public key
 pub fn dh_exchange<'a, SUITE: Suite>(

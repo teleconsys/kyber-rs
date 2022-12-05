@@ -17,5 +17,5 @@ pub use group::Group;
 pub use group::Point;
 pub use group::Scalar;
 pub use random::Random;
-pub use share::Suite;
+pub use share::vss::suite::Suite;
 pub use xof::{XOFFactory, XOF};

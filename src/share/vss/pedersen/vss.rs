@@ -1,48 +1,16 @@
-/// Package vss implements the verifiable secret sharing scheme from the
-/// paper "Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold
-/// Scheme for Implicit Certificates".
-/// VSS enables a dealer to share a secret securely and verifiably among n
-/// participants out of which at least t are required for its reconstruction.
-/// The verifiability of the process prevents a
-/// malicious dealer from influencing the outcome to his advantage as each
-/// verifier can check the validity of the received share. The protocol has the
-/// following steps:
-///
-///   1) The dealer send a Deal to every verifiers using `Deals()`. Each deal must
-///   be sent securely to one verifier whose public key is at the same index than
-///   the index of the Deal.
-///
-///   2) Each verifier processes the Deal with `ProcessDeal`.
-///   This function returns a Response which can be twofold:
-///   - an approval, to confirm a correct deal
-///   - a complaint to announce an incorrect deal notifying others that the
-///     dealer might be malicious.
-///	 All Responses must be broadcasted to every verifiers and the dealer.
-///   3) The dealer can respond to each complaint by a justification revealing the
-///   share he originally sent out to the accusing verifier. This is done by
-///   calling `ProcessResponse` on the `Dealer`.
-///   4) The verifiers refuse the shared secret and abort the protocol if there
-///   are at least t complaints OR if a Justification is wrong. The verifiers
-///   accept the shared secret if there are at least t approvals at which point
-///   any t out of n verifiers can reveal their shares to reconstruct the shared
-///   secret.
-use core::fmt;
-use std::collections::HashMap;
+use core::{fmt, ops::Deref};
+use std::{collections::HashMap, ops::DerefMut};
 
-use crate::encoding::{self, unmarshal_binary, BinaryMarshaler, Marshaling};
-use crate::group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical};
-use crate::share::poly::{self, new_pri_poly, PriShare, PubPoly};
-use crate::share::vss::dh::{AEAD, context, dh_exchange};
-use crate::share::vss::suite::Suite;
-use crate::sign::schnorr;
-use crate::Scalar;
-use crate::Point;
-
-use anyhow::{bail, Error, Ok, Result};
 use byteorder::{LittleEndian, WriteBytesExt};
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
+use serde::{Serialize, de::DeserializeOwned, Deserialize};
+
+/// Package vss implements the verifiable secret sharing scheme from
+/// "Non-Interactive and Information-Theoretic Secure Verifiable Secret Sharing"
+/// by Torben Pryds Pedersen.
+/// https://link.springer.com/content/pdf/10.1007/3-540-46766-1_9.pdf
+
+use anyhow::{Result, bail, Error};
+use crate::{Point, share::{poly::{PriShare, new_pri_poly}, vss::{dh::{context, dh_exchange, AEAD}, suite::Suite}, self}, encoding::{Marshaling, BinaryMarshaler, self, unmarshal_binary}, sign::schnorr, Scalar, group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical}};
 
 /// Dealer encapsulates for creating and distributing the shares and for
 /// replying to any Responses.
@@ -58,6 +26,7 @@ where
     pub(crate) pubb: SUITE::POINT,
     pub secret: <SUITE::POINT as Point>::SCALAR,
     secret_commits: Vec<SUITE::POINT>,
+    secret_poly:    share::poly::PriPoly<SUITE>,
     pub(crate) verifiers: Vec<SUITE::POINT>,
     hkdf_context: Vec<u8>,
     // threshold of shares that is needed to reconstruct the secret
@@ -67,50 +36,6 @@ where
     // list of deals this Dealer has generated
     pub(crate) deals: Vec<Deal<SUITE>>,
     pub(crate) aggregator: Aggregator<SUITE>,
-}
-
-impl<SUITE: Suite> Default for Dealer<SUITE>
-where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
-    fn default() -> Self {
-        Self {
-            suite: Default::default(),
-            long: Default::default(),
-            pubb: Default::default(),
-            secret: Default::default(),
-            secret_commits: Default::default(),
-            verifiers: Default::default(),
-            hkdf_context: Default::default(),
-            t: Default::default(),
-            session_id: Default::default(),
-            deals: Default::default(),
-            aggregator: Default::default(),
-        }
-    }
-}
-
-impl<SUITE: Suite> Deref for Dealer<SUITE>
-where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
-    type Target = Aggregator<SUITE>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.aggregator
-    }
-}
-
-impl<SUITE: Suite> DerefMut for Dealer<SUITE>
-where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.aggregator
-    }
 }
 
 /// Deal encapsulates the verifiable secret share and is sent by the dealer to a verifier.
@@ -124,8 +49,6 @@ where
     pub(crate) session_id: Vec<u8>,
     /// Private share generated by the dealer
     pub(crate) sec_share: PriShare<<SUITE::POINT as Point>::SCALAR>,
-    /// Random share generated by the dealer
-    pub(crate) rnd_share: PriShare<<SUITE::POINT as Point>::SCALAR>,
     /// Threshold used for this secret sharing run
     pub(crate) t: usize,
     // Commitments are the coefficients used to verify the shares against
@@ -141,7 +64,6 @@ where
         Self {
             session_id: Default::default(),
             sec_share: Default::default(),
-            rnd_share: Default::default(),
             t: Default::default(),
             commitments: Default::default(),
         }
@@ -163,7 +85,7 @@ where
 impl<SUITE: Suite> BinaryMarshaler for Deal<SUITE>
 where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
+    SUITE::POINT: Point + Serialize + DeserializeOwned,
 {
     fn marshal_binary(&self) -> Result<Vec<u8>> {
         encoding::marshal_binary(self)
@@ -186,12 +108,6 @@ pub struct EncryptedDeal<POINT: Point + Serialize> {
     pub(crate) cipher: Vec<u8>,
 }
 
-impl<POINT: Point + Serialize> BinaryMarshaler for EncryptedDeal<POINT> {
-    fn marshal_binary(&self) -> Result<Vec<u8>> {
-        encoding::marshal_binary(self)
-    }
-}
-
 /// Response is sent by the verifiers to all participants and holds each
 /// individual validation or refusal of a Deal.
 #[derive(Clone, Debug, PartialEq)]
@@ -200,8 +116,8 @@ pub struct Response {
     pub session_id: Vec<u8>,
     /// Index of the verifier issuing this Response
     pub index: u32,
-    /// Approved is true if the Response is valid
-    pub approved: bool,
+    /// false = NO APPROVAL == Complaint , true = APPROVAL
+    pub status: bool,
     /// Signature over the whole packet
     pub signature: Vec<u8>,
 }
@@ -211,7 +127,7 @@ impl Default for Response {
         Self {
             session_id: Default::default(),
             index: Default::default(),
-            approved: Default::default(),
+            status: Default::default(),
             signature: Default::default(),
         }
     }
@@ -224,10 +140,18 @@ impl Response {
         h.write("response".as_bytes())?;
         h.write(&self.session_id)?;
         h.write_u32::<LittleEndian>(self.index)?;
-        h.write_u32::<LittleEndian>(self.approved as u32)?;
+        h.write_u32::<LittleEndian>(self.status as u32)?;
         Ok(h.finalize().to_vec())
     }
 }
+
+/// StatusComplaint is a constant value meaning that a verifier issues
+/// a Complaint against its Dealer.
+const STATUS_COMPLAINT: bool = false;
+/// StatusApproval is a constant value meaning that a verifier agrees with
+/// the share it received.
+const STATUS_APPROVAL: bool = true;
+
 
 /// Justification is a message that is broadcasted by the Dealer in response to
 /// a Complaint. It contains the original Complaint as well as the shares
@@ -287,39 +211,32 @@ where
     if !valid_t(t, verifiers) {
         bail!("dealer: t {} invalid", t);
     }
+    // 	d.t = t
 
-    let h = derive_h(suite, verifiers);
     let f = new_pri_poly(suite, t, Some(secret.clone()), suite.random_stream());
-    let g = new_pri_poly(suite, t, None, suite.random_stream());
     let d_pubb = suite.point().mul(&longterm, None);
 
-    // Compute public polynomial coefficients
-    let f_caps = f.commit(Some(&suite.point().base()));
-    let (_, secret_commits) = f_caps.info();
-    let g_caps = g.commit(Some(&h));
+	// Compute public polynomial coefficients
+	let f_caps = f.commit(Some(&suite.point().base()));
+	let (_, secret_commits) = f_caps.info();
 
-    let c = f_caps.add(&g_caps)?;
-    let (_, commitments) = c.info();
+    let session_id = session_id(&suite, &d_pubb, &verifiers, &secret_commits, t)?;
 
-    let session_id = session_id(&suite, &d_pubb, &verifiers, &commitments, t)?;
+    let aggregator = new_aggregator(&suite, &d_pubb, &verifiers, &secret_commits, t, &session_id);
 
-    let aggregator = new_aggregator(&suite, &d_pubb, &verifiers, &commitments, t, &session_id);
-    // C = F + G
-    let mut deals: Vec<Deal<SUITE>> = vec![];
+	// C = F + G
+    let mut deals: Vec<Deal<SUITE>> = Vec::with_capacity(verifiers.len());
     for i in 0..verifiers.len() {
         let fi = f.eval(i);
-        let gi = g.eval(i);
         deals.push(Deal {
             session_id: session_id.clone(),
             sec_share: fi,
-            rnd_share: gi,
-            commitments: commitments.clone(),
+            commitments: secret_commits.clone(),
             t: t,
         });
     }
 
     let hkdf_context = context(&suite, &d_pubb, &verifiers).to_vec();
-
     Ok(Dealer {
         suite: suite,
         long: longterm,
@@ -327,6 +244,7 @@ where
         verifiers: verifiers.to_vec(),
         pubb: d_pubb,
         secret_commits,
+        secret_poly: f,
         hkdf_context,
         t,
         session_id,
@@ -340,6 +258,7 @@ where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
+
     /// PlaintextDeal returns the plaintext version of the deal destined for peer i.
     /// Use this only for testing.
     pub fn plaintext_deal(&mut self, i: usize) -> Result<&mut Deal<SUITE>> {
@@ -408,7 +327,7 @@ where
     {
         self.aggregator.verify_response(r)?;
 
-        if r.approved {
+        if r.status == STATUS_APPROVAL {
             return Ok(None);
         }
 
@@ -430,69 +349,68 @@ where
     /// SecretCommit returns the commitment of the secret being shared by this
     /// dealer. This function is only to be called once the deal has enough approvals
     /// and is verified otherwise it returns nil.
-    pub fn secret_commit(&self) -> Option<SUITE::POINT> {
-        if !self.aggregator.clone().enough_approvals() || !self.aggregator.deal_certified() {
-            return None;
+    fn secret_commit(&self) -> Option<SUITE::POINT> {
+        if !self.aggregator.deal_certified() {
+            return None
         }
-        return Some(self.suite.point().mul(&self.secret, None));
+        return Some(self.suite.point().mul(&self.secret, None))
     }
 
     /// Commits returns the commitments of the coefficient of the secret polynomial
     /// the Dealer is sharing.
-    pub fn commits(&self) -> Option<Vec<SUITE::POINT>> {
-        if !self.aggregator.clone().enough_approvals() || !self.aggregator.deal_certified() {
-            return None;
-        }
-        return Some(self.secret_commits.clone());
+    fn commits(&self) -> Vec<SUITE::POINT> {
+        return self.secret_commits.clone()
     }
 
     /// Key returns the longterm key pair used by this Dealer.
-    fn key(self) -> (<SUITE::POINT as Point>::SCALAR, SUITE::POINT) {
-        return (self.long, self.pubb);
+    fn key(&self) -> (<SUITE::POINT as Point>::SCALAR, SUITE::POINT) {
+        return (self.long.clone(), self.pubb.clone())
     }
 
     /// SessionID returns the current sessionID generated by this dealer for this
     /// protocol run.
-    pub fn session_id(&self) -> Vec<u8> {
-        return self.session_id.clone();
+    fn session_id(&self) -> Vec<u8> {
+        return self.session_id.clone()
     }
 
-    /// SetTimeout tells this dealer to consider this moment the maximum time limit.
-    /// it calls cleanVerifiers which will take care of all Verifiers who have not
-    /// responded until now.
-    pub fn set_timeout(&mut self) {
-        self.aggregator.clean_verifiers();
+    /// SetTimeout marks the end of a round, invalidating any missing (or future) response
+    /// for this DKG protocol round. The caller is expected to call this after a long timeout
+    /// so each DKG node can still compute its share if enough Deals are valid.
+    fn set_timeout(&mut self) {
+        self.aggregator.timeout = true
     }
 
-    /// deal_certified returns true if there has been less than t complaints, all
-    /// Justifications were correct and if EnoughApprovals() returns true.
-    pub fn deal_certified(&self) -> bool {
-        self.aggregator.deal_certified()
+    /// PrivatePoly returns the private polynomial used to generate the deal. This
+    /// private polynomial can be saved and then later on used to generate new
+    /// shares.  This information SHOULD STAY PRIVATE and thus MUST never be given
+    /// to any third party.
+    fn private_poly(&self) -> share::poly::PriPoly<SUITE> {
+        return self.secret_poly.clone()
     }
 }
 
 /// Verifier receives a Deal from a Dealer, can reply with a Complaint, and can
 /// collaborate with other Verifiers to reconstruct a secret.
-pub struct Verifier<SUITE: Suite>
+pub struct Verifier<SUITE: Suite> 
 where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
+SUITE::POINT: Serialize + DeserializeOwned,
+<SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned
 {
-    suite: SUITE,
-    pub(crate) longterm: <SUITE::POINT as Point>::SCALAR,
-    pub(crate) pubb: SUITE::POINT,
-    dealer: SUITE::POINT,
-    pub(crate) index: usize,
-    verifiers: Vec<SUITE::POINT>,
-    hkdf_context: Vec<u8>,
-    pub(crate) aggregator: Option<Aggregator<SUITE>>,
+	suite:       SUITE,
+	pub(crate) longterm:    <SUITE::POINT as Point>::SCALAR,
+	pub(crate) pubb:         SUITE::POINT,
+	dealer:      SUITE::POINT,
+	pub(crate) index:       usize,
+	verifiers:   Vec<SUITE::POINT>,
+	hkdf_context: Vec<u8>,
+	pub(crate) aggregator: Option<Aggregator<SUITE>>
 }
 
 /// NewVerifier returns a Verifier out of:
-/// - its longterm secret key
-/// - the longterm dealer public key
-/// - the list of public key of verifiers. The list MUST include the public key
-/// of this Verifier also.
+///   - its longterm secret key
+///   - the longterm dealer public key
+///   - the list of public key of verifiers. The list MUST include the public key of this Verifier also.
+///
 /// The security parameter t of the secret sharing scheme is automatically set to
 /// a default safe value. If a different t value is required, it is possible to set
 /// it with `verifier.SetT()`.
@@ -556,10 +474,10 @@ where
 
 impl<SUITE: Suite> Verifier<SUITE>
 where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
-    /// process_encrypted_deal decrypt the deal received from the Dealer.
+<SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+SUITE::POINT: Serialize + DeserializeOwned {
+
+    /// ProcessEncryptedDeal decrypt the deal received from the Dealer.
     /// If the deal is valid, i.e. the verifier can verify its shares
     /// against the public coefficients and the signature is valid, an approval
     /// response is returned and must be broadcasted to every participants
@@ -568,10 +486,10 @@ where
     /// broadcasted to every other participants including the dealer.
     /// If the deal has already been received, or the signature generation of the
     /// response failed, it returns an error without any responses.
-    pub fn process_encrypted_deal(&mut self, e: &EncryptedDeal<SUITE::POINT>) -> Result<Response>
+    fn process_encrypted_deal(&mut self, e: EncryptedDeal<SUITE::POINT>) -> Result<Response> 
     where
-        SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
-        <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
+    SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
+    <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
     {
         let d = self.decrypt_deal(e)?;
         if d.sec_share.i != self.index {
@@ -602,13 +520,13 @@ where
         let mut r = Response {
             session_id: sid,
             index: self.index as u32,
-            approved: true,
+            status: STATUS_APPROVAL,
             ..Default::default()
         };
         let result = self.verify_deal(&d, true);
 
         if let Err(err) = result {
-            r.approved = false;
+            r.status = STATUS_COMPLAINT;
             // TODO: manage error
             match err {
                 VerifyDealError::DealAlreadyProcessedError => bail!(err),
@@ -630,10 +548,11 @@ where
         Ok(r)
     }
 
-    pub fn decrypt_deal(&self, e: &EncryptedDeal<SUITE::POINT>) -> Result<Deal<SUITE>>
+
+    fn decrypt_deal(&self, e: EncryptedDeal<SUITE::POINT>) -> Result<Deal<SUITE>> 
     where
-        SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
-        <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
+    SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
+    <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
     {
         let eph_buff = e.dhkey.marshal_binary()?;
         // verify signature
@@ -644,7 +563,7 @@ where
             &e.signature,
         )?;
 
-        // compute shared key and AES526-GCM cipher
+    	// compute shared key and AES526-GCM cipher
         let pre = dh_exchange(self.suite, self.longterm.clone(), e.dhkey.clone());
         let gcm = AEAD::new(pre, &self.hkdf_context)?;
         let decrypted = gcm.open(
@@ -655,6 +574,7 @@ where
         )?;
         Deal::decode(&decrypted)
     }
+
 
     /// ProcessResponse analyzes the given response. If it's a valid complaint, the
     /// verifier should expect to see a Justification from the Dealer. It returns an
@@ -671,26 +591,31 @@ where
         }
     }
 
-    /// deal returns the Deal that this verifier has received. It returns
+    /// Commits returns the commitments of the coefficients of the polynomial
+    /// contained in the Deal received. It is public information. The private
+    /// information in the deal must be retrieved through Deal().
+    fn commits(&self) -> Option<Vec<SUITE::POINT>> {
+        match &self.deal {
+            Some(d) => Some(d.commitments.clone()),
+            None => None,
+        }
+    }
+
+    /// Deal returns the Deal that this verifier has received. It returns
     /// nil if the deal is not certified or there is not enough approvals.
-    pub fn deal(&self) -> Option<Deal<SUITE>> {
-        if self.aggregator.clone().is_none() {
-            return None;
-        }
-        if !self.aggregator.clone().unwrap().enough_approvals()
-            || !self.aggregator.clone().unwrap().deal_certified()
-        {
-            return None;
-        }
-        return self.deal.clone();
+    fn deal(&self) -> Option<Deal<SUITE>> {
+    	if !self.deal_certified() {
+    		return None
+    	}
+    	return self.deal.clone()
     }
 
     /// ProcessJustification takes a DealerResponse and returns an error if
     /// something went wrong during the verification. If it is the case, that
     /// probably means the Dealer is acting maliciously. In order to be sure, call
-    /// `v.EnoughApprovals()` and if true, `v.DealCertified()`.
-    pub fn process_justification(&mut self, dr: &Justification<SUITE>) -> Result<()> {
-          match &mut self.aggregator {
+    /// `v.DealCertified()`.
+    fn process_justification(&mut self, dr: Justification<SUITE>) -> Result<()> {
+        match &mut self.aggregator {
             Some(a) => a.verify_justification(dr),
             None => bail!("missing aggregator"),
         }
@@ -714,79 +639,57 @@ where
         return self.sid.clone();
     }
 
-    /// SetTimeout tells this verifier to consider this moment the maximum time limit.
-    /// it calls cleanVerifiers which will take care of all Verifiers who have not
-    /// responded until now.
-    pub fn set_timeout(&mut self) {
-        if let Some(a) = self.aggregator.as_mut() {
-            a.clean_verifiers()
+    /// SetTimeout marks the end of the protocol. The caller is expected to call this
+    /// after a long timeout so each verifier can still deem its share valid if
+    /// enough deals were approved. One should call `DealCertified()` after this
+    /// method in order to know if the deal is valid or the protocol should abort.
+    fn set_timeout(&mut self) {
+    	if let Some(a) = self.aggregator.as_mut() {
+            a.timeout = true;
         }
     }
+
+    /// UnsafeSetResponseDKG is an UNSAFE bypass method to allow DKG to use VSS
+    /// that works on basis of approval only.
+    #[allow(unused_must_use)]
+    pub fn unsafe_set_response_dkg(&mut self, idx: u32, approval: bool) {
+        let r = Response {
+            session_id: self.sid.clone(),
+            index: idx,
+            status: approval,
+            signature: vec![],
+        };
+
+        self.add_response(&r);
+    }
+
 }
 
-/// Aggregator is used to collect all deals, and responses for one protocol run.
-/// It brings common functionalities for both Dealer and Verifier structs.
-#[derive(Clone)]
-pub struct Aggregator<SUITE: Suite>
-where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
+
+
+/// RecoverSecret recovers the secret shared by a Dealer by gathering at least t
+/// Deals from the verifiers. It returns an error if there is not enough Deals or
+/// if all Deals don't have the same SessionID.
+pub fn recover_secret<SUITE: Suite>(
     suite: SUITE,
-    dealer: SUITE::POINT,
-    verifiers: Vec<SUITE::POINT>,
-    commits: Vec<SUITE::POINT>,
-
-    pub(crate) responses: HashMap<u32, Response>,
-    pub(crate) sid: Vec<u8>,
-    pub(crate) deal: Option<Deal<SUITE>>,
-    pub(crate) t: usize,
-    pub(crate) bad_dealer: bool,
-}
-
-impl<SUITE: Suite> Default for Aggregator<SUITE>
+    deals: Vec<Deal<SUITE>>,
+    n: usize,
+    t: usize,
+) -> Result<<SUITE::POINT as Point>::SCALAR>
 where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
-    fn default() -> Self {
-        Self {
-            suite: Default::default(),
-            dealer: Default::default(),
-            verifiers: Default::default(),
-            commits: Default::default(),
-            responses: Default::default(),
-            sid: Default::default(),
-            deal: Default::default(),
-            t: Default::default(),
-            bad_dealer: Default::default(),
+    let mut shares = Vec::with_capacity(deals.len());
+    for deal in &deals {
+        // all sids the same
+        if deal.session_id == deals[0].session_id {
+            shares.push(Some(deal.sec_share.clone()));
+        } else {
+            bail!("vss: all deals need to have same session id");
         }
     }
-}
-
-fn new_aggregator<SUITE: Suite>(
-    suite: &SUITE,
-    dealer: &SUITE::POINT,
-    verifiers: &[SUITE::POINT],
-    commitments: &[SUITE::POINT],
-    t: usize,
-    sid: &[u8],
-) -> Aggregator<SUITE>
-where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
-    Aggregator {
-        suite: *suite,
-        dealer: dealer.clone(),
-        verifiers: verifiers.to_vec(),
-        commits: commitments.to_vec(),
-        t,
-        sid: sid.clone().to_vec(),
-        responses: HashMap::new(),
-        deal: None,
-        bad_dealer: false,
-    }
+    share::poly::recover_secret(suite, &shares, t, n)
 }
 
 #[derive(Debug, Clone)]
@@ -815,13 +718,74 @@ impl fmt::Display for DealAlreadyProcessedError {
     }
 }
 
+
+/// ErrNoDealBeforeResponse is an error returned if a verifier receives a
+/// deal before having received any responses. For the moment, the caller must
+/// be sure to have dispatched a deal before.
+#[derive(Debug, Clone)]
+struct ErrNoDealBeforeResponse;
+
+impl fmt::Display for ErrNoDealBeforeResponse {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "verifier: need to receive deal before response")
+    }
+}
+
+/// Aggregator is used to collect all deals, and responses for one protocol run.
+/// It brings common functionalities for both Dealer and Verifier structs.
+#[derive(Clone)]
+pub struct Aggregator<SUITE: Suite>
+where
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
+{
+    suite: SUITE,
+    dealer: SUITE::POINT,
+    verifiers: Vec<SUITE::POINT>,
+    commits: Vec<SUITE::POINT>,
+
+    pub(crate) responses: HashMap<u32, Response>,
+    pub(crate) sid: Vec<u8>,
+    pub(crate) deal: Option<Deal<SUITE>>,
+    pub(crate) t: usize,
+    pub(crate) bad_dealer: bool,
+    pub(crate) timeout: bool
+}
+
+fn new_aggregator<SUITE: Suite>(
+    suite: &SUITE,
+    dealer: &SUITE::POINT,
+    verifiers: &[SUITE::POINT],
+    commitments: &[SUITE::POINT],
+    t: usize,
+    sid: &[u8],
+) -> Aggregator<SUITE>
+where
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
+{
+    Aggregator {
+        suite: *suite,
+        dealer: dealer.clone(),
+        verifiers: verifiers.to_vec(),
+        commits: commitments.to_vec(),
+        t,
+        sid: sid.clone().to_vec(),
+        responses: HashMap::new(),
+        deal: None,
+        bad_dealer: false,
+        timeout: false
+    }
+}
+
 impl<SUITE: Suite> Aggregator<SUITE>
 where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
-    /// verify_deal analyzes the deal and returns an error if it's incorrect. If
-    /// inclusion is true, it also returns an error if it the second time this struct
+
+    /// VerifyDeal analyzes the deal and returns an error if it's incorrect. If
+    /// inclusion is true, it also returns an error if it is the second time this struct
     /// analyzes a Deal.
     pub fn verify_deal(&mut self, d: &Deal<SUITE>, inclusion: bool) -> Result<(), VerifyDealError> {
         if self.deal.is_some() && inclusion {
@@ -839,6 +803,12 @@ where
             ));
         }
 
+        if d.t != self.t {
+            return Err(VerifyDealError::TextError(
+                "vss: incompatible threshold - potential attack".to_string(),
+            ));
+        }
+
         if self.sid != d.session_id {
             return Err(VerifyDealError::TextError(
                 "vss: find different sessionIDs from Deal".to_string(),
@@ -846,50 +816,43 @@ where
         }
 
         let fi = &d.sec_share;
-        let gi = &d.rnd_share;
-        if fi.i != gi.i {
-            return Err(VerifyDealError::TextError(
-                "vss: not the same index for f and g share in Deal".to_string(),
-            ));
-        }
-        if fi.i >= self.verifiers.len() {
+        if fi.i < 0 || fi.i >= self.verifiers.len() {
             return Err(VerifyDealError::TextError(
                 "vss: index out of bounds in Deal".to_string(),
             ));
         }
-        // compute fi * G + gi * H
+        // compute fi * G
         let fig = self.suite.point().base().mul(&fi.v, None);
-        let h = derive_h(self.suite, &self.verifiers);
-        let gih = self.suite.point().mul(&gi.v, Some(&h));
-        let ci = self.suite.point().add(&fig, &gih);
 
-        let commit_poly = PubPoly::new(&self.suite, None, &d.commitments);
+        let commit_poly = share::poly::PubPoly::new(&self.suite, None, &d.commitments);
 
         let pub_share = commit_poly.eval(fi.i);
-        if ci != pub_share.v {
+        if !fig.equal(&pub_share.v) {
             return Err(VerifyDealError::TextError(
                 "vss: share does not verify against commitments in Deal".to_string(),
             ));
         }
-        Result::Ok(())
+        Ok(())
     }
 
-    /// cleanVerifiers checks the aggregator's response array and creates a StatusComplaint
-    /// response for all verifiers who have no response in the array.
-    pub fn clean_verifiers(&mut self) {
-        for i in 0..self.verifiers.len() {
-            if !self.responses.contains_key(&(i as u32)) {
-                self.responses.insert(
-                    i as u32,
-                    Response {
-                        session_id: self.sid.clone(),
-                        index: i as u32,
-                        approved: false,
-                        ..Response::default()
-                    },
-                );
-            }
-        }
+    /// SetThreshold is used to specify the expected threshold *before* the verifier
+    /// receives anything. Sometimes, a verifier knows the treshold in advance and
+    /// should make sure the one it receives from the dealer is consistent. If this
+    /// method is not called, the first threshold received is considered as the
+    /// "truth".
+    fn set_threshold(&mut self, t: usize) {
+        self.t = t
+    }
+
+    /// ProcessResponse verifies the validity of the given response and stores it
+    /// internall. It is  the public version of verifyResponse created this way to
+    /// allow higher-level package to use these functionalities.
+    fn process_response(&mut self, r: Response) -> Result<()> 
+    where
+    <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
+    SUITE::POINT: PointCanCheckCanonicalAndSmallOrder
+    {
+    	self.verify_response(&r)
     }
 
     pub fn verify_response(&mut self, r: &Response) -> Result<()>
@@ -913,8 +876,8 @@ where
         self.add_response(&r)
     }
 
-    fn verify_justification(&mut self, j: &Justification<SUITE>) -> Result<()> {
-        let pubb = find_pub(&self.verifiers, j.index as usize);
+    fn verify_justification(&mut self, j: Justification<SUITE>) -> Result<()> {
+    	let pubb = find_pub(&self.verifiers, j.index as usize);
         if pubb.is_none() {
             bail!("vss: index out of bounds in justification")
         }
@@ -926,74 +889,85 @@ where
         // clone the resp here
         let mut r = self.responses[&j.index].clone();
 
-        if r.approved {
+        if r.status != STATUS_COMPLAINT {
             bail!("vss: justification received for an approval")
         }
 
-        let verification = self.verify_deal(&j.deal, false);
-        if verification.is_err() {
-            self.bad_dealer = true;
-        } else {
-            r.approved = true
+        match self.verify_deal(&j.deal, false){
+            Ok(_) => r.status = STATUS_APPROVAL,
+            Err(err) => {
+                // if one justification is bad, then flag the dealer as malicious
+    		    self.bad_dealer = true;
+                return Err(anyhow::format_err!(err))
+            },
         }
-
-        // add the updated resp
-        self.responses.insert(j.index, r);
-
-        return verification.map_err(|e| Error::msg(e.to_string()));
+    	Ok(())
     }
 
-    pub fn add_response(&mut self, r: &Response) -> Result<()> {
-        if find_pub(&self.verifiers, r.index as usize).is_none() {
-            bail!("vss: index out of bounds in Complaint");
-        }
-        if self.responses.get(&(r.index as u32)).is_some() {
-            bail!("vss: already existing response from same origin")
-        }
-        self.responses.insert(r.index, r.clone());
-        Ok(())
+pub fn add_response(&mut self, r: &Response) -> Result<()> {
+    if find_pub(&self.verifiers, r.index as usize).is_none() {
+        bail!("vss: index out of bounds in Complaint");
+    }
+    if self.responses.get(&(r.index as u32)).is_some() {
+        bail!("vss: already existing response from same origin")
+    }
+    self.responses.insert(r.index, r.clone());
+    Ok(())
+}
+
+    /// Responses returns the list of responses received and processed by this
+    /// aggregator
+    fn responses(self) -> HashMap<u32, Response> {
+        return self.responses
     }
 
-    /// EnoughApprovals returns true if enough verifiers have sent their approval for
-    /// the deal they received.
-    pub fn enough_approvals(&self) -> bool {
-        let mut app = 0usize;
-        for (_, r) in &self.responses {
-            if r.approved {
-                app += 1;
-            }
-        }
-        return app >= self.t;
-    }
+    /// DealCertified returns true if the deal is certified.
+    /// For a deal to be certified, it needs to comply to the following
+    /// conditions in two different cases, since we are not working with the
+    /// synchrony assumptions from Feldman's VSS:
+    /// Before the timeout (i.e. before the "period" ends):
+    /// 1. there is at least t approvals
+    /// 2. all complaints must be justified (a complaint becomes an approval when
+    /// justified) -> no complaints
+    /// 3. there must not be absent responses
+    /// After the timeout, when the "period" ended, we replace the third condition:
+    /// 3. there must not be more than n-t missing responses (otherwise it is not
+    /// possible to retrieve the secret).
+    /// If the caller previously called `SetTimeout` and `DealCertified()` returns
+    /// false, the protocol MUST abort as the deal is not and never will be validated.
+    fn deal_certified(&self) -> bool {
+        let mut absent_verifiers = 0usize;
+        let mut approvals = 0usize;
+        let mut is_complaint = false;
 
-    /// deal_certified returns true if there has been less than t complaints, all
-    /// Justifications were correct and if EnoughApprovals() returns true.
-    pub fn deal_certified(&self) -> bool {
-        let mut verifiers_unstable = 0usize;
-        // Check either a StatusApproval or StatusComplaint for all known verifiers
-        // i.e. make sure all verifiers are either timed-out or OK.
         for (i, _) in self.verifiers.iter().enumerate() {
             if !self.responses.contains_key(&(i as u32)) {
-                verifiers_unstable += 1;
+                absent_verifiers += 1;
+            } else {
+                match self.responses.get(&(i as u32)).unwrap().status {
+                    STATUS_COMPLAINT => is_complaint = true,
+                    STATUS_APPROVAL => approvals += 1,
+                }
             }
         }
-
-        let too_much_complaints = verifiers_unstable > 0 || self.bad_dealer;
-        return self.enough_approvals() && !too_much_complaints;
+        let enough_approvals = approvals >= self.t;
+        let too_much_absents = absent_verifiers > self.verifiers.len() - self.t;
+        let base_condition = !self.bad_dealer && enough_approvals && !is_complaint;
+        if self.timeout {
+            return base_condition && !too_much_absents
+        }
+        return base_condition && !(absent_verifiers > 0)
     }
 
-    /// UnsafeSetResponseDKG is an UNSAFE bypass method to allow DKG to use VSS
-    /// that works on basis of approval only.
-    #[allow(unused_must_use)]
-    pub fn unsafe_set_response_dkg(&mut self, idx: u32, approval: bool) {
-        let r = Response {
-            session_id: self.sid.clone(),
-            index: idx,
-            approved: approval,
-            signature: vec![],
-        };
-
-        self.add_response(&r);
+    /// MissingResponses returns the indexes of the expected but missing responses.
+    fn missing_responses(&self) -> Vec<usize> {
+    	let mut absents = Vec::new();
+    	for (i, _) in self.verifiers.iter().enumerate() {
+    		if self.responses.contains_key(&(i as u32)) {
+    			absents.push(i);
+    		}
+    	}
+    	return absents
     }
 }
 
@@ -1046,27 +1020,5 @@ pub(crate) fn session_id<SUITE: Suite>(
     Ok(h.finalize().to_vec())
 }
 
-/// RecoverSecret recovers the secret shared by a Dealer by gathering at least t
-/// Deals from the verifiers. It returns an error if there is not enough Deals or
-/// if all Deals don't have the same SessionID.
-pub fn recover_secret<SUITE: Suite>(
-    suite: SUITE,
-    deals: Vec<Deal<SUITE>>,
-    n: usize,
-    t: usize,
-) -> Result<<SUITE::POINT as Point>::SCALAR>
-where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
-    let mut shares = Vec::with_capacity(deals.len());
-    for deal in &deals {
-        // all sids the same
-        if deal.session_id == deals[0].session_id {
-            shares.push(Some(deal.sec_share.clone()));
-        } else {
-            bail!("vss: all deals need to have same session id");
-        }
-    }
-    poly::recover_secret(suite, &shares, t, n)
-}
+
+

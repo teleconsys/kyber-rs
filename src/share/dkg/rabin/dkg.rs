@@ -43,11 +43,12 @@ use crate::{
     group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
     share::{
         poly::{recover_pri_poly, PriShare, PubPoly},
-        vss::{self, Dealer},
+        vss::{self, suite::Suite},
     },
     sign::{dss, schnorr},
-    Point, Scalar, Suite,
+    Point, Scalar,
 };
+
 
 use anyhow::{bail, Result};
 

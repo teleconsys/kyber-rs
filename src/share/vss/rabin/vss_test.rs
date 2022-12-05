@@ -1,15 +1,15 @@
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
+use vss::dh::{context, dh_exchange, KEY_SIZE};
 
 use crate::{
     encoding::BinaryMarshaler,
     group::edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
     share::vss::{
-        dh::{self, context, dh_exchange},
-        find_pub, new_verifier, recover_secret, session_id, Response,
+        find_pub, new_verifier, recover_secret, session_id, Response, self, suite::Suite,
     },
     sign::schnorr,
-    Group, Point, Random, Scalar, Suite,
+    Group, Point, Random, Scalar,
 };
 
 use super::{minimum_t, new_dealer, Dealer, Verifier};
@@ -305,7 +305,7 @@ fn test_vss_verifier_decrypt_deal() {
 
     // all fine
     let mut enc_d = dealer.encrypted_deal(0).unwrap();
-    let dec_d = v.decryptDeal(&enc_d).unwrap();
+    let dec_d = v.decrypt_deal(&enc_d).unwrap();
     let b1 = d.marshal_binary().unwrap();
     let b2 = dec_d.marshal_binary().unwrap();
     assert_eq!(b1, b2);
@@ -313,21 +313,21 @@ fn test_vss_verifier_decrypt_deal() {
     // wrong dh key
     let good_dh = enc_d.dhkey;
     enc_d.dhkey = test_data.suite.point();
-    let dec_d = v.decryptDeal(&enc_d);
+    let dec_d = v.decrypt_deal(&enc_d);
     assert!(dec_d.is_err());
     enc_d.dhkey = good_dh;
 
     // wrong signature
     let good_sig = enc_d.signature;
     enc_d.signature = random_bytes(32);
-    let dec_d = v.decryptDeal(&enc_d);
+    let dec_d = v.decrypt_deal(&enc_d);
     assert!(dec_d.is_err());
     enc_d.signature = good_sig;
 
     // wrong ciphertext
     let good_cipher = enc_d.cipher;
     enc_d.cipher = random_bytes(good_cipher.len());
-    let dec_d = v.decryptDeal(&enc_d);
+    let dec_d = v.decrypt_deal(&enc_d);
     assert!(dec_d.is_err());
     enc_d.cipher = good_cipher;
 }
@@ -798,7 +798,7 @@ fn test_vss_context() {
         &test_data.dealer_pub,
         &test_data.verifiers_pub,
     );
-    assert_eq!(c.len(), dh::KEY_SIZE);
+    assert_eq!(c.len(), KEY_SIZE);
 }
 
 fn gen_pair() -> (EdScalar, EdPoint) {

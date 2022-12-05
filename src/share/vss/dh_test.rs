@@ -2,8 +2,8 @@ use hkdf::hmac::Hmac;
 use sha2::Sha256;
 
 use crate::group::edwards25519::Point;
-use crate::share::vss::rabin::dh::aead_decrypt;
-use crate::{encoding::BinaryUnmarshaler, share::vss::rabin::dh::hkdf};
+use crate::share::vss::dh::aead_decrypt;
+use crate::{encoding::BinaryUnmarshaler, share::vss::dh::hkdf};
 
 use super::dh::{aead_encrypt, aes_decrypt, aes_encrypt, AES_NONCE_LENGTH};
 
