@@ -272,7 +272,7 @@ pub fn new_dist_key_generator<SUITE: Suite>(
     t: usize,
 ) -> Result<DistKeyGenerator<SUITE>>
 where
-    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
     let pubb = suite.point().mul(&longterm, None);
@@ -310,8 +310,8 @@ where
 
 impl<SUITE: Suite> DistKeyGenerator<SUITE>
 where
-    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned + ScalarCanCheckCanonical,
+    SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder,
 {
     /// Deals returns all the deals that must be broadcasted to all
     /// participants. The deal corresponding to this DKG is already added
@@ -324,11 +324,7 @@ where
     ///   }
     ///
     /// This method panics if it can't process its own deal.
-    pub fn deals(&mut self) -> Result<HashMap<usize, Deal<SUITE::POINT>>>
-    where
-        SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
-        <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
-    {
+    pub fn deals(&mut self) -> Result<HashMap<usize, Deal<SUITE::POINT>>> {
         let deals = self.dealer.encrypted_deals()?;
         let mut dd = HashMap::new();
         for (i, _) in self.participants.clone().iter().enumerate() {
@@ -362,11 +358,7 @@ where
     /// returns a Response to broadcast to every other participants. It returns an
     /// error in case the deal has already been stored, or if the deal is incorrect
     /// (see `vss.Verifier.ProcessEncryptedDeal()`).
-    pub fn process_deal(&mut self, dd: &Deal<SUITE::POINT>) -> Result<Response>
-    where
-        SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
-        <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
-    {
+    pub fn process_deal(&mut self, dd: &Deal<SUITE::POINT>) -> Result<Response> {
         // public key of the dealer
         let pubb = match find_pub(&self.participants, dd.index as usize) {
             Some(pubb) => pubb,
@@ -399,11 +391,7 @@ where
     /// and returns nil with a possible error regarding the validity of the response.
     /// If the response designates a deal this dkg has issued, then the dkg will process
     /// the response, and returns a justification.
-    pub fn process_response(&mut self, resp: &Response) -> Result<Option<Justification<SUITE>>>
-    where
-        SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
-        <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
-    {
+    pub fn process_response(&mut self, resp: &Response) -> Result<Option<Justification<SUITE>>> {
         if !self.verifiers.contains_key(&resp.index) {
             bail!("dkg: complaint received but no deal for it");
         }
@@ -538,11 +526,7 @@ where
     pub fn process_secret_commits(
         &mut self,
         sc: &SecretCommits<SUITE>,
-    ) -> Result<Option<ComplaintCommits<SUITE>>>
-    where
-        SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
-        <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
-    {
+    ) -> Result<Option<ComplaintCommits<SUITE>>> {
         let pubb = match find_pub(&self.participants, sc.index as usize) {
             Some(public) => public,
             None => bail!("dkg: secretcommits received with index out of bounds"),
@@ -595,11 +579,7 @@ where
     pub fn process_complaint_commits(
         &mut self,
         cc: &ComplaintCommits<SUITE>,
-    ) -> Result<ReconstructCommits<SUITE>>
-    where
-        SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
-        <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
-    {
+    ) -> Result<ReconstructCommits<SUITE>> {
         let issuer = match find_pub(&self.participants, cc.index as usize) {
             Some(issuer) => issuer,
             None => bail!("dkg: commitcomplaint with unknown issuer"),
@@ -666,11 +646,7 @@ where
     /// along any others. If there are enough messages to recover the coefficients of
     /// the public polynomials of the malicious dealer in question, then the
     /// polynomial is recovered.
-    pub fn process_reconstruct_commits(&mut self, rc: &ReconstructCommits<SUITE>) -> Result<()>
-    where
-        SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
-        <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
-    {
+    pub fn process_reconstruct_commits(&mut self, rc: &ReconstructCommits<SUITE>) -> Result<()> {
         if self.reconstructed.contains_key(&rc.dealer_index) {
             // commitments already reconstructed, no need for other shares
             return Ok(());
