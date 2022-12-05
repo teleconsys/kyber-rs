@@ -43,7 +43,7 @@ use crate::{
     group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
     share::{
         poly::{recover_pri_poly, PriShare, PubPoly},
-        vss::{self, suite::Suite, rabin::EncryptedDeal},
+        vss::{self, rabin::EncryptedDeal, suite::Suite},
     },
     sign::{dss, schnorr},
     Point, Scalar,
@@ -291,7 +291,8 @@ where
     }
     // generate our dealer / deal
     let own_sec = suite.scalar().pick(&mut suite.random_stream());
-    let dealer = vss::rabin::vss::new_dealer(suite, longterm.clone(), own_sec, participants.clone(), t)?;
+    let dealer =
+        vss::rabin::vss::new_dealer(suite, longterm.clone(), own_sec, participants.clone(), t)?;
 
     Ok(DistKeyGenerator {
         dealer: dealer,
@@ -370,7 +371,8 @@ where
         }
 
         // verifier receiving the dealer's deal
-        let mut ver = vss::rabin::vss::new_verifier(&self.suite, &self.long, &pubb, &self.participants)?;
+        let mut ver =
+            vss::rabin::vss::new_verifier(&self.suite, &self.long, &pubb, &self.participants)?;
 
         let resp = ver.process_encrypted_deal(&dd.deal)?;
 

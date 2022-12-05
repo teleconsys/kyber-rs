@@ -1,10 +1,17 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Read};
 
-use serde::{Serialize, de::DeserializeOwned};
+use rand::{rngs::StdRng, RngCore, SeedableRng};
+use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{Suite, Point, share::{self, vss}};
+use crate::{
+    share::{self, vss},
+    util::{self, random::Randstream},
+    Point, Scalar, Suite,
+};
 
 use super::structs::DistKeyShare;
+
+use anyhow::Result;
 
 /// Package dkg implements a general distributed key generation (DKG) framework.
 /// This package serves two functionalities: (1) to run a fresh new DKG from
@@ -26,226 +33,283 @@ use super::structs::DistKeyShare;
 /// with the current share of the node. If the node using this config is a new
 /// addition and thus has no current share, the PublicCoeffs field be must be
 /// filled in.
-pub struct Config<SUITE: Suite> {
-	suite: SUITE,
+#[derive(Clone)]
+pub struct Config<SUITE: Suite, READ: Read + Clone> {
+    suite: SUITE,
 
-	/// Longterm is the longterm secret key.
-	longterm: <SUITE::POINT as Point>::SCALAR,
+    /// Longterm is the longterm secret key.
+    longterm: <SUITE::POINT as Point>::SCALAR,
 
-	/// Current group of share holders. It will be nil for new DKG. These nodes
-	/// will have invalid shares after the protocol has been run. To be able to issue
-	/// new shares to a new group, the group member's public key must be inside this
-	/// list and in the Share field. Keys can be disjoint or not with respect to the
-	/// NewNodes list.
-	old_nodes: Vec<SUITE::POINT>,
+    /// Current group of share holders. It will be nil for new DKG. These nodes
+    /// will have invalid shares after the protocol has been run. To be able to issue
+    /// new shares to a new group, the group member's public key must be inside this
+    /// list and in the Share field. Keys can be disjoint or not with respect to the
+    /// NewNodes list.
+    old_nodes: Vec<SUITE::POINT>,
 
-	/// PublicCoeffs are the coefficients of the distributed polynomial needed
-	/// during the resharing protocol. The first coefficient is the key. It is
-	/// required for new share holders.  It should be nil for a new DKG.
-	public_coeffs: Vec<SUITE::POINT>,
+    /// PublicCoeffs are the coefficients of the distributed polynomial needed
+    /// during the resharing protocol. The first coefficient is the key. It is
+    /// required for new share holders.  It should be nil for a new DKG.
+    public_coeffs: Option<Vec<SUITE::POINT>>,
 
-	/// Expected new group of share holders. These public-key designated nodes
-	/// will be in possession of new shares after the protocol has been run. To be a
-	/// receiver of a new share, one's public key must be inside this list. Keys
-	/// can be disjoint or not with respect to the OldNodes list.
-	new_nodes: Vec<SUITE::POINT>,
+    /// Expected new group of share holders. These public-key designated nodes
+    /// will be in possession of new shares after the protocol has been run. To be a
+    /// receiver of a new share, one's public key must be inside this list. Keys
+    /// can be disjoint or not with respect to the OldNodes list.
+    new_nodes: Vec<SUITE::POINT>,
 
-	/// Share to refresh. It must be nil for a new node wishing to
-	/// join or create a group. To be able to issue new fresh shares to a new group,
-	/// one's share must be specified here, along with the public key inside the
-	/// OldNodes field.
-	share: DistKeyShare<SUITE::POINT>,
+    /// Share to refresh. It must be nil for a new node wishing to
+    /// join or create a group. To be able to issue new fresh shares to a new group,
+    /// one's share must be specified here, along with the public key inside the
+    /// OldNodes field.
+    share: Option<DistKeyShare<SUITE::POINT>>,
 
-	/// The threshold to use in order to reconstruct the secret with the produced
-	/// shares. This threshold is with respect to the number of nodes in the
-	/// NewNodes list. If unspecified, default is set to
-	/// `vss.MinimumT(len(NewNodes))`. This threshold indicates the degree of the
-	/// polynomials used to create the shares, and the minimum number of
-	/// verification required for each deal.
-	threshold: usize,
+    /// The threshold to use in order to reconstruct the secret with the produced
+    /// shares. This threshold is with respect to the number of nodes in the
+    /// NewNodes list. If unspecified, default is set to
+    /// `vss.MinimumT(len(NewNodes))`. This threshold indicates the degree of the
+    /// polynomials used to create the shares, and the minimum number of
+    /// verification required for each deal.
+    threshold: usize,
 
-	/// OldThreshold holds the threshold value that was used in the previous
-	/// configuration. This field MUST be specified when doing resharing, but is
-	/// not needed when doing a fresh DKG. This value is required to gather a
-	/// correct number of valid deals before creating the distributed key share.
-	/// NOTE: this field is always required (instead of taking the default when
-	/// absent) when doing a resharing to avoid a downgrade attack, where a resharing
-	/// the number of deals required is less than what it is supposed to be.
-	old_threshold: usize,
+    /// OldThreshold holds the threshold value that was used in the previous
+    /// configuration. This field MUST be specified when doing resharing, but is
+    /// not needed when doing a fresh DKG. This value is required to gather a
+    /// correct number of valid deals before creating the distributed key share.
+    /// NOTE: this field is always required (instead of taking the default when
+    /// absent) when doing a resharing to avoid a downgrade attack, where a resharing
+    /// the number of deals required is less than what it is supposed to be.
+    old_threshold: usize,
 
-	// /// Reader is an optional field that can hold a user-specified entropy source.
-	// /// If it is set, Reader's data will be combined with random data from crypto/rand
-	// /// to create a random stream which will pick the dkg's secret coefficient. Otherwise,
-	// /// the random stream will only use crypto/rand's entropy.
-	// Reader io.Reader
+    /// Reader is an optional field that can hold a user-specified entropy source.
+    /// If it is set, Reader's data will be combined with random data from crypto/rand
+    /// to create a random stream which will pick the dkg's secret coefficient. Otherwise,
+    /// the random stream will only use crypto/rand's entropy.
+    reader: Option<READ>,
 
-	/// When UserReaderOnly it set to true, only the user-specified entropy source
-	/// Reader will be used. This should only be used in tests, allowing reproducibility.
-	user_reader_only: bool
+    /// When UserReaderOnly it set to true, only the user-specified entropy source
+    /// Reader will be used. This should only be used in tests, allowing reproducibility.
+    user_reader_only: bool,
 }
 
-// DistKeyGenerator is the struct that runs the DKG protocol.
-pub struct DistKeyGenerator<SUITE:Suite> 
-where 
-SUITE::POINT: Serialize + DeserializeOwned,
-<SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned
+/// DistKeyGenerator is the struct that runs the DKG protocol.
+pub struct DistKeyGenerator<SUITE: Suite, READ: Read + Clone>
+where
+    SUITE::POINT: Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
 {
-	/// config driving the behavior of DistKeyGenerator
-	c:     Config<SUITE>,
-	suite: SUITE,
+    /// config driving the behavior of DistKeyGenerator
+    c: Config<SUITE, READ>,
+    suite: SUITE,
 
-	long:   <SUITE::POINT as Point>::SCALAR,
-	pubb:    SUITE::POINT,
-	dpub:   share::poly::PubPoly<SUITE>,
-	dealer: vss::pedersen::vss::Dealer<SUITE>,
-	/// verifiers indexed by dealer index
-	verifiers: HashMap<u32, vss::pedersen::vss::Verifier<SUITE>>,
-	/// performs the part of the response verification for old nodes
-	old_aggregators: HashMap<u32, vss::pedersen::vss::Aggregator<SUITE>>,
-	/// index in the old list of nodes
-	oidx: usize,
-	/// index in the new list of nodes
-	nidx: usize,
-	/// old threshold used in the previous DKG
-	old_t: usize,
-	/// new threshold to use in this round
-	new_t: usize,
-	/// indicates whether we are in the re-sharing protocol or basic DKG
-	is_resharing: bool,
-	/// indicates whether we are able to issue shares or not
-	can_issue: bool,
-	/// Indicates whether we are able to receive a new share or not
-	can_receive: bool,
-	/// indicates whether the node holding the pub key is present in the new list
-	new_present: bool,
-	/// indicates whether the node is present in the old list
-	old_present: bool,
-	/// already processed our own deal
-	processed: bool,
-	/// did the timeout / period / already occured or not
-	timeout: bool
+    long: <SUITE::POINT as Point>::SCALAR,
+    pubb: SUITE::POINT,
+    dpub: share::poly::PubPoly<SUITE>,
+    dealer: vss::pedersen::vss::Dealer<SUITE>,
+    /// verifiers indexed by dealer index
+    verifiers: HashMap<u32, vss::pedersen::vss::Verifier<SUITE>>,
+    /// performs the part of the response verification for old nodes
+    old_aggregators: HashMap<u32, vss::pedersen::vss::Aggregator<SUITE>>,
+    /// index in the old list of nodes
+    oidx: usize,
+    /// index in the new list of nodes
+    nidx: usize,
+    /// old threshold used in the previous DKG
+    old_t: usize,
+    /// new threshold to use in this round
+    new_t: usize,
+    /// indicates whether we are in the re-sharing protocol or basic DKG
+    is_resharing: bool,
+    /// indicates whether we are able to issue shares or not
+    can_issue: bool,
+    /// Indicates whether we are able to receive a new share or not
+    can_receive: bool,
+    /// indicates whether the node holding the pub key is present in the new list
+    new_present: bool,
+    /// indicates whether the node is present in the old list
+    old_present: bool,
+    /// already processed our own deal
+    processed: bool,
+    /// did the timeout / period / already occured or not
+    timeout: bool,
 }
 
-// // NewDistKeyHandler takes a Config and returns a DistKeyGenerator that is able
-// // to drive the DKG or resharing protocol.
-// func NewDistKeyHandler(c *Config) (*DistKeyGenerator, error) {
-// 	if len(c.NewNodes) == 0 && len(c.OldNodes) == 0 {
-// 		return nil, errors.New("dkg: can't run with empty node list")
-// 	}
+/// NewDistKeyHandler takes a Config and returns a DistKeyGenerator that is able
+/// to drive the DKG or resharing protocol.
+fn new_dist_key_handler<SUITE: Suite, READ: Read + Clone + 'static>(
+    mut c: Config<SUITE, READ>,
+) -> Result<DistKeyGenerator<SUITE, READ>>
+where
+    SUITE::POINT: Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+{
+    if c.new_nodes.len() == 0 && c.old_nodes.len() == 0 {
+        return Err(anyhow::Error::msg("dkg: can't run with empty node list"));
+    }
 
-// 	var isResharing bool
-// 	if c.Share != nil || c.PublicCoeffs != nil {
-// 		isResharing = true
-// 	}
-// 	if isResharing {
-// 		if len(c.OldNodes) == 0 {
-// 			return nil, errors.New("dkg: resharing config needs old nodes list")
-// 		}
-// 		if c.OldThreshold == 0 {
-// 			return nil, errors.New("dkg: resharing case needs old threshold field")
-// 		}
-// 	}
-// 	// canReceive is true by default since in the default DKG mode everyone
-// 	// participates
-// 	var canReceive = true
-// 	pub := c.Suite.Point().Mul(c.Longterm, nil)
-// 	oidx, oldPresent := findPub(c.OldNodes, pub)
-// 	nidx, newPresent := findPub(c.NewNodes, pub)
-// 	if !oldPresent && !newPresent {
-// 		return nil, errors.New("dkg: public key not found in old list or new list")
-// 	}
+    let mut is_resharing = false;
+    if c.share.is_some() || c.public_coeffs.is_some() {
+        is_resharing = true;
+    }
+    if is_resharing {
+        if c.old_nodes.len() == 0 {
+            return Err(anyhow::Error::msg(
+                "dkg: resharing config needs old nodes list",
+            ));
+        }
+        if c.old_threshold == 0 {
+            return Err(anyhow::Error::msg(
+                "dkg: resharing case needs old threshold field",
+            ));
+        }
+    }
+    // canReceive is true by default since in the default DKG mode everyone
+    // participates
+    let mut can_receive = true;
+    let pubb = c.suite.point().mul(&c.longterm, None);
+    let (mut oidx, mut old_present) = find_pub(&c.old_nodes, &pubb);
+    let (nidx, new_present) = find_pub(&c.new_nodes, &pubb);
+    if !old_present && !new_present {
+        return Err(anyhow::Error::msg(
+            "dkg: public key not found in old list or new list",
+        ));
+    }
 
-// 	var newThreshold int
-// 	if c.Threshold != 0 {
-// 		newThreshold = c.Threshold
-// 	} else {
-// 		newThreshold = vss.MinimumT(len(c.NewNodes))
-// 	}
+    let mut new_threshold = 0;
+    if c.threshold != 0 {
+        new_threshold = c.threshold;
+    } else {
+        new_threshold = vss::pedersen::vss::minimum_t(c.new_nodes.len());
+    }
 
-// 	var dealer *vss.Dealer
-// 	var err error
-// 	var canIssue bool
-// 	if c.Share != nil {
-// 		// resharing case
-// 		secretCoeff := c.Share.Share.V
-// 		dealer, err = vss.NewDealer(c.Suite, c.Longterm, secretCoeff, c.NewNodes, newThreshold)
-// 		canIssue = true
-// 	} else if !isResharing && newPresent {
-// 		// fresh DKG case
-// 		randomStream := random.New()
-// 		// if the user provided a reader, use it alone or combined with crypto/rand
-// 		if c.Reader != nil && !c.UserReaderOnly {
-// 			randomStream = random.New(c.Reader, rand.Reader)
-// 		} else if c.Reader != nil && c.UserReaderOnly {
-// 			randomStream = random.New(c.Reader)
-// 		}
-// 		secretCoeff := c.Suite.Scalar().Pick(randomStream)
-// 		dealer, err = vss.NewDealer(c.Suite, c.Longterm, secretCoeff, c.NewNodes, newThreshold)
-// 		canIssue = true
-// 		c.OldNodes = c.NewNodes
-// 		oidx, oldPresent = findPub(c.OldNodes, pub)
-// 	}
+    let mut dealer = vss::pedersen::Dealer::default();
+    let mut can_issue = false;
+    if c.share.is_some() {
+        // resharing case
+        let secret_coeff = c.share.clone().unwrap().share.v;
+        dealer = vss::pedersen::vss::new_dealer(
+            c.suite,
+            c.longterm.clone(),
+            secret_coeff,
+            &c.new_nodes,
+            new_threshold,
+        )?;
+        can_issue = true;
+    } else if !is_resharing && new_present {
+        // fresh DKG case
+        let mut random_stream = Randstream::default();
+        //if the user provided a reader, use it alone or combined with crypto/rand
+        if c.reader.is_some() && !c.user_reader_only {
+            let mut r_vec = Vec::new();
+            let r = Box::new(c.reader.clone().unwrap()) as Box<dyn Read>;
+            r_vec.push(r);
+            let rng_core = Box::new(StdRng::from_entropy()) as Box<dyn RngCore>;
+            r_vec.push(Box::new(rng_core) as Box<dyn Read>);
+            random_stream = Randstream::new(r_vec); //, rand.Reader
+        } else if c.reader.is_some() && c.user_reader_only {
+            let mut r_vec = Vec::new();
+            let r = Box::new(c.reader.clone().unwrap()) as Box<dyn Read>;
+            r_vec.push(r);
+            random_stream = Randstream::new(r_vec);
+        }
+        let secret_coeff = c.suite.scalar().pick(&mut random_stream);
+        dealer = vss::pedersen::vss::new_dealer(
+            c.suite,
+            c.longterm.clone(),
+            secret_coeff,
+            &c.new_nodes,
+            new_threshold,
+        )?;
+        can_issue = true;
+        c.old_nodes = c.new_nodes.clone();
+        (oidx, old_present) = find_pub(&c.old_nodes, &pubb);
+    }
 
-// 	if err != nil {
-// 		return nil, err
-// 	}
+    let mut dpub = share::poly::PubPoly::<SUITE>::default();
+    let mut old_threshold = 0;
+    if !new_present {
+        // if we are not in the new list of nodes, then we definitely can't
+        // receive anything
+        can_receive = false;
+    } else if is_resharing && new_present {
+        if c.public_coeffs.is_none() && c.share.is_none() {
+            return Err(anyhow::Error::msg(
+                "dkg: can't receive new shares without the public polynomial",
+            ));
+        } else if c.public_coeffs.is_some() {
+            dpub = share::poly::PubPoly::new(
+                &c.suite,
+                Some(c.suite.point().base()),
+                &c.public_coeffs.clone().unwrap(),
+            );
+        } else if c.share.is_some() {
+            // take the commits of the share, no need to duplicate information
+            c.public_coeffs = Some(c.share.clone().unwrap().commits);
+            dpub = share::poly::PubPoly::new(
+                &c.suite,
+                Some(c.suite.point().base()),
+                &c.public_coeffs.clone().unwrap(),
+            )
+        }
+        // oldThreshold is only useful in the context of a new share holder, to
+        // make sure there are enough correct deals from the old nodes.
+        can_receive = true;
+        old_threshold = c.public_coeffs.clone().unwrap().len();
+    }
+    let dkg = DistKeyGenerator::<SUITE, READ> {
+        dealer: dealer,
+        old_aggregators: HashMap::new(),
+        suite: c.suite,
+        long: c.longterm.clone(),
+        pubb: pubb,
+        can_receive: can_receive,
+        can_issue: can_issue,
+        is_resharing: is_resharing,
+        dpub: dpub,
+        oidx: oidx,
+        nidx: nidx,
+        c: c,
+        old_t: old_threshold,
+        new_t: new_threshold,
+        new_present: new_present,
+        old_present: old_present,
+        verifiers: HashMap::new(),
+        processed: false,
+        timeout: false,
+    };
+    // if newPresent {
+    // 	err = dkg.initVerifiers(c)
+    // }
+    // return dkg, err
+    todo!()
+}
 
-// 	var dpub *share.PubPoly
-// 	var oldThreshold int
-// 	if !newPresent {
-// 		// if we are not in the new list of nodes, then we definitely can't
-// 		// receive anything
-// 		canReceive = false
-// 	} else if isResharing && newPresent {
-// 		if c.PublicCoeffs == nil && c.Share == nil {
-// 			return nil, errors.New("dkg: can't receive new shares without the public polynomial")
-// 		} else if c.PublicCoeffs != nil {
-// 			dpub = share.NewPubPoly(c.Suite, c.Suite.Point().Base(), c.PublicCoeffs)
-// 		} else if c.Share != nil {
-// 			// take the commits of the share, no need to duplicate information
-// 			c.PublicCoeffs = c.Share.Commits
-// 			dpub = share.NewPubPoly(c.Suite, c.Suite.Point().Base(), c.PublicCoeffs)
-// 		}
-// 		// oldThreshold is only useful in the context of a new share holder, to
-// 		// make sure there are enough correct deals from the old nodes.
-// 		canReceive = true
-// 		oldThreshold = len(c.PublicCoeffs)
-// 	}
-// 	dkg := &DistKeyGenerator{
-// 		dealer:         dealer,
-// 		oldAggregators: make(map[uint32]*vss.Aggregator),
-// 		suite:          c.Suite,
-// 		long:           c.Longterm,
-// 		pub:            pub,
-// 		canReceive:     canReceive,
-// 		canIssue:       canIssue,
-// 		isResharing:    isResharing,
-// 		dpub:           dpub,
-// 		oidx:           oidx,
-// 		nidx:           nidx,
-// 		c:              c,
-// 		oldT:           oldThreshold,
-// 		newT:           newThreshold,
-// 		newPresent:     newPresent,
-// 		oldPresent:     oldPresent,
-// 	}
-// 	if newPresent {
-// 		err = dkg.initVerifiers(c)
-// 	}
-// 	return dkg, err
-// }
-
-// // NewDistKeyGenerator returns a dist key generator ready to create a fresh
-// // distributed key with the regular DKG protocol.
-// func NewDistKeyGenerator(suite Suite, longterm kyber.Scalar, participants []kyber.Point, t int) (*DistKeyGenerator, error) {
-// 	c := &Config{
-// 		Suite:     suite,
-// 		Longterm:  longterm,
-// 		NewNodes:  participants,
-// 		Threshold: t,
-// 	}
-// 	return NewDistKeyHandler(c)
-// }
+/// NewDistKeyGenerator returns a dist key generator ready to create a fresh
+/// distributed key with the regular DKG protocol.
+pub fn new_dist_key_generator<SUITE: Suite, READ: Read + Clone + 'static>(
+    suite: SUITE,
+    longterm: <SUITE::POINT as Point>::SCALAR,
+    participants: &[SUITE::POINT],
+    t: usize,
+) -> DistKeyGenerator<SUITE, READ>
+where
+    SUITE::POINT: Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+{
+    let c = Config {
+        suite: suite,
+        longterm: longterm,
+        new_nodes: participants.to_vec(),
+        threshold: t,
+        old_nodes: Vec::new(),
+        public_coeffs: None,
+        share: None,
+        old_threshold: 0,
+        reader: None,
+        user_reader_only: false,
+    };
+    new_dist_key_handler(c).unwrap()
+}
 
 // // Deals returns all the deals that must be broadcasted to all participants in
 // // the new list. The deal corresponding to this DKG is already added to this DKG
@@ -840,14 +904,14 @@ SUITE::POINT: Serialize + DeserializeOwned,
 // 	return list[i], true
 // }
 
-// func findPub(list []kyber.Point, toFind kyber.Point) (int, bool) {
-// 	for i, p := range list {
-// 		if p.Equal(toFind) {
-// 			return i, true
-// 		}
-// 	}
-// 	return 0, false
-// }
+fn find_pub<POINT: Point>(list: &[POINT], to_find: &POINT) -> (usize, bool) {
+    for (i, p) in list.iter().enumerate() {
+        if p.equal(to_find) {
+            return (i, true);
+        }
+    }
+    return (0, false);
+}
 
 // func checksDealCertified(i uint32, v *vss.Verifier) bool {
 // 	return v.DealCertified()

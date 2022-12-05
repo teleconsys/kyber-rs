@@ -399,6 +399,16 @@ where
     commits: Vec<GROUP::POINT>,
 }
 
+impl<GROUP: Group> Default for PubPoly<GROUP> {
+    fn default() -> Self {
+        Self {
+            g: Default::default(),
+            b: Default::default(),
+            commits: Default::default(),
+        }
+    }
+}
+
 impl<GROUP: Group> PubPoly<GROUP> {
     /// NewPubPoly creates a new public commitment polynomial.
     pub fn new(g: &GROUP, b: Option<GROUP::POINT>, commits: &[GROUP::POINT]) -> PubPoly<GROUP> {

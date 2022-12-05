@@ -1,14 +1,31 @@
 use rand::Rng;
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{Suite, Point, group::{edwards25519::{SuiteEd25519, Point as EdPoint, Scalar as EdScalar}, HashFactory}, Group, Scalar, Random, share::vss::{pedersen::{vss::{recover_secret, STATUS_APPROVAL, Response, STATUS_COMPLAINT}, dh::dh_exchange}, pedersen::{dh::context, vss::{find_pub, session_id}}}, encoding::BinaryMarshaler, sign::schnorr};
+use crate::{
+    encoding::BinaryMarshaler,
+    group::{
+        edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
+        HashFactory,
+    },
+    share::vss::{
+        pedersen::{
+            dh::context,
+            vss::{find_pub, session_id},
+        },
+        pedersen::{
+            dh::dh_exchange,
+            vss::{recover_secret, Response, STATUS_APPROVAL, STATUS_COMPLAINT},
+        },
+    },
+    sign::schnorr,
+    Group, Point, Random, Scalar, Suite,
+};
 
-use super::vss::{minimum_t, Dealer, new_dealer, new_verifier, Verifier};
+use super::vss::{minimum_t, new_dealer, new_verifier, Dealer, Verifier};
 
 fn suite() -> SuiteEd25519 {
     SuiteEd25519::new_blake_sha256ed25519()
 }
-
 
 #[derive(Clone)]
 struct TestData<SUITE: Suite> {
@@ -45,11 +62,11 @@ fn new_test_data() -> TestData<SuiteEd25519> {
 
 #[test]
 fn test_vss_whole() {
-	let test_data = new_test_data();
+    let test_data = new_test_data();
 
     let (mut dealer, mut verifiers) = gen_all(&test_data);
 
-	// 1. dispatch deal
+    // 1. dispatch deal
     let mut resps = vec![];
     let enc_deals = dealer.encrypted_deals().unwrap();
     for (i, d) in enc_deals.iter().enumerate() {
@@ -57,9 +74,8 @@ fn test_vss_whole() {
         resps.push(resp);
     }
 
-
-	// 2. dispatch responses
-	// 2. dispatch responses
+    // 2. dispatch responses
+    // 2. dispatch responses
     for resp in resps {
         for (i, v) in verifiers.iter_mut().enumerate() {
             if resp.index == i as u32 {
@@ -73,19 +89,19 @@ fn test_vss_whole() {
         assert!(justification_response.unwrap().is_none());
     }
 
-	// 3. check certified
+    // 3. check certified
     for v in &verifiers {
         assert!(v.deal_certified());
     }
 
-	// 4. collect deals
+    // 4. collect deals
     let mut deals = Vec::with_capacity(test_data.nb_verifiers);
     for v in verifiers {
         deals.push(v.deal().unwrap());
     }
 
-	// 5. recover
-	// 5. recover
+    // 5. recover
+    // 5. recover
     let sec = recover_secret(
         test_data.suite,
         deals,
@@ -95,9 +111,9 @@ fn test_vss_whole() {
     .unwrap();
     assert_eq!(dealer.secret.to_string(), sec.to_string());
 
-	let pri_poly = dealer.private_poly();
-	let pri_coeffs = pri_poly.coefficients();
-	assert_eq!(test_data.secret.string(), pri_coeffs[0].string())
+    let pri_poly = dealer.private_poly();
+    let pri_coeffs = pri_poly.coefficients();
+    assert_eq!(test_data.secret.string(), pri_coeffs[0].string())
 }
 
 #[test]
@@ -165,23 +181,28 @@ fn test_vss_share() {
     let resp = ver.process_encrypted_deal(&deal).unwrap();
     assert_eq!(resp.status, STATUS_APPROVAL);
 
-    
     let aggr = ver.aggregator.as_mut().unwrap();
 
     for i in 1..aggr.t - 1 {
-       aggr.responses.insert(
+        aggr.responses.insert(
             i as u32,
             Response {
                 status: STATUS_APPROVAL,
                 ..Response::default()
             },
         );
-    }    
+    }
 
     // not enough approvals
-	assert!(ver.deal().is_none());
+    assert!(ver.deal().is_none());
     let aggr = ver.aggregator.as_mut().unwrap();
-	aggr.responses.insert(aggr.t as u32, Response{status: STATUS_APPROVAL, ..Response::default()});
+    aggr.responses.insert(
+        aggr.t as u32,
+        Response {
+            status: STATUS_APPROVAL,
+            ..Response::default()
+        },
+    );
 
     ver.set_timeout();
 
@@ -191,9 +212,8 @@ fn test_vss_share() {
     assert!(ver.deal().is_none());
     let aggr = ver.aggregator.as_mut().unwrap();
     aggr.bad_dealer = false;
-    
-    assert!(ver.deal().is_some());
 
+    assert!(ver.deal().is_some());
 }
 
 #[test]
@@ -212,8 +232,8 @@ fn test_vss_aggregator_deal_certified() {
         );
     }
 
-	// Mark remaining verifiers as timed-out
-	dealer.set_timeout();
+    // Mark remaining verifiers as timed-out
+    dealer.set_timeout();
 
     let aggr = &mut dealer.aggregator;
     assert!(aggr.deal_certified());
@@ -227,9 +247,9 @@ fn test_vss_aggregator_deal_certified() {
     assert!(!aggr.deal_certified());
     assert!(dealer.secret_commit().is_none());
 
-	// reset dealer status
+    // reset dealer status
     let aggr = &mut dealer.aggregator;
-	aggr.bad_dealer = false;
+    aggr.bad_dealer = false;
 
     // inconsistent state on purpose
     // too much complaints
@@ -525,38 +545,59 @@ fn test_vss_aggregator_verify_response() {
 #[test]
 fn test_vss_aggregator_all_responses() {
     let test_data = new_test_data();
-	let mut dealer = gen_dealer(&test_data);
-	let aggr = &mut dealer.aggregator;
+    let mut dealer = gen_dealer(&test_data);
+    let aggr = &mut dealer.aggregator;
 
-	for i in 0..aggr.t {
-		aggr.responses.insert(i as u32, Response{status: STATUS_APPROVAL, ..Default::default()});
-	}
-	assert!(!aggr.deal_certified());
-    
-	for i in aggr.t..test_data.nb_verifiers {
-		aggr.responses.insert(i as u32, Response{status: STATUS_APPROVAL, ..Default::default()});
-	}
+    for i in 0..aggr.t {
+        aggr.responses.insert(
+            i as u32,
+            Response {
+                status: STATUS_APPROVAL,
+                ..Default::default()
+            },
+        );
+    }
+    assert!(!aggr.deal_certified());
 
-	assert!(aggr.deal_certified());
-	assert_eq!(test_data.suite.point().mul(&test_data.secret, None), dealer.secret_commit().unwrap())
+    for i in aggr.t..test_data.nb_verifiers {
+        aggr.responses.insert(
+            i as u32,
+            Response {
+                status: STATUS_APPROVAL,
+                ..Default::default()
+            },
+        );
+    }
+
+    assert!(aggr.deal_certified());
+    assert_eq!(
+        test_data.suite.point().mul(&test_data.secret, None),
+        dealer.secret_commit().unwrap()
+    )
 }
 
 #[test]
 fn test_vss_dealer_timeout() {
     let test_data = new_test_data();
-	let mut dealer = gen_dealer(&test_data);
-    
-	let aggr = &mut dealer.aggregator;
+    let mut dealer = gen_dealer(&test_data);
 
-	for i in 0..aggr.t {
-		aggr.responses.insert(i as u32, Response{status: STATUS_APPROVAL, ..Default::default()});
-	}
+    let aggr = &mut dealer.aggregator;
+
+    for i in 0..aggr.t {
+        aggr.responses.insert(
+            i as u32,
+            Response {
+                status: STATUS_APPROVAL,
+                ..Default::default()
+            },
+        );
+    }
     assert!(!aggr.deal_certified());
 
-	// Tell dealer to consider other verifiers timed-out
-	dealer.set_timeout();
+    // Tell dealer to consider other verifiers timed-out
+    dealer.set_timeout();
 
-	// Deal should be certified
+    // Deal should be certified
     let aggr = &mut dealer.aggregator;
     assert!(aggr.deal_certified());
     assert!(dealer.secret_commit().is_some());
@@ -565,30 +606,36 @@ fn test_vss_dealer_timeout() {
 #[test]
 fn test_vss_verifier_timeout() {
     let test_data = new_test_data();
-	let (dealer, mut verifiers) = gen_all(&test_data);
-	let v = &mut verifiers[0];
+    let (dealer, mut verifiers) = gen_all(&test_data);
+    let v = &mut verifiers[0];
 
-	let enc_deal =dealer.encrypted_deal(0).unwrap();
+    let enc_deal = dealer.encrypted_deal(0).unwrap();
 
-	// Make verifier create it's Aggregator by processing EncDeal
-	_ = v.process_encrypted_deal(&enc_deal).unwrap();
+    // Make verifier create it's Aggregator by processing EncDeal
+    _ = v.process_encrypted_deal(&enc_deal).unwrap();
 
-	let aggr = v.aggregator.as_mut().unwrap();
-
-	// Add t responses
-	for i in 0..aggr.t {
-        aggr.responses.insert(i as u32, Response{status: STATUS_APPROVAL, ..Default::default()});
-	}
-	assert!(!aggr.deal_certified());
-
-	// Trigger time out, thus adding StatusComplaint to all
-	// remaining verifiers
-	v.set_timeout();
-
-	// Deal must be certified now
     let aggr = v.aggregator.as_mut().unwrap();
-	assert!(aggr.deal_certified());
-	assert!(v.deal().is_some());
+
+    // Add t responses
+    for i in 0..aggr.t {
+        aggr.responses.insert(
+            i as u32,
+            Response {
+                status: STATUS_APPROVAL,
+                ..Default::default()
+            },
+        );
+    }
+    assert!(!aggr.deal_certified());
+
+    // Trigger time out, thus adding StatusComplaint to all
+    // remaining verifiers
+    v.set_timeout();
+
+    // Deal must be certified now
+    let aggr = v.aggregator.as_mut().unwrap();
+    assert!(aggr.deal_certified());
+    assert!(v.deal().is_some());
 }
 
 #[test]

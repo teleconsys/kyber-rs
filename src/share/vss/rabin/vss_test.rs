@@ -4,9 +4,10 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::{
     encoding::BinaryMarshaler,
     group::edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
-    share::vss::rabin::{vss::{
-        find_pub, new_verifier, recover_secret, session_id, Response,
-    }, dh::{context, dh_exchange, KEY_SIZE}},
+    share::vss::rabin::{
+        dh::{context, dh_exchange, KEY_SIZE},
+        vss::{find_pub, new_verifier, recover_secret, session_id, Response},
+    },
     sign::schnorr,
     Group, Point, Random, Scalar, Suite,
 };

@@ -72,6 +72,29 @@ where
     }
 }
 
+impl<SUITE: Suite> Default for Dealer<SUITE>
+where
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
+{
+    fn default() -> Self {
+        Self {
+            suite: Default::default(),
+            long: Default::default(),
+            pubb: Default::default(),
+            secret: Default::default(),
+            secret_commits: Default::default(),
+            secret_poly: Default::default(),
+            verifiers: Default::default(),
+            hkdf_context: Default::default(),
+            t: Default::default(),
+            session_id: Default::default(),
+            deals: Default::default(),
+            aggregator: Default::default(),
+        }
+    }
+}
+
 /// Deal encapsulates the verifiable secret share and is sent by the dealer to a verifier.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Deal<SUITE: Suite>
@@ -801,6 +824,27 @@ where
         deal: None,
         bad_dealer: false,
         timeout: false,
+    }
+}
+
+impl<SUITE: Suite> Default for Aggregator<SUITE>
+where
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
+{
+    fn default() -> Self {
+        Self {
+            suite: Default::default(),
+            dealer: Default::default(),
+            verifiers: Default::default(),
+            commits: Default::default(),
+            responses: Default::default(),
+            sid: Default::default(),
+            deal: Default::default(),
+            t: Default::default(),
+            bad_dealer: Default::default(),
+            timeout: Default::default(),
+        }
     }
 }
 
