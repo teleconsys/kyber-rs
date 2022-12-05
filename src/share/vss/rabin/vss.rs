@@ -32,11 +32,11 @@ use std::collections::HashMap;
 use crate::encoding::{self, unmarshal_binary, BinaryMarshaler, Marshaling};
 use crate::group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical};
 use crate::share::poly::{self, new_pri_poly, PriShare, PubPoly};
-use crate::share::vss::dh::{AEAD, context, dh_exchange};
+use crate::share::vss::dh::{context, dh_exchange, AEAD};
 use crate::share::vss::suite::Suite;
 use crate::sign::schnorr;
-use crate::Scalar;
 use crate::Point;
+use crate::Scalar;
 
 use anyhow::{bail, Error, Ok, Result};
 use byteorder::{LittleEndian, WriteBytesExt};
@@ -690,7 +690,7 @@ where
     /// probably means the Dealer is acting maliciously. In order to be sure, call
     /// `v.EnoughApprovals()` and if true, `v.DealCertified()`.
     pub fn process_justification(&mut self, dr: &Justification<SUITE>) -> Result<()> {
-          match &mut self.aggregator {
+        match &mut self.aggregator {
             Some(a) => a.verify_justification(dr),
             None => bail!("missing aggregator"),
         }

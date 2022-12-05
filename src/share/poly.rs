@@ -68,9 +68,12 @@ pub struct PriPoly<GROUP: Group> {
     pub coeffs: Vec<<GROUP::POINT as Point>::SCALAR>,
 }
 
-impl<GROUP: Group> Default for PriPoly<GROUP>{
+impl<GROUP: Group> Default for PriPoly<GROUP> {
     fn default() -> Self {
-        Self { g: Default::default(), coeffs: Default::default() }
+        Self {
+            g: Default::default(),
+            coeffs: Default::default(),
+        }
     }
 }
 

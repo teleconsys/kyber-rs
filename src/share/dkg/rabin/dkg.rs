@@ -49,7 +49,6 @@ use crate::{
     Point, Scalar,
 };
 
-
 use anyhow::{bail, Result};
 
 /// DistKeyShare holds the share of a distributed key for a participant.

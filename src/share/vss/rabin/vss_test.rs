@@ -6,7 +6,7 @@ use crate::{
     encoding::BinaryMarshaler,
     group::edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
     share::vss::{
-        find_pub, new_verifier, recover_secret, session_id, Response, self, suite::Suite,
+        self, find_pub, new_verifier, recover_secret, session_id, suite::Suite, Response,
     },
     sign::schnorr,
     Group, Point, Random, Scalar,

@@ -9,12 +9,11 @@ the "happy" path where each node does its job correctly.
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
+    encoding::BinaryMarshaler,
     group::edwards25519::SuiteEd25519,
-    share::{
-        self,
-        dkg,
-    },
-    Group, Point, Random, Scalar, Suite, sign::dss::DistKeyShare, encoding::BinaryMarshaler,
+    share::{self, dkg},
+    sign::dss::DistKeyShare,
+    Group, Point, Random, Scalar, Suite,
 };
 
 const NUM_NODES: usize = 3;
@@ -31,7 +30,7 @@ where
     deals: Vec<dkg::Deal<SUITE::POINT>>,
     resps: Vec<dkg::Response>,
     secret_share: share::poly::PriShare<<SUITE::POINT as Point>::SCALAR>,
-    distributed_public_key: SUITE::POINT
+    distributed_public_key: SUITE::POINT,
 }
 
 #[test]
@@ -53,7 +52,7 @@ fn test_example_dkg() {
             deals: Vec::new(),
             resps: Vec::new(),
             secret_share: Default::default(),
-            distributed_public_key: Default::default()
+            distributed_public_key: Default::default(),
         });
     }
 
@@ -77,9 +76,9 @@ fn test_example_dkg() {
     }
 
     // 4. Process the Deals on each node and send the responses to the other
-	// nodes
+    // nodes
     let mut all_resps = Vec::new();
-	for (i, node) in nodes.iter_mut().enumerate() {
+    for (i, node) in nodes.iter_mut().enumerate() {
         for deal in node.deals.clone() {
             let resp = node.dkg.process_deal(&deal).unwrap();
             all_resps.push((i, resp));
@@ -87,52 +86,58 @@ fn test_example_dkg() {
     }
     for (i, node) in nodes.iter_mut().enumerate() {
         for (j, resp) in all_resps.clone() {
-        if i == j {
-            continue
-        }
-        node.resps.push(resp);
+            if i == j {
+                continue;
+            }
+            node.resps.push(resp);
         }
     }
 
     let mut all_justifications = Vec::new();
     // 5. Process the responses on each node
-	for node in nodes.iter_mut() {
-		for resp in node.resps.clone() {
-			let justification = node.dkg.process_response(&resp).unwrap();
+    for node in nodes.iter_mut() {
+        for resp in node.resps.clone() {
+            let justification = node.dkg.process_response(&resp).unwrap();
             all_justifications.push(justification);
-		}
-	}
+        }
+    }
 
     // 6. Process justifications on each node (if any)
     for (i, node) in nodes.iter_mut().enumerate() {
-		for j in all_justifications.clone() {
-			if j.is_none() {
-                continue
+        for j in all_justifications.clone() {
+            if j.is_none() {
+                continue;
             }
             let justification = j.unwrap();
             if justification.index == i as u32 {
-                continue
-            }            
-			assert!(node.dkg.process_justification(&justification).is_ok(), "dealer misbehaved")
-		}
-	}
+                continue;
+            }
+            assert!(
+                node.dkg.process_justification(&justification).is_ok(),
+                "dealer misbehaved"
+            )
+        }
+    }
 
     // 7. Check and print the qualified shares
-	for (i, node) in nodes.iter().enumerate() {
+    for (i, node) in nodes.iter().enumerate() {
         assert!(node.dkg.certified());
         assert_eq!(THRESHOLD, node.dkg.qual().len());
-		println!("Qualified nodes (from node {} prospective): {:?}", i, node.dkg.qual());
-	}
+        println!(
+            "Qualified nodes (from node {} prospective): {:?}",
+            i,
+            node.dkg.qual()
+        );
+    }
 
     // 8. Generate and broadcast secret commits
     let mut scs = Vec::new();
-	for (i, node) in nodes.iter_mut().enumerate() {
+    for (i, node) in nodes.iter_mut().enumerate() {
         let sc = node.dkg.secret_commits().unwrap();
         scs.push(sc);
+    }
 
-	}
-
-    // 9. Process secret commits 
+    // 9. Process secret commits
     let mut ccs = Vec::new();
     for sc in scs.iter() {
         for node in nodes.iter_mut() {
@@ -146,7 +151,7 @@ fn test_example_dkg() {
     for (i, node) in nodes.iter_mut().enumerate() {
         for cc in ccs.clone() {
             if cc.is_none() {
-                continue
+                continue;
             }
             let complaint = cc.unwrap();
             if complaint.index == i as u32 {
@@ -161,16 +166,19 @@ fn test_example_dkg() {
     // 11. Process renconstructed commits (if any)
     for rc in rcs.clone() {
         for node in nodes.iter_mut() {
-           node.dkg.process_reconstruct_commits(&rc).unwrap();
+            node.dkg.process_reconstruct_commits(&rc).unwrap();
         }
     }
 
-    // 12. Now everyone should be able to compute the distributed key 
+    // 12. Now everyone should be able to compute the distributed key
     for (i, node) in nodes.iter_mut().enumerate() {
         let dks = node.dkg.dist_key_share().unwrap();
         node.secret_share = dks.pri_share();
         node.distributed_public_key = dks.public();
-        println!("Distributed public key (from node {} prospective): {:?}", i, node.distributed_public_key.marshal_binary().unwrap());
+        println!(
+            "Distributed public key (from node {} prospective): {:?}",
+            i,
+            node.distributed_public_key.marshal_binary().unwrap()
+        );
     }
-
 }

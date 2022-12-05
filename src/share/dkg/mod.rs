@@ -1,5 +1,5 @@
-pub mod rabin;
 pub mod pedersen;
+pub mod rabin;
 
-pub use rabin::*;
 pub use pedersen::*;
+pub use rabin::*;

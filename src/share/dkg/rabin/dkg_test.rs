@@ -9,7 +9,7 @@ use crate::{
         vss::{self, suite::Suite},
     },
     sign::schnorr,
-    Group, Point, Random, Scalar, 
+    Group, Point, Random, Scalar,
 };
 
 use super::{new_dist_key_generator, DistKeyGenerator};
