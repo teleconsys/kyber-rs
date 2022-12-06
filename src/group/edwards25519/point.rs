@@ -225,6 +225,12 @@ impl group::Point for Point {
     }
 }
 
+impl ToString for Point {
+    fn to_string(&self) -> String {
+        self.string()
+    }
+}
+
 impl PointCanCheckCanonicalAndSmallOrder for Point {
     /// HasSmallOrder determines whether the group element has small order
     ///

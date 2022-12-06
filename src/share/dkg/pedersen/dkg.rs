@@ -5,13 +5,13 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     share::{self, vss},
-    util::{self, random::Randstream},
+    util::{random::Randstream},
     Point, Scalar, Suite, encoding::BinaryMarshaler, sign::schnorr, group::{ScalarCanCheckCanonical, PointCanCheckCanonicalAndSmallOrder},
 };
 
 use super::structs::{DistKeyShare, Deal, Response, Justification};
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 
 /// Package dkg implements a general distributed key generation (DKG) framework.
 /// This package serves two functionalities: (1) to run a fresh new DKG from
@@ -93,6 +93,7 @@ pub struct Config<SUITE: Suite, READ: Read + Clone> {
 }
 
 /// DistKeyGenerator is the struct that runs the DKG protocol.
+#[derive(Clone)]
 pub struct DistKeyGenerator<SUITE: Suite, READ: Read + Clone>
 where
     SUITE::POINT: Serialize + DeserializeOwned,
@@ -140,11 +141,11 @@ fn new_dist_key_handler<SUITE: Suite, READ: Read + Clone + 'static>(
     mut c: Config<SUITE, READ>,
 ) -> Result<DistKeyGenerator<SUITE, READ>>
 where
-    SUITE::POINT: Serialize + DeserializeOwned,
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned + ScalarCanCheckCanonical,
 {
     if c.new_nodes.len() == 0 && c.old_nodes.len() == 0 {
-        return Err(anyhow::Error::msg("dkg: can't run with empty node list"));
+        bail!("dkg: can't run with empty node list")
     }
 
     let mut is_resharing = false;
@@ -153,14 +154,10 @@ where
     }
     if is_resharing {
         if c.old_nodes.len() == 0 {
-            return Err(anyhow::Error::msg(
-                "dkg: resharing config needs old nodes list",
-            ));
+            bail!("dkg: resharing config needs old nodes list");
         }
         if c.old_threshold == 0 {
-            return Err(anyhow::Error::msg(
-                "dkg: resharing case needs old threshold field",
-            ));
+            bail!("dkg: resharing case needs old threshold field");
         }
     }
     // canReceive is true by default since in the default DKG mode everyone
@@ -170,9 +167,7 @@ where
     let (mut oidx, mut old_present) = find_pub(&c.old_nodes, &pubb);
     let (nidx, new_present) = find_pub(&c.new_nodes, &pubb);
     if !old_present && !new_present {
-        return Err(anyhow::Error::msg(
-            "dkg: public key not found in old list or new list",
-        ));
+        bail!("dkg: public key not found in old list or new list");
     }
 
     let mut new_threshold = 0;
@@ -233,9 +228,7 @@ where
         can_receive = false;
     } else if is_resharing && new_present {
         if c.public_coeffs.is_none() && c.share.is_none() {
-            return Err(anyhow::Error::msg(
-                "dkg: can't receive new shares without the public polynomial",
-            ));
+            bail!("dkg: can't receive new shares without the public polynomial")
         } else if c.public_coeffs.is_some() {
             dpub = share::poly::PubPoly::new(
                 &c.suite,
@@ -256,7 +249,7 @@ where
         can_receive = true;
         old_threshold = c.public_coeffs.clone().unwrap().len();
     }
-    let dkg = DistKeyGenerator::<SUITE, READ> {
+    let mut dkg = DistKeyGenerator::<SUITE, READ> {
         dealer: dealer,
         old_aggregators: HashMap::new(),
         suite: c.suite,
@@ -268,7 +261,7 @@ where
         dpub: dpub,
         oidx: oidx,
         nidx: nidx,
-        c: c,
+        c: c.clone(),
         old_t: old_threshold,
         new_t: new_threshold,
         new_present: new_present,
@@ -277,11 +270,15 @@ where
         processed: false,
         timeout: false,
     };
-    // if newPresent {
-    // 	err = dkg.initVerifiers(c)
-    // }
+    if new_present {
+        let mut dkg_try = dkg.clone();
+    	let res_init = dkg_try.init_verifiers(c);
+        if res_init.is_ok() {
+            return Ok(dkg_try)
+        }
+    }
+    Ok(dkg)
     // return dkg, err
-    todo!()
 }
 
 /// NewDistKeyGenerator returns a dist key generator ready to create a fresh
@@ -293,8 +290,8 @@ pub fn new_dist_key_generator<SUITE: Suite, READ: Read + Clone + 'static>(
     t: usize,
 ) -> DistKeyGenerator<SUITE, READ>
 where
-    SUITE::POINT: Serialize + DeserializeOwned,
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned + ScalarCanCheckCanonical,
 {
     let c = Config {
         suite: suite,
@@ -376,7 +373,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     fn process_deal(&mut self, dd: &Deal<SUITE::POINT>) -> Result<Response> 
     {
         if !self.new_present {
-            return Err(anyhow::Error::msg("dkg: unexpected deal for unlisted dealer in new list"))
+            bail!("dkg: unexpected deal for unlisted dealer in new list")
         }
         let pubb;
         let ok;
@@ -387,7 +384,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
         }
         // public key of the dealer
         if !ok {
-            return Err(anyhow::Error::msg("dkg: dist deal out of bounds index"))
+            bail!("dkg: dist deal out of bounds index")
         }
 
         // verify signature
@@ -470,7 +467,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     	}
 
     	if !self.verifiers.contains_key(&resp.index) {
-    		return Err(anyhow::Error::msg(format!("dkg: responses received for unknown dealer {}", resp.index)))
+    		bail!("dkg: responses received for unknown dealer {}", resp.index)
     	}
         let v = self.verifiers.get_mut(&resp.index).unwrap();
         v.process_response(&resp.response)?;
@@ -516,7 +513,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
 
     	agg.process_response(resp.response.clone())?;
     	if resp.index as usize != self.oidx {
-    		return Err(anyhow::Error::msg("error"))
+    		bail!("error")
     	}
 
         if resp.response.status == vss::pedersen::vss::STATUS_APPROVAL {
@@ -543,7 +540,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     /// error in case the justification is wrong.
     fn process_justification(&mut self, j: Justification<SUITE>) -> Result<()> {
         if !self.verifiers.contains_key(&j.index) {
-            return Err(anyhow::Error::msg("dkg: Justification received but no deal for it"))
+            bail!("dkg: Justification received but no deal for it")
         }
         let v = self.verifiers.get_mut(&j.index).unwrap();
     	return v.process_justification(&j.justification)
@@ -739,154 +736,177 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
         }
     }
 
-    // // DistKeyShare generates the distributed key relative to this receiver.
-    // // It throws an error if something is wrong such as not enough deals received.
-    // // The shared secret can be computed when all deals have been sent and
-    // // basically consists of a public point and a share. The public point is the sum
-    // // of all aggregated individual public commits of each individual secrets.
-    // // The share is evaluated from the global Private Polynomial, basically SUM of
-    // // fj(i) for a receiver i.
-    // func (d *DistKeyGenerator) DistKeyShare() (*DistKeyShare, error) {
-    // 	if !d.ThresholdCertified() {
-    // 		return nil, errors.New("dkg: distributed key not certified")
-    // 	}
-    // 	if !d.canReceive {
-    // 		return nil, errors.New("dkg: should not expect to compute any dist. share")
-    // 	}
+    /// DistKeyShare generates the distributed key relative to this receiver.
+    /// It throws an error if something is wrong such as not enough deals received.
+    /// The shared secret can be computed when all deals have been sent and
+    /// basically consists of a public point and a share. The public point is the sum
+    /// of all aggregated individual public commits of each individual secrets.
+    /// The share is evaluated from the global Private Polynomial, basically SUM of
+    /// fj(i) for a receiver i.
+    fn dist_key_share(&self) -> Result<DistKeyShare<SUITE::POINT>> {
+    	if !self.threshold_certified() {
+    		bail!("dkg: distributed key not certified")
+    	}
+    	if !self.can_receive {
+    		bail!("dkg: should not expect to compute any dist. share")
+    	}
 
-    // 	if d.isResharing {
-    // 		return d.resharingKey()
-    // 	}
+    	if self.is_resharing {
+    		return self.resharing_key()
+    	}
 
-    // 	return d.dkgKey()
-    // }
+    	return self.dkg_key()
+    }
 
-    // func (d *DistKeyGenerator) dkgKey() (*DistKeyShare, error) {
-    // 	sh := d.suite.Scalar().Zero()
-    // 	var pub *share.PubPoly
-    // 	var err error
-    // 	d.qualIter(func(i uint32, v *vss.Verifier) bool {
-    // 		// share of dist. secret = sum of all share received.
-    // 		deal := v.Deal()
-    // 		s := deal.SecShare.V
-    // 		sh = sh.Add(sh, s)
-    // 		// Dist. public key = sum of all revealed commitments
-    // 		poly := share.NewPubPoly(d.suite, d.suite.Point().Base(), deal.Commitments)
-    // 		if pub == nil {
-    // 			// first polynomial we see (instead of generating n empty commits)
-    // 			pub = poly
-    // 			return true
-    // 		}
-    // 		pub, err = pub.Add(poly)
-    // 		return err == nil
-    // 	})
+    fn dkg_key(&self) -> Result<DistKeyShare<SUITE::POINT>> {
+    	let mut sh = self.suite.scalar().zero();
+    	let mut tmp_pubb = None;
+        let mut pubb: Option<share::poly::PubPoly<SUITE>> = None;
+        // TODO: fix this weird error management and the messy pubb
+        let mut error: Option<anyhow::Error> = None;
+    	self.qual_iter(|i, v| {
+    		// share of dist. secret = sum of all share received.
+            let (s, deal) = match v.deal() {
+                Some(deal) => (deal.clone().sec_share.v, deal),
+                None => {
+                    error = Some(anyhow::Error::msg("dkg: deals not found"));
+                    return false;
+                }
+            };
+            let sh_clone = sh.clone();
+            sh = sh_clone + s;
+    		// Dist. public key = sum of all revealed commitments
+    		let poly = share::poly::PubPoly::new(&self.suite, Some(self.suite.point().base()), &deal.commitments);
+            if pubb.is_none() && tmp_pubb.is_none() {
+                // first polynomial we see (instead of generating n empty commits)
+                tmp_pubb = Some(poly);
+                return true;
+            }
+            if pubb.is_none() {
+                match tmp_pubb.as_ref().unwrap().add(&poly) {
+                    Ok(p) => pubb = Some(p),
+                    Err(e) => error = Some(anyhow::Error::msg(e.to_string())),
+                }
+            } else {
+                match pubb.as_ref().unwrap().add(&poly) {
+                    Ok(p) => pubb = Some(p),
+                    Err(e) => error = Some(anyhow::Error::msg(e.to_string())),
+                }
+            };
+            return error.is_none();
+    	});
 
-    // 	if err != nil {
-    // 		return nil, err
-    // 	}
-    // 	_, commits := pub.Info()
+    	if error.is_some() {
+            return Err(error.unwrap());
+        }
+    	let (_, commits) = pubb.unwrap().info();
 
-    // 	return &DistKeyShare{
-    // 		Commits: commits,
-    // 		Share: &share.PriShare{
-    // 			I: int(d.nidx),
-    // 			V: sh,
-    // 		},
-    // 		PrivatePoly: d.dealer.PrivatePoly().Coefficients(),
-    // 	}, nil
+        Ok(DistKeyShare {
+            commits: commits,
+            share: share::poly::PriShare {
+                i: self.nidx as usize,
+                v: sh,
+            },
+            private_poly: self.dealer.private_poly().coefficients()
+        })    	
+    }
 
-    // }
+    fn resharing_key(&self) -> Result<DistKeyShare<SUITE::POINT>> {
+    	// only old nodes sends shares
+    	let mut shares = Vec::new();
+    	let mut coeffs = Vec::new();
+        let mut error = None;
+    	self.qual_iter(|i, v| {
+    		let mut deal = match v.deal() {
+                Some(deal) => deal,
+                None => {
+                    error = Some(anyhow::Error::msg("dkg: deals not found"));
+                    coeffs.push(None);
+                    shares.push(None);
+                    return false;
+                }
+            };
+            coeffs.push(Some(deal.commitments));
+    		// share of dist. secret. Invertion of rows/column
+    		deal.sec_share.i = i as usize;
+    		shares.push(Some(deal.sec_share));
+    		return true
+    	});
+        
 
-    // func (d *DistKeyGenerator) resharingKey() (*DistKeyShare, error) {
-    // 	// only old nodes sends shares
-    // 	shares := make([]*share.PriShare, len(d.c.OldNodes))
-    // 	coeffs := make([][]kyber.Point, len(d.c.OldNodes))
-    // 	d.qualIter(func(i uint32, v *vss.Verifier) bool {
-    // 		deal := v.Deal()
-    // 		coeffs[int(i)] = deal.Commitments
-    // 		// share of dist. secret. Invertion of rows/column
-    // 		deal.SecShare.I = int(i)
-    // 		shares[int(i)] = deal.SecShare
-    // 		return true
-    // 	})
+    	// the private polynomial is generated from the old nodes, thus inheriting
+    	// the old threshold condition
+    	let pri_poly = share::poly::recover_pri_poly(&self.suite, &shares, self.old_t, self.c.old_nodes.len())?;
+    	let private_share = share::poly::PriShare{
+    		i: self.nidx,
+    		v: pri_poly.secret(),
+    	};
 
-    // 	// the private polynomial is generated from the old nodes, thus inheriting
-    // 	// the old threshold condition
-    // 	priPoly, err := share.RecoverPriPoly(d.suite, shares, d.oldT, len(d.c.OldNodes))
-    // 	if err != nil {
-    // 		return nil, err
-    // 	}
-    // 	privateShare := &share.PriShare{
-    // 		I: int(d.nidx),
-    // 		V: priPoly.Secret(),
-    // 	}
+    	// recover public polynomial by interpolating coefficient-wise all
+    	// polynomials
+    	// the new public polynomial must however have "newT" coefficients since it
+    	// will be held by the new nodes.
+    	let mut final_coeffs = Vec::with_capacity(self.new_t);
+    	for i in 0..self.new_t {
+    		let mut tmp_coeffs = Vec::with_capacity(coeffs.len());
+    		// take all i-th coefficients
+    		for (j, _) in coeffs.iter().enumerate() {
+    			if coeffs[j] == None {
+                    tmp_coeffs.push(None);
+    				continue
+    			}
+    			tmp_coeffs.push(Some(share::poly::PubShare{
+                    i: j,
+                    v: coeffs[j].clone().unwrap()[i].clone(),
+                }));
+    		}
 
-    // 	// recover public polynomial by interpolating coefficient-wise all
-    // 	// polynomials
-    // 	// the new public polynomial must however have "newT" coefficients since it
-    // 	// will be held by the new nodes.
-    // 	finalCoeffs := make([]kyber.Point, d.newT)
-    // 	for i := 0; i < d.newT; i++ {
-    // 		tmpCoeffs := make([]*share.PubShare, len(coeffs))
-    // 		// take all i-th coefficients
-    // 		for j := range coeffs {
-    // 			if coeffs[j] == nil {
-    // 				continue
-    // 			}
-    // 			tmpCoeffs[j] = &share.PubShare{I: j, V: coeffs[j][i]}
-    // 		}
+    		// using the old threshold / length because there are at most
+    		// len(d.c.OldNodes) i-th coefficients since they are the one generating one
+    		// each, thus using the old threshold.
+    		let coeff = share::poly::recover_commit(self.suite, &tmp_coeffs, self.old_t, self.c.old_nodes.len())?;
+    		final_coeffs.push(coeff);
+    	}
 
-    // 		// using the old threshold / length because there are at most
-    // 		// len(d.c.OldNodes) i-th coefficients since they are the one generating one
-    // 		// each, thus using the old threshold.
-    // 		coeff, err := share.RecoverCommit(d.suite, tmpCoeffs, d.oldT, len(d.c.OldNodes))
-    // 		if err != nil {
-    // 			return nil, err
-    // 		}
-    // 		finalCoeffs[i] = coeff
-    // 	}
+    	// Reconstruct the final public polynomial
+    	let pub_poly = share::poly::PubPoly::new(&self.suite, None, &final_coeffs);
 
-    // 	// Reconstruct the final public polynomial
-    // 	pubPoly := share.NewPubPoly(d.suite, nil, finalCoeffs)
+    	if !pub_poly.check(&private_share) {
+    		bail!("dkg: share do not correspond to public polynomial ><");
+    	}
+    	Ok(DistKeyShare{
+    		commits:     final_coeffs,
+    		share:       private_share,
+    		private_poly: pri_poly.coefficients(),
+    	})
+    }
 
-    // 	if !pubPoly.Check(privateShare) {
-    // 		return nil, errors.New("dkg: share do not correspond to public polynomial ><")
-    // 	}
-    // 	return &DistKeyShare{
-    // 		Commits:     finalCoeffs,
-    // 		Share:       privateShare,
-    // 		PrivatePoly: priPoly.Coefficients(),
-    // 	}, nil
-    // }
+    // Verifiers returns the verifiers keeping state of each deals
+    fn verifiers(&self) -> &HashMap<u32, vss::pedersen::vss::Verifier<SUITE>> {
+    	return &self.verifiers
+    }
 
-    // // Verifiers returns the verifiers keeping state of each deals
-    // func (d *DistKeyGenerator) Verifiers() map[uint32]*vss.Verifier {
-    // 	return d.verifiers
-    // }
+    fn init_verifiers(&mut self, c: Config<SUITE, READ>) -> Result<()> {
+    	let mut already_taken = HashMap::new();
+    	let verifier_list = c.new_nodes;
+    	let dealer_list = c.old_nodes;
+    	let mut verifiers = HashMap::new();
+    	for (i, pubb) in dealer_list.iter().enumerate() {
+    		if already_taken.contains_key(&pubb.to_string()) {
+    			bail!("duplicate public key in NewNodes list")
+    		}
+            already_taken.insert(pubb.to_string(), true);
+    		let mut ver = vss::pedersen::vss::new_verifier(&c.suite, &c.longterm, pubb, &verifier_list)?;
+    		// set that the number of approval for this deal must be at the given
+    		// threshold regarding the new nodes. (see config.
+    		ver.set_threshold(c.threshold);
+            verifiers.insert(i as u32, ver);
+    	}
+    	self.verifiers = verifiers;
+    	Ok(())
+    }
+}
 
-    // func (d *DistKeyGenerator) initVerifiers(c *Config) error {
-    // 	var alreadyTaken = make(map[string]bool)
-    // 	verifierList := c.NewNodes
-    // 	dealerList := c.OldNodes
-    // 	verifiers := make(map[uint32]*vss.Verifier)
-    // 	for i, pub := range dealerList {
-    // 		if _, exists := alreadyTaken[pub.String()]; exists {
-    // 			return errors.New("duplicate public key in NewNodes list")
-    // 		}
-    // 		alreadyTaken[pub.String()] = true
-    // 		ver, err := vss.NewVerifier(c.Suite, c.Longterm, pub, verifierList)
-    // 		if err != nil {
-    // 			return err
-    // 		}
-    // 		// set that the number of approval for this deal must be at the given
-    // 		// threshold regarding the new nodes. (see config.
-    // 		ver.SetThreshold(c.Threshold)
-    // 		verifiers[uint32(i)] = ver
-    // 	}
-    // 	d.verifiers = verifiers
-    // 	return nil
-    // }
-} 
 
 
 impl<P: Point> DistKeyShare<P>{
@@ -895,12 +915,12 @@ impl<P: Point> DistKeyShare<P>{
     {
     	// Check G(0) = 0*G.
     	if !g.public().equal(&suite.point().base().mul(&suite.scalar().zero(), None)) {
-    		return Err(anyhow::Error::msg("wrong renewal function"))
+    		bail!("wrong renewal function")
     	}
 
     	// Check whether they have the same index
     	if self.share.i != g.share.i {
-    		return Err(anyhow::Error::msg("not the same party"))
+    		bail!("not the same party")
     	}
 
     	let new_share = self.share.v.clone() + g.share.v;

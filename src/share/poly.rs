@@ -387,6 +387,7 @@ impl<POINT: Point> PubShare<POINT> {
 }
 
 /// PubPoly represents a public commitment polynomial to a secret sharing polynomial.
+#[derive(Clone)]
 pub struct PubPoly<GROUP>
 where
     GROUP: Group,

@@ -26,6 +26,7 @@ use anyhow::{bail, Error, Result};
 
 /// Dealer encapsulates for creating and distributing the shares and for
 /// replying to any Responses.
+#[derive(Clone)]
 pub struct Dealer<SUITE: Suite>
 where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
@@ -446,6 +447,7 @@ where
 
 /// Verifier receives a Deal from a Dealer, can reply with a Complaint, and can
 /// collaborate with other Verifiers to reconstruct a secret.
+#[derive(Clone)]
 pub struct Verifier<SUITE: Suite>
 where
     SUITE::POINT: Serialize + DeserializeOwned,
@@ -909,7 +911,7 @@ where
     /// should make sure the one it receives from the dealer is consistent. If this
     /// method is not called, the first threshold received is considered as the
     /// "truth".
-    fn set_threshold(&mut self, t: usize) {
+    pub fn set_threshold(&mut self, t: usize) {
         self.t = t
     }
 
