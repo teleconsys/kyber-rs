@@ -6,10 +6,10 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::{
     share::{self, vss},
     util::{self, random::Randstream},
-    Point, Scalar, Suite,
+    Point, Scalar, Suite, encoding::BinaryMarshaler, sign::schnorr, group::{ScalarCanCheckCanonical, PointCanCheckCanonicalAndSmallOrder},
 };
 
-use super::structs::DistKeyShare;
+use super::structs::{DistKeyShare, Deal, Response};
 
 use anyhow::Result;
 
@@ -311,150 +311,155 @@ where
     new_dist_key_handler(c).unwrap()
 }
 
-// // Deals returns all the deals that must be broadcasted to all participants in
-// // the new list. The deal corresponding to this DKG is already added to this DKG
-// // and is ommitted from the returned map. To know which participant a deal
-// // belongs to, loop over the keys as indices in the list of new participants:
-// //
-// //	for i,dd := range distDeals {
-// //	   sendTo(participants[i],dd)
-// //	}
-// //
-// // If this method cannot process its own Deal, that indicates a
-// // severe problem with the configuration or implementation and
-// // results in a panic.
-// func (d *DistKeyGenerator) Deals() (map[int]*Deal, error) {
-// 	if !d.canIssue {
-// 		// We do not hold a share, so we cannot make a deal, so
-// 		// return an empty map and no error. This makes callers not
-// 		// need to care if they are in a resharing context or not.
-// 		return nil, nil
-// 	}
-// 	deals, err := d.dealer.EncryptedDeals()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	dd := make(map[int]*Deal)
-// 	for i := range d.c.NewNodes {
-// 		distd := &Deal{
-// 			Index: uint32(d.oidx),
-// 			Deal:  deals[i],
-// 		}
-// 		// sign the deal
-// 		buff, err := distd.MarshalBinary()
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		distd.Signature, err = schnorr.Sign(d.suite, d.long, buff)
-// 		if err != nil {
-// 			return nil, err
-// 		}
+impl<SUITE: Suite, READ: Read + Clone +'static> DistKeyGenerator<SUITE, READ> 
+where 
+<SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned + ScalarCanCheckCanonical,
+SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder,
+{
 
-// 		// if there is a resharing in progress, nodes that stay must send their
-// 		// deals to the old nodes, otherwise old nodes won't get responses from
-// 		// staying nodes and won't be certified.
-// 		if i == int(d.nidx) && d.newPresent && !d.isResharing {
-// 			if d.processed {
-// 				continue
-// 			}
-// 			d.processed = true
-// 			if resp, err := d.ProcessDeal(distd); err != nil {
-// 				panic("dkg: cannot process own deal: " + err.Error())
-// 			} else if resp.Response.Status != vss.StatusApproval {
-// 				panic("dkg: own deal gave a complaint")
-// 			}
-// 			continue
-// 		}
-// 		dd[i] = distd
-// 	}
-// 	return dd, nil
-// }
+/// Deals returns all the deals that must be broadcasted to all participants in
+/// the new list. The deal corresponding to this DKG is already added to this DKG
+/// and is ommitted from the returned map. To know which participant a deal
+/// belongs to, loop over the keys as indices in the list of new participants:
+///
+///	for i,dd := range distDeals {
+///	   sendTo(participants[i],dd)
+///	}
+///
+/// If this method cannot process its own Deal, that indicates a
+/// severe problem with the configuration or implementation and
+/// results in a panic.
+fn deals(&mut self) -> Result<Option<HashMap<usize, Deal<SUITE::POINT>>>> {
+	if !self.can_issue {
+		// We do not hold a share, so we cannot make a deal, so
+		// return an empty map and no error. This makes callers not
+		// need to care if they are in a resharing context or not.
+		return Ok(None)
+	}
+	let deals = self.dealer.encrypted_deals()?;
+	let mut dd = HashMap::new();
+	for (i, _) in self.c.new_nodes.clone().iter().enumerate() {
+		let mut distd = Deal{
+			index: self.oidx as u32,
+			deal:  deals[i].clone(),
+            signature: Vec::new()
+		};
+		// sign the deal
+		let buff = distd.marshal_binary()?;
+		distd.signature = schnorr::sign(&self.suite, &self.long, &buff)?;
 
-// // ProcessDeal takes a Deal created by Deals() and stores and verifies it. It
-// // returns a Response to broadcast to every other participant, including the old
-// // participants. It returns an error in case the deal has already been stored,
-// // or if the deal is incorrect (see vss.Verifier.ProcessEncryptedDeal).
-// func (d *DistKeyGenerator) ProcessDeal(dd *Deal) (*Response, error) {
-// 	if !d.newPresent {
-// 		return nil, errors.New("dkg: unexpected deal for unlisted dealer in new list")
-// 	}
-// 	var pub kyber.Point
-// 	var ok bool
-// 	if d.isResharing {
-// 		pub, ok = getPub(d.c.OldNodes, dd.Index)
-// 	} else {
-// 		pub, ok = getPub(d.c.NewNodes, dd.Index)
-// 	}
-// 	// public key of the dealer
-// 	if !ok {
-// 		return nil, errors.New("dkg: dist deal out of bounds index")
-// 	}
+		// if there is a resharing in progress, nodes that stay must send their
+		// deals to the old nodes, otherwise old nodes won't get responses from
+		// staying nodes and won't be certified.
+		if i == self.nidx && self.new_present && !self.is_resharing {
+			if self.processed {
+				continue
+			}
+			self.processed = true;
+            let resp = self.process_deal(&distd);
+			if resp.is_err() {
+				panic!("dkg: cannot process own deal: ")
+			} else if resp.unwrap().response.status != vss::pedersen::vss::STATUS_APPROVAL {
+				panic!("dkg: own deal gave a complaint")
+			}
+			continue
+		}
+		dd.insert(i, distd);
+	}
+	Ok(Some(dd))
+}
 
-// 	// verify signature
-// 	buff, err := dd.MarshalBinary()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if err := schnorr.Verify(d.suite, pub, buff, dd.Signature); err != nil {
-// 		return nil, err
-// 	}
+/// ProcessDeal takes a Deal created by Deals() and stores and verifies it. It
+/// returns a Response to broadcast to every other participant, including the old
+/// participants. It returns an error in case the deal has already been stored,
+/// or if the deal is incorrect (see vss.Verifier.ProcessEncryptedDeal).
+fn process_deal(&mut self, dd: &Deal<SUITE::POINT>) -> Result<Response> 
+{
+	if !self.new_present {
+		return Err(anyhow::Error::msg("dkg: unexpected deal for unlisted dealer in new list"))
+	}
+	let pubb;
+	let ok;
+	if self.is_resharing {
+		(pubb, ok) = get_pub(&self.c.old_nodes, dd.index as usize);
+	} else {
+		(pubb, ok) = get_pub(&self.c.new_nodes, dd.index as usize);
+	}
+	// public key of the dealer
+	if !ok {
+		return Err(anyhow::Error::msg("dkg: dist deal out of bounds index"))
+	}
 
-// 	ver, _ := d.verifiers[dd.Index]
+	// verify signature
+	let buff = dd.marshal_binary()?;
+    schnorr::verify(self.suite, &pubb.clone().unwrap(), &buff, &dd.signature)?;
 
-// 	resp, err := ver.ProcessEncryptedDeal(dd.Deal)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+    let resp;
+    {
+	let ver = self.verifiers.get_mut(&dd.index).unwrap();
+	resp = ver.process_encrypted_deal(&dd.deal)?;
+    }
 
-// 	reject := func() (*Response, error) {
-// 		idx, present := findPub(d.c.NewNodes, pub)
-// 		if present {
-// 			// the dealer is present in both list, so we set its own response
-// 			// (as a verifier) to a complaint since he won't do it himself
-// 			d.verifiers[uint32(dd.Index)].UnsafeSetResponseDKG(uint32(idx), vss.StatusComplaint)
-// 		}
-// 		// indicate to VSS that this dkg's new status is complaint for this
-// 		// deal
-// 		d.verifiers[uint32(dd.Index)].UnsafeSetResponseDKG(uint32(d.nidx), vss.StatusComplaint)
-// 		resp.Status = vss.StatusComplaint
-// 		s, err := schnorr.Sign(d.suite, d.long, resp.Hash(d.suite))
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		resp.Signature = s
-// 		return &Response{
-// 			Index:    dd.Index,
-// 			Response: resp,
-// 		}, nil
-// 	}
+	if self.is_resharing && self.can_receive {
+		// verify share integrity wrt to the dist. secret
+        let deal_commits;
+        {
+        let ver = self.verifiers.get_mut(&dd.index).unwrap();
+		deal_commits = ver.commits();
+        }
+        let mut reject = || {
+            let mut resp = resp.clone();
+            let (idx, present) = find_pub(&self.c.new_nodes, &pubb.clone().unwrap());
+            if present {
+                // the dealer is present in both list, so we set its own response
+                // (as a verifier) to a complaint since he won't do it himself
+                self.verifiers.get_mut(&dd.index).unwrap().unsafe_set_response_dkg(idx as u32, vss::pedersen::vss::STATUS_COMPLAINT);
+            }
+            // indicate to VSS that this dkg's new status is complaint for this
+            // deal
+            self.verifiers.get_mut(&dd.index).unwrap().unsafe_set_response_dkg(self.nidx as u32, vss::pedersen::vss::STATUS_COMPLAINT);
+            resp.status = vss::pedersen::vss::STATUS_COMPLAINT;
+            let msg_res = resp.hash(&self.suite);
+            if msg_res.is_err() {
+                return Err(msg_res.unwrap_err())
+            }
+            let s_res = schnorr::sign(&self.suite,& self.long, &msg_res.unwrap());
+            if s_res.is_err() {
+                return Err(s_res.unwrap_err())
+            }
+            resp.signature = s_res.unwrap();
+            Ok(Response{
+                index:    dd.index,
+                response: resp,
+            })
+        };  
+		// Check that the received committed share is equal to the one we
+		// generate from the known public polynomial
+		let expected_pub_share = self.dpub.eval(dd.index as usize);
+		if !expected_pub_share.v.equal(&deal_commits.unwrap()[0]) {
+			return reject()
+		}
+	}
+    
 
-// 	if d.isResharing && d.canReceive {
-// 		// verify share integrity wrt to the dist. secret
-// 		dealCommits := ver.Commits()
-// 		// Check that the received committed share is equal to the one we
-// 		// generate from the known public polynomial
-// 		expectedPubShare := d.dpub.Eval(int(dd.Index))
-// 		if !expectedPubShare.V.Equal(dealCommits[0]) {
-// 			return reject()
-// 		}
-// 	}
+	// If the dealer in the old list is also present in the new list, then set
+	// his response to approval since he won't issue his own response for his
+	// own deal.
+	// In the case of resharing the dealer will issue his own response in order
+	// for the old comities to get responses and be certified, which is why we
+	// don't add it manually there.
+	let (new_idx, found) = find_pub(&self.c.new_nodes, &pubb.unwrap());
+	if found && !self.is_resharing {
+        self.verifiers.get_mut(&dd.index).unwrap().unsafe_set_response_dkg(new_idx as u32, vss::pedersen::vss::STATUS_APPROVAL);
+	}
 
-// 	// If the dealer in the old list is also present in the new list, then set
-// 	// his response to approval since he won't issue his own response for his
-// 	// own deal.
-// 	// In the case of resharing the dealer will issue his own response in order
-// 	// for the old comities to get responses and be certified, which is why we
-// 	// don't add it manually there.
-// 	newIdx, found := findPub(d.c.NewNodes, pub)
-// 	if found && !d.isResharing {
-// 		d.verifiers[dd.Index].UnsafeSetResponseDKG(uint32(newIdx), vss.StatusApproval)
-// 	}
+    Ok(Response{
+        index: dd.index,
+        response: resp
+    })
+}
+} 
 
-// 	return &Response{
-// 		Index:    dd.Index,
-// 		Response: resp,
-// 	}, nil
-// }
 
 // // ProcessResponse takes a response from every other peer.  If the response
 // // designates the deal of another participant than this dkg, this dkg stores it
@@ -897,12 +902,12 @@ where
 // 	}, nil
 // }
 
-// func getPub(list []kyber.Point, i uint32) (kyber.Point, bool) {
-// 	if i >= uint32(len(list)) {
-// 		return nil, false
-// 	}
-// 	return list[i], true
-// }
+fn get_pub<POINT: Point>(list: &[POINT], i: usize) -> (Option<POINT>, bool) {
+	if i >= list.len() {
+		return (None, false)
+	}
+	return (Some(list[i].clone()), true)
+}
 
 fn find_pub<POINT: Point>(list: &[POINT], to_find: &POINT) -> (usize, bool) {
     for (i, p) in list.iter().enumerate() {

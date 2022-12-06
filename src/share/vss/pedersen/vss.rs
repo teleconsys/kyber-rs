@@ -647,7 +647,7 @@ where
     /// Commits returns the commitments of the coefficients of the polynomial
     /// contained in the Deal received. It is public information. The private
     /// information in the deal must be retrieved through Deal().
-    fn commits(&self) -> Option<Vec<SUITE::POINT>> {
+    pub fn commits(&self) -> Option<Vec<SUITE::POINT>> {
         match &self.deal {
             Some(d) => Some(d.commitments.clone()),
             None => None,
