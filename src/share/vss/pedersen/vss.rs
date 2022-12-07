@@ -1039,7 +1039,7 @@ where
     pub fn missing_responses(&self) -> Vec<usize> {
         let mut absents = Vec::new();
         for (i, _) in self.verifiers.iter().enumerate() {
-            if self.responses.contains_key(&(i as u32)) {
+            if !self.responses.contains_key(&(i as u32)) {
                 absents.push(i);
             }
         }

@@ -107,11 +107,11 @@ where
 /// CoefficientsToPriPoly returns a PriPoly based on the given coefficients
 pub fn coefficients_to_pri_poly<GROUP: Group>(
     g: &GROUP,
-    coeffs: Vec<<GROUP::POINT as Point>::SCALAR>,
+    coeffs: &[<GROUP::POINT as Point>::SCALAR],
 ) -> PriPoly<GROUP> {
     return PriPoly {
         g: g.clone(),
-        coeffs: coeffs,
+        coeffs: coeffs.to_vec(),
     };
 }
 

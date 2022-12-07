@@ -132,7 +132,7 @@ fn test_example_dkg() {
 
     // 8. Generate and broadcast secret commits
     let mut scs = Vec::new();
-    for (i, node) in nodes.iter_mut().enumerate() {
+    for (_, node) in nodes.iter_mut().enumerate() {
         let sc = node.dkg.secret_commits().unwrap();
         scs.push(sc);
     }

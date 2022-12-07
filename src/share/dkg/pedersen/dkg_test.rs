@@ -6,9 +6,9 @@ use std::{io::Read, collections::HashMap};
 use crate::{group::{edwards25519::SuiteEd25519, edwards25519::{Point as EdPoint, Scalar as EdScalar}, ScalarCanCheckCanonical, PointCanCheckCanonicalAndSmallOrder}, share::{vss, self}, Suite, Point, Group, Scalar, Random};
 use lazy_static::lazy_static;
 use rand::Rng;
-use serde::{Serialize, de::DeserializeOwned, Deserialize};
+use serde::{Serialize, de::DeserializeOwned};
 
-use super::dkg::{DistKeyGenerator, new_dist_key_generator, Config, new_dist_key_handler};
+use super::{dkg::{DistKeyGenerator, new_dist_key_generator, Config, new_dist_key_handler}, structs::DistKeyShare};
 
 fn suite() -> SuiteEd25519 {
     SuiteEd25519::new_blake_sha256ed25519()
@@ -364,161 +364,149 @@ fn test_dkg_resharing_threshold() {
 
 }
 
-// // TestDKGThreshold tests the "threshold dkg" where only a subset of nodes succeed
-// // at the DKG
-// func TestDKGThreshold(t *testing.T) {
-// 	n := 7
-// 	// should succeed with only this number of nodes
-// 	newTotal := vss.MinimumT(n)
+/// TestDKGThreshold tests the "threshold dkg" where only a subset of nodes succeed
+/// at the DKG
+#[test]
+fn test_dkg_threshold() {
+    let n = 7;
+	// should succeed with only this number of nodes
+	let new_total = vss::pedersen::vss::minimum_t(n);
+    let (_, _, dkgs) = generate(n, new_total);
 
-// 	dkgs := make([]*DistKeyGenerator, n)
-// 	privates := make([]kyber.Scalar, n)
-// 	publics := make([]kyber.Point, n)
-// 	for i := 0; i < n; i++ {
-// 		priv, pub := genPair()
-// 		privates[i] = priv
-// 		publics[i] = pub
-// 	}
+	// only take a threshold of them
+	let mut thr_dkgs = HashMap::new();
+	let mut already_taken = HashMap::new();
+	while thr_dkgs.len() < new_total {
+		let idx = rand::thread_rng().gen_range(0..DEFAULT_N); 
+		if already_taken.contains_key(&idx) {
+			continue
+		}
+		already_taken.insert(idx, true);
+        //thr_dkgs.insert(idx, dkgs[idx].clone());
+        thr_dkgs.insert(idx, dkgs[idx].clone());
+	}
 
-// 	for i := 0; i < n; i++ {
-// 		dkg, err := NewDistKeyGenerator(suite, privates[i], publics, newTotal)
-// 		if err != nil {
-// 			panic(err)
-// 		}
-// 		dkgs[i] = dkg
-// 	}
+    // full secret sharing exchange
+	// 1. broadcast deals
+    let mut all_deals = Vec::new();
+	let mut resps = Vec::with_capacity(new_total * new_total);
+	for (_, dkg) in thr_dkgs.iter_mut() {
+		let deals = dkg.deals().unwrap();
+        all_deals.push(deals);		
+	}
+    for deals in all_deals {
+        for (i, d) in deals {
+            // give the deal anyway - simpler
+            if !thr_dkgs.contains_key(&i){
+                continue
+            }
+            let recipient = thr_dkgs.get_mut(&i).unwrap();
+            let resp = recipient.process_deal(&d).unwrap();
+            assert_eq!(vss::pedersen::vss::STATUS_APPROVAL, resp.response.status);
+            resps.push(resp);
+        }
+    }
 
-// 	// only take a threshold of them
-// 	thrDKGs := make(map[uint32]*DistKeyGenerator)
-// 	alreadyTaken := make(map[int]bool)
-// 	for len(thrDKGs) < newTotal {
-// 		idx := mathRand.Intn(defaultN)
-// 		if alreadyTaken[idx] {
-// 			continue
-// 		}
-// 		alreadyTaken[idx] = true
-// 		dkg := dkgs[idx]
-// 		thrDKGs[uint32(dkg.nidx)] = dkg
-// 	}
+	// 2. Broadcast responses
+	for resp in resps {
+		for (_, dkg) in thr_dkgs.iter_mut() {
+			if resp.response.index == dkg.nidx as u32 {
+				// skip the responses this dkg sent out
+				continue
+			}
+			let j = dkg.process_response(&resp).unwrap();
+			assert!(j.is_none());
+		}
+	}
 
-// 	// full secret sharing exchange
-// 	// 1. broadcast deals
-// 	resps := make([]*Response, 0, newTotal*newTotal)
-// 	for _, dkg := range thrDKGs {
-// 		deals, err := dkg.Deals()
-// 		require.Nil(t, err)
-// 		for i, d := range deals {
-// 			// give the deal anyway - simpler
-// 			recipient, exists := thrDKGs[uint32(i)]
-// 			if !exists {
-// 				// one of the "offline" dkg
-// 				continue
-// 			}
-// 			resp, err := recipient.ProcessDeal(d)
-// 			require.Nil(t, err)
-// 			require.Equal(t, vss.StatusApproval, resp.Response.Status)
-// 			resps = append(resps, resp)
-// 		}
-// 	}
+	// 3. make sure nobody has a QUAL set
+	for (_, dkg) in thr_dkgs.iter() {
+        assert!(!dkg.certified());
+        assert_eq!(0, dkg.qual().len());
+		for (_, dkg2) in thr_dkgs.iter() {
+            assert!(!dkg.is_in_qual(dkg2.nidx as u32));
+		}
+	}
 
-// 	// 2. Broadcast responses
-// 	for _, resp := range resps {
-// 		for _, dkg := range thrDKGs {
-// 			if resp.Response.Index == uint32(dkg.nidx) {
-// 				// skip the responses this dkg sent out
-// 				continue
-// 			}
-// 			j, err := dkg.ProcessResponse(resp)
-// 			require.Nil(t, err)
-// 			require.Nil(t, j)
-// 		}
-// 	}
+	for (_, dkg) in thr_dkgs.iter_mut() {
+		for (i, v) in dkg.verifiers.iter_mut() {
+			let mut app = 0;
+            let responses = v.responses();
+			for (_, r) in responses {
+				if r.status == vss::pedersen::vss::STATUS_APPROVAL {
+					app += 1;
+				}
+			}
+			if already_taken.contains_key(&(i.clone() as usize)) {
+                assert_eq!(already_taken.len(), app);
+			} else {
+                assert_eq!(0 ,app);
+			}
+		}
+		dkg.set_timeout()
+	}
 
-// 	// 3. make sure nobody has a QUAL set
-// 	for _, dkg := range thrDKGs {
-// 		require.False(t, dkg.Certified())
-// 		require.Equal(t, 0, len(dkg.QUAL()))
-// 		for _, dkg2 := range thrDKGs {
-// 			require.False(t, dkg.isInQUAL(uint32(dkg2.nidx)))
-// 		}
-// 	}
+	for (_, dkg) in thr_dkgs.iter() {
+		assert_eq!(new_total, dkg.qual().len());
+        assert!(dkg.threshold_certified());
+        assert!(!dkg.certified());
+        let qual_shares = dkg.qualified_shares();
+		for (_, dkg2) in thr_dkgs.iter() {
+			assert!(qual_shares.contains(&dkg2.nidx));
+		}
+	}
 
-// 	for _, dkg := range thrDKGs {
-// 		for i, v := range dkg.verifiers {
-// 			var app int
-// 			for _, r := range v.Responses() {
-// 				if r.Status == vss.StatusApproval {
-// 					app++
-// 				}
-// 			}
-// 			if alreadyTaken[int(i)] {
-// 				require.Equal(t, len(alreadyTaken), app)
-// 			} else {
-// 				require.Equal(t, 0, app)
-// 			}
-// 		}
-// 		dkg.SetTimeout()
-// 	}
+    for (_, dkg) in thr_dkgs.iter_mut() {
+        dkg.dist_key_share().unwrap();
+    }
 
-// 	for _, dkg := range thrDKGs {
-// 		require.Equal(t, newTotal, len(dkg.QUAL()))
-// 		require.True(t, dkg.ThresholdCertified())
-// 		require.False(t, dkg.Certified())
-// 		qualShares := dkg.QualifiedShares()
-// 		for _, dkg2 := range thrDKGs {
-// 			require.Contains(t, qualShares, dkg2.nidx)
-// 		}
-// 		_, err := dkg.DistKeyShare()
-// 		require.NoError(t, err)
-// 		for _, dkg2 := range thrDKGs {
-// 			require.True(t, dkg.isInQUAL(uint32(dkg2.nidx)))
-// 		}
-// 	}
+    for (_, dkg) in thr_dkgs.iter() {
+        for (_, dkg2) in thr_dkgs.iter() {
+            assert!(dkg.is_in_qual(dkg2.nidx as u32));
+        }
+    }
 
-// }
+}
 
-// func TestDistKeyShare(t *testing.T) {
-// 	_, _, dkgs := generate(defaultN, defaultT)
-// 	fullExchange(t, dkgs, true)
+#[test]
+fn test_dist_key_share() {
+    let (_, _, mut dkgs) = generate(DEFAULT_N, *DEFAULT_T);
+    full_exchange(&mut dkgs, true);
 
-// 	for _, dkg := range dkgs {
-// 		require.True(t, dkg.Certified())
-// 	}
-// 	// verify integrity of shares etc
-// 	dkss := make([]*DistKeyShare, defaultN)
-// 	var poly *share.PriPoly
-// 	for i, dkg := range dkgs {
-// 		dks, err := dkg.DistKeyShare()
-// 		require.Nil(t, err)
-// 		require.NotNil(t, dks)
-// 		require.NotNil(t, dks.PrivatePoly)
-// 		dkss[i] = dks
-// 		require.Equal(t, dkg.nidx, dks.Share.I)
+	for dkg in dkgs.iter() {
+		assert!(dkg.certified());
+	}
+	// verify integrity of shares etc
+	let mut dkss = Vec::with_capacity(DEFAULT_N);
+	let mut poly = None;
+	for (_, dkg) in dkgs.iter_mut().enumerate() {
+		let dks = dkg.dist_key_share().unwrap();
+		assert!(!dks.private_poly.is_empty());
+		dkss.push(dks.clone());
+        assert_eq!(dkg.nidx, dks.share.i);
 
-// 		pripoly := share.CoefficientsToPriPoly(suite, dks.PrivatePoly)
-// 		if poly == nil {
-// 			poly = pripoly
-// 			continue
-// 		}
-// 		poly, err = poly.Add(pripoly)
-// 		require.NoError(t, err)
-// 	}
+        let pri_poly = share::poly::coefficients_to_pri_poly(&suite(), &dks.private_poly);
+		if poly.is_none() {
+			poly = Some(pri_poly);
+			continue
+		}
+		poly = Some(poly.unwrap().add(&pri_poly).unwrap());
+	}
 
-// 	shares := make([]*share.PriShare, defaultN)
-// 	for i, dks := range dkss {
-// 		require.True(t, checkDks(dks, dkss[0]), "dist key share not equal %d vs %d", dks.Share.I, 0)
-// 		shares[i] = dks.Share
-// 	}
+	let mut shares = Vec::with_capacity(DEFAULT_N);
+	for dks in dkss.iter() {
+        assert!(check_dks(&dks, &dkss[0]), "dist key share not equal {} vs {}", dks.share.i, 0);
+		shares.push(Some(dks.share.clone()));
+	}
 
-// 	secret, err := share.RecoverSecret(suite, shares, defaultN, defaultN)
-// 	require.Nil(t, err)
+	let secret = share::poly::recover_secret(suite(), &shares, DEFAULT_N, DEFAULT_N).unwrap();
 
-// 	secretCoeffs := poly.Coefficients()
-// 	require.Equal(t, secret.String(), secretCoeffs[0].String())
+	let secret_coeffs = poly.unwrap().coefficients();
+    assert_eq!(secret.to_string(), secret_coeffs[0].to_string());
 
-// 	commitSecret := suite.Point().Mul(secret, nil)
-// 	require.Equal(t, dkss[0].Public().String(), commitSecret.String())
-// }
+	let commit_secret = suite().point().mul(&secret, None);
+    assert_eq!(dkss[0].public().to_string(), commit_secret.to_string());
+}
 
 fn gen_pair() -> (EdScalar, EdPoint) {
     let suite = suite();
@@ -536,17 +524,17 @@ fn random_bytes(n: usize) -> Vec<u8> {
     return buff;
 }
 
-// func checkDks(dks1, dks2 *DistKeyShare) bool {
-// 	if len(dks1.Commits) != len(dks2.Commits) {
-// 		return false
-// 	}
-// 	for i, p := range dks1.Commits {
-// 		if !p.Equal(dks2.Commits[i]) {
-// 			return false
-// 		}
-// 	}
-// 	return true
-// }
+fn check_dks<POINT: Point>(dks1: &DistKeyShare<POINT>, dks2: &DistKeyShare<POINT>) -> bool {
+	if dks1.commits.len() != dks2.commits.len() {
+		return false
+	}
+	for (i, p) in dks1.commits.iter().enumerate() {
+		if !p.equal(&dks2.commits[i]) {
+			return false
+		}
+	}
+	return true
+}
 
 fn full_exchange<SUITE: Suite, READ: Read + Clone +'static>(dkgs: &mut Vec<DistKeyGenerator<SUITE, READ>>, check_qual: bool) 
 where 
