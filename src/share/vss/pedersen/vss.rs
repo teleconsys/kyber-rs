@@ -496,14 +496,14 @@ where
     }
     let c = context(suite, dealer_key, verifiers);
     Ok(Verifier {
-        suite: *suite,
+        suite: suite.clone(),
         longterm: longterm.clone(),
         dealer: dealer_key.clone(),
         verifiers: verifiers.to_vec(),
         pubb,
         index,
         hkdf_context: Vec::from(c),
-        aggregator: None,
+        aggregator: Some(new_empty_aggregator(suite.clone(), verifiers))
     })
 }
 
@@ -562,17 +562,6 @@ where
             &d.commitments,
             t,
         )?;
-
-        if self.aggregator.is_none() {
-            self.aggregator = Some(new_aggregator(
-                &self.suite,
-                &self.dealer,
-                &self.verifiers,
-                &d.commitments,
-                t,
-                &d.session_id,
-            ));
-        }
 
         let mut r = Response {
             session_id: sid,
@@ -850,6 +839,21 @@ where
     }
 }
 
+/// NewEmptyAggregator returns a structure capable of storing Responses about a
+/// deal and check if the deal is certified or not.
+pub fn new_empty_aggregator<SUITE: Suite>(suite: SUITE, verifiers: &[SUITE::POINT]) -> Aggregator<SUITE> 
+where
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
+{
+	return Aggregator{
+		suite:     suite,
+		verifiers: verifiers.to_vec(),
+		responses: HashMap::new(),
+        ..Default::default()
+	}
+}
+
 impl<SUITE: Suite> Aggregator<SUITE>
 where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
@@ -866,6 +870,7 @@ where
             self.commits = d.commitments.clone();
             self.sid = d.session_id.clone();
             self.deal = Some(d.clone());
+            self.t = d.t;
         }
 
         if !valid_t(d.t, &self.verifiers) {

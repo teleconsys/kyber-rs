@@ -59,7 +59,9 @@ pub struct Deal<POINT: Point + Serialize> {
 
 impl<POINT: Point + Serialize> BinaryMarshaler for Deal<POINT> {
     fn marshal_binary(&self) -> Result<Vec<u8>> {
-        encoding::marshal_binary(self)
+        let mut deal = self.clone();
+        deal.signature = Vec::new();
+        encoding::marshal_binary(&deal)
         // 	var b bytes.Buffer
         // 	binary.Write(&b, binary.LittleEndian, d.Index)
         // 	b.Write(d.Deal.Cipher)

@@ -56,7 +56,7 @@ pub struct Config<SUITE: Suite, READ: Read + Clone> {
     /// will be in possession of new shares after the protocol has been run. To be a
     /// receiver of a new share, one's public key must be inside this list. Keys
     /// can be disjoint or not with respect to the OldNodes list.
-    new_nodes: Vec<SUITE::POINT>,
+    pub new_nodes: Vec<SUITE::POINT>,
 
     /// Share to refresh. It must be nil for a new node wishing to
     /// join or create a group. To be able to issue new fresh shares to a new group,
@@ -100,35 +100,35 @@ where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
 {
     /// config driving the behavior of DistKeyGenerator
-    c: Config<SUITE, READ>,
+    pub c: Config<SUITE, READ>,
     suite: SUITE,
 
     long: <SUITE::POINT as Point>::SCALAR,
     pubb: SUITE::POINT,
     dpub: share::poly::PubPoly<SUITE>,
-    dealer: vss::pedersen::vss::Dealer<SUITE>,
+    pub dealer: vss::pedersen::vss::Dealer<SUITE>,
     /// verifiers indexed by dealer index
-    verifiers: HashMap<u32, vss::pedersen::vss::Verifier<SUITE>>,
+    pub verifiers: HashMap<u32, vss::pedersen::vss::Verifier<SUITE>>,
     /// performs the part of the response verification for old nodes
     old_aggregators: HashMap<u32, vss::pedersen::vss::Aggregator<SUITE>>,
     /// index in the old list of nodes
     oidx: usize,
     /// index in the new list of nodes
-    nidx: usize,
+    pub nidx: usize,
     /// old threshold used in the previous DKG
     old_t: usize,
     /// new threshold to use in this round
     new_t: usize,
     /// indicates whether we are in the re-sharing protocol or basic DKG
-    is_resharing: bool,
+    pub is_resharing: bool,
     /// indicates whether we are able to issue shares or not
-    can_issue: bool,
+    pub can_issue: bool,
     /// Indicates whether we are able to receive a new share or not
-    can_receive: bool,
+    pub can_receive: bool,
     /// indicates whether the node holding the pub key is present in the new list
-    new_present: bool,
+    pub new_present: bool,
     /// indicates whether the node is present in the old list
-    old_present: bool,
+    pub old_present: bool,
     /// already processed our own deal
     processed: bool,
     /// did the timeout / period / already occured or not
@@ -288,7 +288,7 @@ pub fn new_dist_key_generator<SUITE: Suite, READ: Read + Clone + 'static>(
     longterm: <SUITE::POINT as Point>::SCALAR,
     participants: &[SUITE::POINT],
     t: usize,
-) -> DistKeyGenerator<SUITE, READ>
+) -> Result<DistKeyGenerator<SUITE, READ>>
 where
     SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder,
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned + ScalarCanCheckCanonical,
@@ -305,7 +305,7 @@ where
         reader: None,
         user_reader_only: false,
     };
-    new_dist_key_handler(c).unwrap()
+    new_dist_key_handler(c)
 }
 
 impl<SUITE: Suite, READ: Read + Clone +'static> DistKeyGenerator<SUITE, READ> 
@@ -326,12 +326,12 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     /// If this method cannot process its own Deal, that indicates a
     /// severe problem with the configuration or implementation and
     /// results in a panic.
-    fn deals(&mut self) -> Result<Option<HashMap<usize, Deal<SUITE::POINT>>>> {
+    pub fn deals(&mut self) -> Result<HashMap<usize, Deal<SUITE::POINT>>> {
         if !self.can_issue {
             // We do not hold a share, so we cannot make a deal, so
             // return an empty map and no error. This makes callers not
             // need to care if they are in a resharing context or not.
-            return Ok(None)
+            return Ok(HashMap::new())
         }
         let deals = self.dealer.encrypted_deals()?;
         let mut dd = HashMap::new();
@@ -363,14 +363,14 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
             }
             dd.insert(i, distd);
         }
-        Ok(Some(dd))
+        Ok(dd)
     }
 
     /// ProcessDeal takes a Deal created by Deals() and stores and verifies it. It
     /// returns a Response to broadcast to every other participant, including the old
     /// participants. It returns an error in case the deal has already been stored,
     /// or if the deal is incorrect (see vss.Verifier.ProcessEncryptedDeal).
-    fn process_deal(&mut self, dd: &Deal<SUITE::POINT>) -> Result<Response> 
+    pub fn process_deal(&mut self, dd: &Deal<SUITE::POINT>) -> Result<Response> 
     {
         if !self.new_present {
             bail!("dkg: unexpected deal for unlisted dealer in new list")
@@ -389,7 +389,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
 
         // verify signature
         let buff = dd.marshal_binary()?;
-        schnorr::verify(self.suite, &pubb.clone().unwrap(), &buff, &dd.signature)?;
+        schnorr::verify(self.suite, &pubb, &buff, &dd.signature)?;
 
         let resp;
         {
@@ -406,7 +406,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
             }
             let mut reject = || {
                 let mut resp = resp.clone();
-                let (idx, present) = find_pub(&self.c.new_nodes, &pubb.clone().unwrap());
+                let (idx, present) = find_pub(&self.c.new_nodes, &pubb.clone());
                 if present {
                     // the dealer is present in both list, so we set its own response
                     // (as a verifier) to a complaint since he won't do it himself
@@ -445,7 +445,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
         // In the case of resharing the dealer will issue his own response in order
         // for the old comities to get responses and be certified, which is why we
         // don't add it manually there.
-        let (new_idx, found) = find_pub(&self.c.new_nodes, &pubb.unwrap());
+        let (new_idx, found) = find_pub(&self.c.new_nodes, &pubb);
         if found && !self.is_resharing {
             self.verifiers.get_mut(&dd.index).unwrap().unsafe_set_response_dkg(new_idx as u32, vss::pedersen::vss::STATUS_APPROVAL);
         }
@@ -461,7 +461,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     /// and returns nil with a possible error regarding the validity of the response.
     /// If the response designates a deal this dkg has issued, then the dkg will process
     /// the response, and returns a justification.
-    fn process_response(&mut self, resp: Response) -> Result<Option<Justification<SUITE>>> {
+    pub fn process_response(&mut self, resp: &Response) -> Result<Option<Justification<SUITE>>> {
     	if self.is_resharing && self.can_issue && !self.new_present {
     		return self.process_resharing_response(resp)
     	}
@@ -495,7 +495,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     /// new,i.e. leaving the group. This node does not have any verifiers since it
     /// can't receive shares. This function makes some check on the response and
     /// returns a justification if the response is invalid.
-    fn process_resharing_response(&mut self, resp: Response) -> Result<Option<Justification<SUITE>>> 
+    fn process_resharing_response(&mut self, resp: &Response) -> Result<Option<Justification<SUITE>>> 
     where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
@@ -538,7 +538,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
 
     /// ProcessJustification takes a justification and validates it. It returns an
     /// error in case the justification is wrong.
-    fn process_justification(&mut self, j: Justification<SUITE>) -> Result<()> {
+    pub fn process_justification(&mut self, j: &Justification<SUITE>) -> Result<()> {
         if !self.verifiers.contains_key(&j.index) {
             bail!("dkg: Justification received but no deal for it")
         }
@@ -743,7 +743,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     /// of all aggregated individual public commits of each individual secrets.
     /// The share is evaluated from the global Private Polynomial, basically SUM of
     /// fj(i) for a receiver i.
-    fn dist_key_share(&self) -> Result<DistKeyShare<SUITE::POINT>> {
+    pub fn dist_key_share(&self) -> Result<DistKeyShare<SUITE::POINT>> {
     	if !self.threshold_certified() {
     		bail!("dkg: distributed key not certified")
     	}
@@ -940,11 +940,11 @@ impl<P: Point> DistKeyShare<P>{
     }
 }
 
-fn get_pub<POINT: Point>(list: &[POINT], i: usize) -> (Option<POINT>, bool) {
+fn get_pub<POINT: Point>(list: &[POINT], i: usize) -> (POINT, bool) {
 	if i >= list.len() {
-		return (None, false)
+		return (Default::default(), false)
 	}
-	return (Some(list[i].clone()), true)
+	return (list[i].clone(), true)
 }
 
 fn find_pub<POINT: Point>(list: &[POINT], to_find: &POINT) -> (usize, bool) {

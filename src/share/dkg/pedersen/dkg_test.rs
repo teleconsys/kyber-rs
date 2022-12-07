@@ -1,232 +1,212 @@
-// // Note: if you are looking for a complete scenario that shows DKG in action
-// // please have a look at examples/dkg_test.go
+// Note: if you are looking for a complete scenario that shows DKG in action
+// please have a look at examples/dkg_test.go
 
-// var suite = edwards25519.NewBlakeSHA256Ed25519()
+use crate::{group::{edwards25519::SuiteEd25519, edwards25519::{Point as EdPoint, Scalar as EdScalar}}, share::vss, Suite, Point, Group, Scalar, Random};
+use lazy_static::lazy_static;
+use rand::Rng;
 
-// const defaultN = 5
+use super::dkg::{DistKeyGenerator, new_dist_key_generator};
 
-// var defaultT = vss.MinimumT(defaultN)
+fn suite() -> SuiteEd25519 {
+    SuiteEd25519::new_blake_sha256ed25519()
+}
 
-// func generate(n, t int) (partPubs []kyber.Point, partSec []kyber.Scalar, dkgs []*DistKeyGenerator) {
-// 	partPubs = make([]kyber.Point, n)
-// 	partSec = make([]kyber.Scalar, n)
-// 	for i := 0; i < n; i++ {
-// 		sec, pub := genPair()
-// 		partPubs[i] = pub
-// 		partSec[i] = sec
-// 	}
-// 	dkgs = make([]*DistKeyGenerator, n)
-// 	for i := 0; i < n; i++ {
-// 		dkg, err := NewDistKeyGenerator(suite, partSec[i], partPubs, t)
-// 		if err != nil {
-// 			panic(err)
-// 		}
-// 		dkgs[i] = dkg
-// 	}
-// 	return
-// }
+const DEFAULT_N: usize = 5;
 
-// func TestDKGNewDistKeyGenerator(t *testing.T) {
-// 	partPubs, partSec, _ := generate(defaultN, defaultT)
+lazy_static!{
+    static ref DEFAULT_T: usize = vss::pedersen::vss::minimum_t(DEFAULT_N);
+}
 
-// 	long := partSec[0]
-// 	dkg, err := NewDistKeyGenerator(suite, long, partPubs, defaultT)
-// 	require.Nil(t, err)
-// 	require.NotNil(t, dkg.dealer)
-// 	require.True(t, dkg.canIssue)
-// 	require.True(t, dkg.canReceive)
-// 	require.True(t, dkg.newPresent)
-// 	// because we set old = new
-// 	require.True(t, dkg.oldPresent)
-// 	require.True(t, dkg.canReceive)
-// 	require.False(t, dkg.isResharing)
+fn generate(n: usize, t: usize) -> (Vec<EdPoint>, Vec<EdScalar>, Vec<DistKeyGenerator<SuiteEd25519, &'static [u8]>>) 
+{
+	let mut part_pubs = Vec::with_capacity(n);
+    let mut part_sec = Vec::with_capacity(n);
+    for _ in 0..n {
+        let (sec, pubb) = gen_pair();
+        part_pubs.push(pubb);
+        part_sec.push(sec);
+    }
+	let mut dkgs = Vec::with_capacity(n);
+	for i in 0..n {
+		let dkg = new_dist_key_generator(suite(), part_sec[i].clone(), &part_pubs, t).unwrap();
+		dkgs.push(dkg);
+	}
+	return (part_pubs, part_sec, dkgs)
+}
 
-// 	sec, _ := genPair()
-// 	_, err = NewDistKeyGenerator(suite, sec, partPubs, defaultT)
-// 	require.Error(t, err)
+#[test]
+fn test_dkg_new_dist_key_generator() {
+	let (part_pubs, part_sec, _) = generate(DEFAULT_N, *DEFAULT_T);
 
-// 	_, err = NewDistKeyGenerator(suite, sec, []kyber.Point{}, defaultT)
-// 	require.EqualError(t, err, "dkg: can't run with empty node list")
-// }
+	let long = part_sec[0].clone();
+	let dkg: DistKeyGenerator<SuiteEd25519, &'static [u8]> = new_dist_key_generator(suite(), long, &part_pubs, *DEFAULT_T).unwrap();
+	assert!(dkg.can_issue);
+    assert!(dkg.can_receive);
+    assert!(dkg.new_present);
+	// because we set old = new
+	assert!(dkg.old_present);
+    assert!(!dkg.is_resharing);
 
-// func TestDKGDeal(t *testing.T) {
-// 	_, _, dkgs := generate(defaultN, defaultT)
-// 	dkg := dkgs[0]
+	let (sec, _) = gen_pair();
+	let dkg_res = new_dist_key_generator::<SuiteEd25519, &'static [u8]>(suite(), sec.clone(), &part_pubs, *DEFAULT_T);
+	assert!(dkg_res.is_err());
 
-// 	dks, err := dkg.DistKeyShare()
-// 	require.Error(t, err)
-// 	require.Nil(t, dks)
+    let dkg_res = new_dist_key_generator::<SuiteEd25519, &'static [u8]>(suite(), sec, &vec![], *DEFAULT_T);
+	assert_eq!(dkg_res.err().unwrap().to_string(), "dkg: can't run with empty node list");
+}
 
-// 	deals, err := dkg.Deals()
-// 	require.Nil(t, err)
-// 	require.Len(t, deals, defaultN-1)
+#[test]
+fn test_dkg_deal() {
+	let (_, _, mut dkgs) = generate(DEFAULT_N, *DEFAULT_T);
+	let dkg = &mut dkgs[0];
 
-// 	for i := range deals {
-// 		require.NotNil(t, deals[i])
-// 		require.Equal(t, uint32(0), deals[i].Index)
-// 	}
+	let dks_res = dkg.dist_key_share();
+    assert!(dks_res.is_err());
 
-// 	v, ok := dkg.verifiers[uint32(dkg.nidx)]
-// 	require.True(t, ok)
-// 	require.NotNil(t, v)
-// }
+	let deals = dkg.deals().unwrap();
+	assert_eq!(deals.len(), DEFAULT_N-1);
 
-// func TestDKGProcessDeal(t *testing.T) {
-// 	_, _, dkgs := generate(defaultN, defaultT)
-// 	dkg := dkgs[0]
-// 	deals, err := dkg.Deals()
-// 	require.Nil(t, err)
+	for i in 1..DEFAULT_N {
+        assert!(deals.contains_key(&i));
+        assert_eq!(deals.get(&i).unwrap().index, 0);
+	}
 
-// 	rec := dkgs[1]
-// 	deal := deals[1]
-// 	require.Equal(t, int(deal.Index), 0)
-// 	require.Equal(t, 1, rec.nidx)
+    assert!(dkg.verifiers.contains_key(&(dkg.nidx as u32)));
+}
 
-// 	// verifier don't find itself
-// 	goodP := rec.c.NewNodes
-// 	rec.c.NewNodes = make([]kyber.Point, 0)
-// 	resp, err := rec.ProcessDeal(deal)
-// 	require.Nil(t, resp)
-// 	require.Error(t, err)
-// 	rec.c.NewNodes = goodP
+#[test]
+fn test_dkg_process_deal() {
+	let (_, _, mut dkgs) = generate(DEFAULT_N, *DEFAULT_T);
+	let dkg = &mut dkgs[0];
+    let mut deals = dkg.deals().unwrap();
 
-// 	// good deal
-// 	resp, err = rec.ProcessDeal(deal)
-// 	require.NotNil(t, resp)
-// 	require.Equal(t, vss.StatusApproval, resp.Response.Status)
-// 	require.Nil(t, err)
-// 	_, ok := rec.verifiers[deal.Index]
-// 	require.True(t, ok)
-// 	require.Equal(t, uint32(0), resp.Index)
+    let rec = &mut dkgs[1];
+    let deal = deals.get_mut(&1).unwrap();
+    assert_eq!(deal.index, 0);
+    assert_eq!(1, rec.nidx);
 
-// 	// duplicate
-// 	resp, err = rec.ProcessDeal(deal)
-// 	require.Nil(t, resp)
-// 	require.Error(t, err)
+    // verifier don't find itself
+    let good_p = rec.c.new_nodes.clone();
+    rec.c.new_nodes = Vec::new();
+    let resp_res = rec.process_deal(deal);
+    assert!(resp_res.is_err());
+    rec.c.new_nodes = good_p;
 
-// 	// wrong index
-// 	goodIdx := deal.Index
-// 	deal.Index = uint32(defaultN + 1)
-// 	resp, err = rec.ProcessDeal(deal)
-// 	require.Nil(t, resp)
-// 	require.Error(t, err)
-// 	deal.Index = goodIdx
+    // good deal
+    let resp = rec.process_deal(deal).unwrap();
+    assert_eq!(resp.response.status, vss::pedersen::vss::STATUS_APPROVAL);
+    assert!(rec.verifiers.contains_key(&deal.index));
+    assert_eq!(0, resp.index);
+	
+    // duplicate
+    let resp_res = rec.process_deal(deal);
+    assert!(resp_res.is_err());
 
-// 	// wrong deal
-// 	goodSig := deal.Deal.Signature
-// 	deal.Deal.Signature = randomBytes(len(deal.Deal.Signature))
-// 	resp, err = rec.ProcessDeal(deal)
-// 	require.Nil(t, resp)
-// 	require.Error(t, err)
-// 	deal.Deal.Signature = goodSig
+    // wrong index
+    let good_idx = deal.index;
+    deal.index = (DEFAULT_N + 1) as u32;
+    let resp_res = rec.process_deal(deal);
+    assert!(resp_res.is_err());
+    deal.index = good_idx;
 
-// }
+    // wrong deal
+    let good_sig = deal.deal.signature.clone();
+    deal.deal.signature = random_bytes(deal.deal.signature.len());
+    let resp_res = rec.process_deal(deal);
+    assert!(resp_res.is_err());
+    deal.deal.signature = good_sig;
+}
 
-// func TestDKGProcessResponse(t *testing.T) {
-// 	// first peer generates wrong deal
-// 	// second peer processes it and returns a complaint
-// 	// first peer process the complaint
+#[test]
+fn test_dkg_process_response() {
+    // first peer generates wrong deal
+    // second peer processes it and returns a complaint
+    // first peer process the complaint
 
-// 	_, _, dkgs := generate(defaultN, defaultT)
-// 	dkg := dkgs[0]
-// 	idxRec := 1
-// 	rec := dkgs[idxRec]
-// 	deal, err := dkg.dealer.PlaintextDeal(idxRec)
-// 	require.Nil(t, err)
+	let (_, _, mut dkgs) = generate(DEFAULT_N, *DEFAULT_T);
+    let idx_rec = 1;
 
-// 	// give a wrong deal
-// 	goodSecret := deal.SecShare.V
-// 	deal.SecShare.V = suite.Scalar().Zero()
-// 	dd, err := dkg.Deals()
-// 	encD := dd[idxRec]
-// 	require.Nil(t, err)
-// 	resp, err := rec.ProcessDeal(encD)
-// 	require.Nil(t, err)
-// 	require.NotNil(t, resp)
-// 	require.Equal(t, vss.StatusComplaint, resp.Response.Status)
-// 	deal.SecShare.V = goodSecret
-// 	dd, _ = dkg.Deals()
-// 	encD = dd[idxRec]
+    // give a wrong deal
+    let good_secret = dkgs[0]
+        .dealer
+        .plaintext_deal(idx_rec)
+        .unwrap()
+        .sec_share
+        .v
+        .clone();
+    dkgs[0].dealer.plaintext_deal(idx_rec).unwrap().sec_share.v = suite().scalar().zero();
+    let dd = dkgs[0].deals().unwrap();
+    let enc_d = dd.get(&idx_rec).unwrap();
+    let mut resp = dkgs[idx_rec].process_deal(enc_d).unwrap();
+    assert_eq!(resp.response.status, vss::pedersen::vss::STATUS_COMPLAINT);
+    dkgs[0].dealer.plaintext_deal(idx_rec).unwrap().sec_share.v = good_secret;
+    _ = dkgs[0].deals().unwrap(); //dd
+                                  //enc_d = dd.get(&idx_rec).unwrap();
 
-// 	// no verifier tied to Response
-// 	v, ok := dkg.verifiers[0]
-// 	require.NotNil(t, v)
-// 	require.True(t, ok)
-// 	require.NotNil(t, v)
-// 	delete(dkg.verifiers, 0)
-// 	j, err := dkg.ProcessResponse(resp)
-// 	require.Nil(t, j)
-// 	require.NotNil(t, err)
-// 	dkg.verifiers[0] = v
+	// no verifier tied to Response
+    assert!(dkgs[0].verifiers.contains_key(&0));
+    let v = dkgs[0].verifiers.remove(&0).unwrap();
+    let res = dkgs[0].process_response(&resp);
+    assert!(res.is_err());
+    dkgs[0].verifiers.insert(0, v);
 
-// 	// invalid response
-// 	goodSig := resp.Response.Signature
-// 	resp.Response.Signature = randomBytes(len(goodSig))
-// 	j, err = dkg.ProcessResponse(resp)
-// 	require.Nil(t, j)
-// 	require.Error(t, err)
-// 	resp.Response.Signature = goodSig
+	// invalid response
+    let good_sig = resp.response.signature.clone();
+    resp.response.signature = random_bytes(good_sig.len());
+    let res = dkgs[0].process_response(&resp);
+    assert!(res.is_err());
+    resp.response.signature = good_sig;
 
-// 	// valid complaint from our deal
-// 	j, err = dkg.ProcessResponse(resp)
-// 	require.NotNil(t, j)
-// 	require.Nil(t, err)
+	// valid complaint from our deal
+    let j = dkgs[0].process_response(&resp).unwrap();
+    assert!(j.is_some());
 
-// 	// valid complaint from another deal from another peer
-// 	dkg2 := dkgs[2]
-// 	require.Nil(t, err)
-// 	// fake a wrong deal
-// 	// deal20, err := dkg2.dealer.PlaintextDeal(0)
-// 	// require.Nil(t, err)
-// 	deal21, err := dkg2.dealer.PlaintextDeal(1)
-// 	require.Nil(t, err)
-// 	goodRnd21 := deal21.SecShare.V
-// 	deal21.SecShare.V = suite.Scalar().Zero()
-// 	deals2, err := dkg2.Deals()
-// 	require.Nil(t, err)
+	// valid complaint from another deal from another peer
+    // fake a wrong deal
+    //deal20, err := dkg2.dealer.PlaintextDeal(0)
+    //require.Nil(t, err)
+    let good_rnd_2_1 = dkgs[2]
+        .dealer
+        .plaintext_deal(1)
+        .unwrap()
+        .sec_share
+        .v
+        .clone();
+    dkgs[2].dealer.plaintext_deal(1).unwrap().sec_share.v = suite().scalar().zero();
+    let mut deals_2 = dkgs[2].deals().unwrap();
 
-// 	resp12, err := rec.ProcessDeal(deals2[idxRec])
-// 	require.NotNil(t, resp)
-// 	require.Equal(t, vss.StatusComplaint, resp12.Response.Status)
-// 	require.Equal(t, deals2[idxRec].Index, uint32(dkg2.nidx))
-// 	require.Equal(t, resp12.Index, uint32(dkg2.nidx))
-// 	require.Equal(t, vss.StatusComplaint, rec.verifiers[uint32(dkg2.oidx)].Responses()[uint32(rec.nidx)].Status)
+    let mut resp_1_2 = dkgs[idx_rec]
+        .process_deal(deals_2.get(&idx_rec).unwrap())
+        .unwrap();
+    assert_eq!(resp_1_2.response.status, vss::pedersen::vss::STATUS_COMPLAINT);
 
-// 	deal21.SecShare.V = goodRnd21
-// 	deals2, err = dkg2.Deals()
-// 	require.Nil(t, err)
+    dkgs[2].dealer.plaintext_deal(1).unwrap().sec_share.v = good_rnd_2_1;
+    deals_2 = dkgs[2].deals().unwrap();
 
-// 	// give it to the first peer
-// 	// process dealer 2's deal
-// 	r, err := dkg.ProcessDeal(deals2[0])
-// 	require.Nil(t, err)
-// 	require.NotNil(t, r)
+	// give it to the first peer
+    // process dealer 2's deal
+    dkgs[0].process_deal(deals_2.get(&0).unwrap()).unwrap(); //r
 
-// 	// process response from peer 1
-// 	j, err = dkg.ProcessResponse(resp12)
-// 	require.Nil(t, j)
-// 	require.Nil(t, err)
+	// process response from peer 1
+    let j = dkgs[0].process_response(&resp_1_2).unwrap();
+    assert!(j.is_none());
 
-// 	// Justification part:
-// 	// give the complaint to the dealer
-// 	j, err = dkg2.ProcessResponse(resp12)
-// 	require.Nil(t, err)
-// 	require.NotNil(t, j)
+	// Justification part:
+    // give the complaint to the dealer
+    let j = dkgs[2].process_response(&resp_1_2).unwrap().unwrap();
 
-// 	// hack because all is local, and resp has been modified locally by dkg2's
-// 	// dealer, the status has became "justified"
-// 	resp12.Response.Status = vss.StatusComplaint
-// 	err = dkg.ProcessJustification(j)
-// 	require.Nil(t, err)
+	// hack because all is local, and resp has been modified locally by dkg2's
+    // dealer, the status has became "justified"
+    resp_1_2.response.status = vss::pedersen::vss::STATUS_COMPLAINT;
+    dkgs[0].process_justification(&j).unwrap();
 
-// 	// remove verifiers
-// 	v = dkg.verifiers[j.Index]
-// 	delete(dkg.verifiers, j.Index)
-// 	err = dkg.ProcessJustification(j)
-// 	require.Error(t, err)
-// 	dkg.verifiers[j.Index] = v
+	// remove verifiers
+    let v = dkgs[0].verifiers.remove(&j.index).unwrap();
+    let res = dkgs[0].process_justification(&j);
+    assert!(res.is_err());
+    dkgs[0].verifiers.insert(j.index, v);
 
-// }
+}
 
 // // Test Resharing to a group with one mode node BUT only a threshold of dealers
 // // are present during the resharing.
@@ -537,16 +517,22 @@
 // 	require.Equal(t, dkss[0].Public().String(), commitSecret.String())
 // }
 
-// func genPair() (kyber.Scalar, kyber.Point) {
-// 	sc := suite.Scalar().Pick(suite.RandomStream())
-// 	return sc, suite.Point().Mul(sc, nil)
-// }
+fn gen_pair() -> (EdScalar, EdPoint) {
+    let suite = suite();
+    let secret = suite.scalar().pick(&mut suite.random_stream());
+    let public = suite.point().mul(&secret, None);
+    (secret, public)
+}
 
-// func randomBytes(n int) []byte {
-// 	var buff = make([]byte, n)
-// 	_, _ = rand.Read(buff[:])
-// 	return buff
-// }
+fn random_bytes(n: usize) -> Vec<u8> {
+    let mut rng = rand::thread_rng();
+    let mut buff = Vec::with_capacity(n);
+    for _ in 0..n {
+        buff.push(rng.gen());
+    }
+    return buff;
+}
+
 // func checkDks(dks1, dks2 *DistKeyShare) bool {
 // 	if len(dks1.Commits) != len(dks2.Commits) {
 // 		return false
