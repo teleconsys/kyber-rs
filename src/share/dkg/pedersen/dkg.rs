@@ -35,22 +35,22 @@ use anyhow::{Result, bail};
 /// filled in.
 #[derive(Clone)]
 pub struct Config<SUITE: Suite, READ: Read + Clone> {
-    suite: SUITE,
+    pub suite: SUITE,
 
     /// Longterm is the longterm secret key.
-    longterm: <SUITE::POINT as Point>::SCALAR,
+    pub longterm: <SUITE::POINT as Point>::SCALAR,
 
     /// Current group of share holders. It will be nil for new DKG. These nodes
     /// will have invalid shares after the protocol has been run. To be able to issue
     /// new shares to a new group, the group member's public key must be inside this
     /// list and in the Share field. Keys can be disjoint or not with respect to the
     /// NewNodes list.
-    old_nodes: Vec<SUITE::POINT>,
+    pub old_nodes: Vec<SUITE::POINT>,
 
     /// PublicCoeffs are the coefficients of the distributed polynomial needed
     /// during the resharing protocol. The first coefficient is the key. It is
     /// required for new share holders.  It should be nil for a new DKG.
-    public_coeffs: Option<Vec<SUITE::POINT>>,
+    pub public_coeffs: Option<Vec<SUITE::POINT>>,
 
     /// Expected new group of share holders. These public-key designated nodes
     /// will be in possession of new shares after the protocol has been run. To be a
@@ -62,7 +62,7 @@ pub struct Config<SUITE: Suite, READ: Read + Clone> {
     /// join or create a group. To be able to issue new fresh shares to a new group,
     /// one's share must be specified here, along with the public key inside the
     /// OldNodes field.
-    share: Option<DistKeyShare<SUITE::POINT>>,
+    pub share: Option<DistKeyShare<SUITE::POINT>>,
 
     /// The threshold to use in order to reconstruct the secret with the produced
     /// shares. This threshold is with respect to the number of nodes in the
@@ -70,7 +70,7 @@ pub struct Config<SUITE: Suite, READ: Read + Clone> {
     /// `vss.MinimumT(len(NewNodes))`. This threshold indicates the degree of the
     /// polynomials used to create the shares, and the minimum number of
     /// verification required for each deal.
-    threshold: usize,
+    pub threshold: usize,
 
     /// OldThreshold holds the threshold value that was used in the previous
     /// configuration. This field MUST be specified when doing resharing, but is
@@ -79,17 +79,17 @@ pub struct Config<SUITE: Suite, READ: Read + Clone> {
     /// NOTE: this field is always required (instead of taking the default when
     /// absent) when doing a resharing to avoid a downgrade attack, where a resharing
     /// the number of deals required is less than what it is supposed to be.
-    old_threshold: usize,
+    pub old_threshold: usize,
 
     /// Reader is an optional field that can hold a user-specified entropy source.
     /// If it is set, Reader's data will be combined with random data from crypto/rand
     /// to create a random stream which will pick the dkg's secret coefficient. Otherwise,
     /// the random stream will only use crypto/rand's entropy.
-    reader: Option<READ>,
+    pub reader: Option<READ>,
 
     /// When UserReaderOnly it set to true, only the user-specified entropy source
     /// Reader will be used. This should only be used in tests, allowing reproducibility.
-    user_reader_only: bool,
+    pub user_reader_only: bool,
 }
 
 /// DistKeyGenerator is the struct that runs the DKG protocol.
@@ -103,8 +103,8 @@ where
     pub c: Config<SUITE, READ>,
     suite: SUITE,
 
-    long: <SUITE::POINT as Point>::SCALAR,
-    pubb: SUITE::POINT,
+    pub long: <SUITE::POINT as Point>::SCALAR,
+    pub pubb: SUITE::POINT,
     dpub: share::poly::PubPoly<SUITE>,
     pub dealer: vss::pedersen::vss::Dealer<SUITE>,
     /// verifiers indexed by dealer index
@@ -112,7 +112,7 @@ where
     /// performs the part of the response verification for old nodes
     old_aggregators: HashMap<u32, vss::pedersen::vss::Aggregator<SUITE>>,
     /// index in the old list of nodes
-    oidx: usize,
+    pub oidx: usize,
     /// index in the new list of nodes
     pub nidx: usize,
     /// old threshold used in the previous DKG
@@ -137,7 +137,7 @@ where
 
 /// NewDistKeyHandler takes a Config and returns a DistKeyGenerator that is able
 /// to drive the DKG or resharing protocol.
-fn new_dist_key_handler<SUITE: Suite, READ: Read + Clone + 'static>(
+pub fn new_dist_key_handler<SUITE: Suite, READ: Read + Clone + 'static>(
     mut c: Config<SUITE, READ>,
 ) -> Result<DistKeyGenerator<SUITE, READ>>
 where
@@ -548,7 +548,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
 
     /// SetTimeout triggers the timeout on all verifiers, and thus makes sure
     /// all verifiers have either responded, or have a StatusComplaint response.
-    fn set_timeout(&mut self) {
+    pub fn set_timeout(&mut self) {
     	self.timeout = true;
     	for (_, v) in self.verifiers.iter_mut() {
     		v.set_timeout()
@@ -565,7 +565,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     /// inconsistencies in the shares produced. For example, node 1 could have
     /// aggregated shares from 1, 2, 3 and node 2 could have aggregated shares from
     /// 2, 3 and 4.
-    fn threshold_certified(&self) -> bool {
+    pub fn threshold_certified(&self) -> bool {
     	if self.is_resharing {
     		// in resharing case, we have two threshold. Here we want the number of
     		// deals to be at least what the old threshold was. (and for each deal,
@@ -580,7 +580,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     /// Certified returns true if *all* deals are certified. This method should
     /// be called before the timeout occurs, as to pre-emptively stop the DKG
     /// protocol if it is already finished before the timeout.
-    fn certified(&self) -> bool {
+    pub fn certified(&self) -> bool {
         let mut good = Vec::new();
     	if self.is_resharing && self.can_issue && !self.new_present {
     		self.old_qual_iter(|i, v| {
@@ -614,7 +614,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     /// invalid
     /// 2. if there are no response from a share holder, the share holder is
     /// removed from the list.
-    fn qualified_shares(&self) -> Vec<usize> {
+    pub fn qualified_shares(&self) -> Vec<usize> {
         let mut invalid_sh = HashMap::new();
         let mut invalid_deals = HashMap::new();
     	// compute list of invalid deals according to 1.
@@ -812,24 +812,30 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     }
 
     fn resharing_key(&self) -> Result<DistKeyShare<SUITE::POINT>> {
-    	// only old nodes sends shares
-    	let mut shares = Vec::new();
-    	let mut coeffs = Vec::new();
+    	
+        let cap = self.verifiers.len();
+        // only old nodes sends shares
+    	let mut shares = Vec::with_capacity(cap);
+        for _ in 0..cap {
+            shares.push(None);
+        }
+    	let mut coeffs = Vec::with_capacity(cap);
+        for _ in 0..cap {
+            coeffs.push(None);
+        }
         let mut error = None;
     	self.qual_iter(|i, v| {
     		let mut deal = match v.deal() {
                 Some(deal) => deal,
                 None => {
                     error = Some(anyhow::Error::msg("dkg: deals not found"));
-                    coeffs.push(None);
-                    shares.push(None);
                     return false;
                 }
             };
-            coeffs.push(Some(deal.commitments));
+            coeffs[i as usize] = Some(deal.commitments);
     		// share of dist. secret. Invertion of rows/column
     		deal.sec_share.i = i as usize;
-    		shares.push(Some(deal.sec_share));
+    		shares[i as usize] = Some(deal.sec_share);
     		return true
     	});
         
