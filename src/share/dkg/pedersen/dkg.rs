@@ -4,14 +4,17 @@ use rand::{rngs::StdRng, RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
+    encoding::BinaryMarshaler,
+    group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
     share::{self, vss},
-    util::{random::Randstream},
-    Point, Scalar, Suite, encoding::BinaryMarshaler, sign::schnorr, group::{ScalarCanCheckCanonical, PointCanCheckCanonicalAndSmallOrder},
+    sign::schnorr,
+    util::random::Randstream,
+    Point, Scalar, Suite,
 };
 
-use super::structs::{DistKeyShare, Deal, Response, Justification};
+use super::structs::{Deal, DistKeyShare, Justification, Response};
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 
 /// Package dkg implements a general distributed key generation (DKG) framework.
 /// This package serves two functionalities: (1) to run a fresh new DKG from
@@ -272,9 +275,9 @@ where
     };
     if new_present {
         let mut dkg_try = dkg.clone();
-    	let res_init = dkg_try.init_verifiers(c);
+        let res_init = dkg_try.init_verifiers(c);
         if res_init.is_ok() {
-            return Ok(dkg_try)
+            return Ok(dkg_try);
         }
     }
     Ok(dkg)
@@ -308,12 +311,11 @@ where
     new_dist_key_handler(c)
 }
 
-impl<SUITE: Suite, READ: Read + Clone +'static> DistKeyGenerator<SUITE, READ> 
-where 
-<SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned + ScalarCanCheckCanonical,
-SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder,
+impl<SUITE: Suite, READ: Read + Clone + 'static> DistKeyGenerator<SUITE, READ>
+where
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned + ScalarCanCheckCanonical,
+    SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder,
 {
-
     /// Deals returns all the deals that must be broadcasted to all participants in
     /// the new list. The deal corresponding to this DKG is already added to this DKG
     /// and is ommitted from the returned map. To know which participant a deal
@@ -331,15 +333,15 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
             // We do not hold a share, so we cannot make a deal, so
             // return an empty map and no error. This makes callers not
             // need to care if they are in a resharing context or not.
-            return Ok(HashMap::new())
+            return Ok(HashMap::new());
         }
         let deals = self.dealer.encrypted_deals()?;
         let mut dd = HashMap::new();
         for (i, _) in self.c.new_nodes.clone().iter().enumerate() {
-            let mut distd = Deal{
+            let mut distd = Deal {
                 index: self.oidx as u32,
-                deal:  deals[i].clone(),
-                signature: Vec::new()
+                deal: deals[i].clone(),
+                signature: Vec::new(),
             };
             // sign the deal
             let buff = distd.marshal_binary()?;
@@ -350,7 +352,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
             // staying nodes and won't be certified.
             if i == self.nidx && self.new_present && !self.is_resharing {
                 if self.processed {
-                    continue
+                    continue;
                 }
                 self.processed = true;
                 let resp = self.process_deal(&distd);
@@ -359,7 +361,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
                 } else if resp.unwrap().response.status != vss::pedersen::vss::STATUS_APPROVAL {
                     panic!("dkg: own deal gave a complaint")
                 }
-                continue
+                continue;
             }
             dd.insert(i, distd);
         }
@@ -370,8 +372,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     /// returns a Response to broadcast to every other participant, including the old
     /// participants. It returns an error in case the deal has already been stored,
     /// or if the deal is incorrect (see vss.Verifier.ProcessEncryptedDeal).
-    pub fn process_deal(&mut self, dd: &Deal<SUITE::POINT>) -> Result<Response> 
-    {
+    pub fn process_deal(&mut self, dd: &Deal<SUITE::POINT>) -> Result<Response> {
         if !self.new_present {
             bail!("dkg: unexpected deal for unlisted dealer in new list")
         }
@@ -393,16 +394,16 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
 
         let resp;
         {
-        let ver = self.verifiers.get_mut(&dd.index).unwrap();
-        resp = ver.process_encrypted_deal(&dd.deal)?;
+            let ver = self.verifiers.get_mut(&dd.index).unwrap();
+            resp = ver.process_encrypted_deal(&dd.deal)?;
         }
 
         if self.is_resharing && self.can_receive {
             // verify share integrity wrt to the dist. secret
             let deal_commits;
             {
-            let ver = self.verifiers.get_mut(&dd.index).unwrap();
-            deal_commits = ver.commits();
+                let ver = self.verifiers.get_mut(&dd.index).unwrap();
+                deal_commits = ver.commits();
             }
             let mut reject = || {
                 let mut resp = resp.clone();
@@ -410,34 +411,42 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
                 if present {
                     // the dealer is present in both list, so we set its own response
                     // (as a verifier) to a complaint since he won't do it himself
-                    self.verifiers.get_mut(&dd.index).unwrap().unsafe_set_response_dkg(idx as u32, vss::pedersen::vss::STATUS_COMPLAINT);
+                    self.verifiers
+                        .get_mut(&dd.index)
+                        .unwrap()
+                        .unsafe_set_response_dkg(idx as u32, vss::pedersen::vss::STATUS_COMPLAINT);
                 }
                 // indicate to VSS that this dkg's new status is complaint for this
                 // deal
-                self.verifiers.get_mut(&dd.index).unwrap().unsafe_set_response_dkg(self.nidx as u32, vss::pedersen::vss::STATUS_COMPLAINT);
+                self.verifiers
+                    .get_mut(&dd.index)
+                    .unwrap()
+                    .unsafe_set_response_dkg(
+                        self.nidx as u32,
+                        vss::pedersen::vss::STATUS_COMPLAINT,
+                    );
                 resp.status = vss::pedersen::vss::STATUS_COMPLAINT;
                 let msg_res = resp.hash(&self.suite);
                 if msg_res.is_err() {
-                    return Err(msg_res.unwrap_err())
+                    return Err(msg_res.unwrap_err());
                 }
-                let s_res = schnorr::sign(&self.suite,& self.long, &msg_res.unwrap());
+                let s_res = schnorr::sign(&self.suite, &self.long, &msg_res.unwrap());
                 if s_res.is_err() {
-                    return Err(s_res.unwrap_err())
+                    return Err(s_res.unwrap_err());
                 }
                 resp.signature = s_res.unwrap();
-                Ok(Response{
-                    index:    dd.index,
+                Ok(Response {
+                    index: dd.index,
                     response: resp,
                 })
-            };  
+            };
             // Check that the received committed share is equal to the one we
             // generate from the known public polynomial
             let expected_pub_share = self.dpub.eval(dd.index as usize);
             if !expected_pub_share.v.equal(&deal_commits.unwrap()[0]) {
-                return reject()
+                return reject();
             }
         }
-        
 
         // If the dealer in the old list is also present in the new list, then set
         // his response to approval since he won't issue his own response for his
@@ -447,12 +456,15 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
         // don't add it manually there.
         let (new_idx, found) = find_pub(&self.c.new_nodes, &pubb);
         if found && !self.is_resharing {
-            self.verifiers.get_mut(&dd.index).unwrap().unsafe_set_response_dkg(new_idx as u32, vss::pedersen::vss::STATUS_APPROVAL);
+            self.verifiers
+                .get_mut(&dd.index)
+                .unwrap()
+                .unsafe_set_response_dkg(new_idx as u32, vss::pedersen::vss::STATUS_APPROVAL);
         }
 
-        Ok(Response{
+        Ok(Response {
             index: dd.index,
-            response: resp
+            response: resp,
         })
     }
 
@@ -462,78 +474,81 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     /// If the response designates a deal this dkg has issued, then the dkg will process
     /// the response, and returns a justification.
     pub fn process_response(&mut self, resp: &Response) -> Result<Option<Justification<SUITE>>> {
-    	if self.is_resharing && self.can_issue && !self.new_present {
-    		return self.process_resharing_response(resp)
-    	}
+        if self.is_resharing && self.can_issue && !self.new_present {
+            return self.process_resharing_response(resp);
+        }
 
-    	if !self.verifiers.contains_key(&resp.index) {
-    		bail!("dkg: responses received for unknown dealer {}", resp.index)
-    	}
+        if !self.verifiers.contains_key(&resp.index) {
+            bail!("dkg: responses received for unknown dealer {}", resp.index)
+        }
         let v = self.verifiers.get_mut(&resp.index).unwrap();
         v.process_response(&resp.response)?;
 
-    	let my_idx = self.oidx as u32;
-    	if !self.can_issue || resp.index != my_idx {
-    		// no justification if we dont issue deals or the deal's not from us
-    		return Ok(None)
-    	}
+        let my_idx = self.oidx as u32;
+        if !self.can_issue || resp.index != my_idx {
+            // no justification if we dont issue deals or the deal's not from us
+            return Ok(None);
+        }
 
-    	let j = self.dealer.process_response(&resp.response)?;
-    	if j.is_none() {
-    		return Ok(None)
-    	}
+        let j = self.dealer.process_response(&resp.response)?;
+        if j.is_none() {
+            return Ok(None);
+        }
         let just = j.unwrap();
         v.process_justification(&just)?;
 
-    	Ok(Some(Justification{
-    		index:         self.oidx as u32,
-    		justification: just,
-    	}))
+        Ok(Some(Justification {
+            index: self.oidx as u32,
+            justification: just,
+        }))
     }
 
     /// special case when an node that is present in the old list but not in the
     /// new,i.e. leaving the group. This node does not have any verifiers since it
     /// can't receive shares. This function makes some check on the response and
     /// returns a justification if the response is invalid.
-    fn process_resharing_response(&mut self, resp: &Response) -> Result<Option<Justification<SUITE>>> 
+    fn process_resharing_response(
+        &mut self,
+        resp: &Response,
+    ) -> Result<Option<Justification<SUITE>>>
     where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
+        <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+        SUITE::POINT: Serialize + DeserializeOwned,
     {
         let agg = match self.old_aggregators.contains_key(&resp.index) {
             true => self.old_aggregators.get_mut(&resp.index).unwrap(),
-            false => { 
+            false => {
                 let mut agg = vss::pedersen::vss::Aggregator::<SUITE>::default();
                 agg.verifiers = self.c.new_nodes.clone();
                 agg.suite = self.suite;
                 self.old_aggregators.insert(resp.index, agg);
                 self.old_aggregators.get_mut(&resp.index).unwrap()
-            },
-        };        
+            }
+        };
 
-    	agg.process_response(resp.response.clone())?;
-    	if resp.index as usize != self.oidx {
-    		return Ok(None)
-    	}
+        agg.process_response(resp.response.clone())?;
+        if resp.index as usize != self.oidx {
+            return Ok(None);
+        }
 
         if resp.response.status == vss::pedersen::vss::STATUS_APPROVAL {
-            return Ok(None)
+            return Ok(None);
         }
 
         let s_id = self.dealer.session_id();
-    	// status is complaint and it is about our deal
-    	let deal = self.dealer.plaintext_deal(resp.response.index as usize)?; // dkg: resharing response can't get deal. BUG - REPORT"
-    	    	
-    	let j = Justification{
-    		index: self.oidx as u32,
-    		justification: vss::pedersen::vss::Justification{
-    			session_id: s_id,
-    			index:     resp.response.index, // good index because of signature check
-    			deal:      deal.clone(),
-                signature: Vec::new()
-    		},
-    	};
-    	Ok(Some(j))
+        // status is complaint and it is about our deal
+        let deal = self.dealer.plaintext_deal(resp.response.index as usize)?; // dkg: resharing response can't get deal. BUG - REPORT"
+
+        let j = Justification {
+            index: self.oidx as u32,
+            justification: vss::pedersen::vss::Justification {
+                session_id: s_id,
+                index: resp.response.index, // good index because of signature check
+                deal: deal.clone(),
+                signature: Vec::new(),
+            },
+        };
+        Ok(Some(j))
     }
 
     /// ProcessJustification takes a justification and validates it. It returns an
@@ -543,16 +558,16 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
             bail!("dkg: Justification received but no deal for it")
         }
         let v = self.verifiers.get_mut(&j.index).unwrap();
-    	return v.process_justification(&j.justification)
+        return v.process_justification(&j.justification);
     }
 
     /// SetTimeout triggers the timeout on all verifiers, and thus makes sure
     /// all verifiers have either responded, or have a StatusComplaint response.
     pub fn set_timeout(&mut self) {
-    	self.timeout = true;
-    	for (_, v) in self.verifiers.iter_mut() {
-    		v.set_timeout()
-    	}
+        self.timeout = true;
+        for (_, v) in self.verifiers.iter_mut() {
+            v.set_timeout()
+        }
     }
 
     /// ThresholdCertified returns true if a THRESHOLD of deals are certified. To know the
@@ -566,15 +581,15 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     /// aggregated shares from 1, 2, 3 and node 2 could have aggregated shares from
     /// 2, 3 and 4.
     pub fn threshold_certified(&self) -> bool {
-    	if self.is_resharing {
-    		// in resharing case, we have two threshold. Here we want the number of
-    		// deals to be at least what the old threshold was. (and for each deal,
-    		// we want the number of approval to be a least what the new threshold
-    		// is).
-    		return self.qual().len() >= self.c.old_threshold
-    	}
-    	// in dkg case, the threshold is symmetric -> # verifiers = # dealers
-    	return self.qual().len() >= self.c.threshold
+        if self.is_resharing {
+            // in resharing case, we have two threshold. Here we want the number of
+            // deals to be at least what the old threshold was. (and for each deal,
+            // we want the number of approval to be a least what the new threshold
+            // is).
+            return self.qual().len() >= self.c.old_threshold;
+        }
+        // in dkg case, the threshold is symmetric -> # verifiers = # dealers
+        return self.qual().len() >= self.c.threshold;
     }
 
     /// Certified returns true if *all* deals are certified. This method should
@@ -582,24 +597,24 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     /// protocol if it is already finished before the timeout.
     pub fn certified(&self) -> bool {
         let mut good = Vec::new();
-    	if self.is_resharing && self.can_issue && !self.new_present {
-    		self.old_qual_iter(|i, v| {
+        if self.is_resharing && self.can_issue && !self.new_present {
+            self.old_qual_iter(|i, v| {
                 if v.missing_responses().len() > 0 {
-    				return false
-    			}
+                    return false;
+                }
                 good.push(i as usize);
                 return true;
-    		});
-    	}
+            });
+        }
         self.qual_iter(|i, v| {
             if v.missing_responses().len() > 0 {
-                return false
+                return false;
             }
             good.push(i as usize);
             return true;
         });
-    	
-    	return good.len() >= self.c.old_nodes.len()
+
+        return good.len() >= self.c.old_nodes.len();
     }
 
     /// QualifiedShares returns the set of shares holder index that are considered
@@ -617,59 +632,59 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     pub fn qualified_shares(&self) -> Vec<usize> {
         let mut invalid_sh = HashMap::new();
         let mut invalid_deals = HashMap::new();
-    	// compute list of invalid deals according to 1.
-    	for (dealer_index, verifier) in self.verifiers.iter() {
-    		let responses = verifier.responses();
-    		if responses.len() == 0 {
-    			// don't analyzes "empty" deals - i.e. dealers that never sent
-    			// their deal in the first place.
+        // compute list of invalid deals according to 1.
+        for (dealer_index, verifier) in self.verifiers.iter() {
+            let responses = verifier.responses();
+            if responses.len() == 0 {
+                // don't analyzes "empty" deals - i.e. dealers that never sent
+                // their deal in the first place.
                 invalid_deals.insert(dealer_index, true);
-    		}
-    		for (holder_index, _) in self.c.new_nodes.iter().enumerate() {
-                match responses.contains_key(&(holder_index as u32)){
+            }
+            for (holder_index, _) in self.c.new_nodes.iter().enumerate() {
+                match responses.contains_key(&(holder_index as u32)) {
                     true => {
                         let resp = responses.get(&(holder_index as u32)).unwrap();
                         if resp.status == vss::pedersen::vss::STATUS_COMPLAINT {
                             // 1. rule
                             invalid_deals.insert(dealer_index, true);
-                            break
+                            break;
                         }
-                    },
+                    }
                     false => (),
                 }
-    		}
-    	}
+            }
+        }
 
-    	// compute list of invalid share holders for valid deals
-    	for (dealer_index, verifier) in self.verifiers.iter() {
-    		// skip analyze of invalid deals
-    		if invalid_deals.contains_key(&dealer_index) {
-    			continue
-    		}
-    		let responses = verifier.responses();
-    		for (holder_index, _) in self.c.new_nodes.iter().enumerate() {
-                if !responses.contains_key(&(holder_index as u32)){
+        // compute list of invalid share holders for valid deals
+        for (dealer_index, verifier) in self.verifiers.iter() {
+            // skip analyze of invalid deals
+            if invalid_deals.contains_key(&dealer_index) {
+                continue;
+            }
+            let responses = verifier.responses();
+            for (holder_index, _) in self.c.new_nodes.iter().enumerate() {
+                if !responses.contains_key(&(holder_index as u32)) {
                     // 2. rule - absent response
                     invalid_sh.insert(holder_index, true);
                 }
-    		}
-    	}
+            }
+        }
 
         let mut valid_holders = Vec::new();
-    	for (i, _) in self.c.new_nodes.iter().enumerate() {
+        for (i, _) in self.c.new_nodes.iter().enumerate() {
             if invalid_sh.contains_key(&i) {
                 continue;
             }
             valid_holders.push(i);
-    	}
-    	return valid_holders
+        }
+        return valid_holders;
     }
 
     /// ExpectedDeals returns the number of deals that this node will
     /// receive from the other participants.
     fn expected_deals(&self) -> usize {
-    	match self.new_present {
-            true => match self.old_present{
+        match self.new_present {
+            true => match self.old_present {
                 true => return self.c.old_nodes.len() - 1,
                 false => return self.c.old_nodes.len(),
             },
@@ -682,19 +697,19 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     /// It does NOT take into account any malicious share holder which share may have
     /// been revealed, due to invalid complaint.
     pub fn qual(&self) -> Vec<usize> {
-    	let mut good = Vec::new();
-    	if self.is_resharing && self.can_issue && !self.new_present {
-    		self.old_qual_iter(|i, _| {
+        let mut good = Vec::new();
+        if self.is_resharing && self.can_issue && !self.new_present {
+            self.old_qual_iter(|i, _| {
                 good.push(i as usize);
                 return true;
-    		});
-    		return good
-    	}
-    	self.qual_iter(|i, _| {
+            });
+            return good;
+        }
+        self.qual_iter(|i, _| {
             good.push(i as usize);
             return true;
         });
-    	return good
+        return good;
     }
 
     pub fn is_in_qual(&self, idx: u32) -> bool {
@@ -744,28 +759,28 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     /// The share is evaluated from the global Private Polynomial, basically SUM of
     /// fj(i) for a receiver i.
     pub fn dist_key_share(&self) -> Result<DistKeyShare<SUITE::POINT>> {
-    	if !self.threshold_certified() {
-    		bail!("dkg: distributed key not certified")
-    	}
-    	if !self.can_receive {
-    		bail!("dkg: should not expect to compute any dist. share")
-    	}
+        if !self.threshold_certified() {
+            bail!("dkg: distributed key not certified")
+        }
+        if !self.can_receive {
+            bail!("dkg: should not expect to compute any dist. share")
+        }
 
-    	if self.is_resharing {
-    		return self.resharing_key()
-    	}
+        if self.is_resharing {
+            return self.resharing_key();
+        }
 
-    	return self.dkg_key()
+        return self.dkg_key();
     }
 
     fn dkg_key(&self) -> Result<DistKeyShare<SUITE::POINT>> {
-    	let mut sh = self.suite.scalar().zero();
-    	let mut tmp_pubb = None;
+        let mut sh = self.suite.scalar().zero();
+        let mut tmp_pubb = None;
         let mut pubb: Option<share::poly::PubPoly<SUITE>> = None;
         // TODO: fix this weird error management and the messy pubb
         let mut error: Option<anyhow::Error> = None;
-    	self.qual_iter(|i, v| {
-    		// share of dist. secret = sum of all share received.
+        self.qual_iter(|i, v| {
+            // share of dist. secret = sum of all share received.
             let (s, deal) = match v.deal() {
                 Some(deal) => (deal.clone().sec_share.v, deal),
                 None => {
@@ -775,8 +790,12 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
             };
             let sh_clone = sh.clone();
             sh = sh_clone + s;
-    		// Dist. public key = sum of all revealed commitments
-    		let poly = share::poly::PubPoly::new(&self.suite, Some(self.suite.point().base()), &deal.commitments);
+            // Dist. public key = sum of all revealed commitments
+            let poly = share::poly::PubPoly::new(
+                &self.suite,
+                Some(self.suite.point().base()),
+                &deal.commitments,
+            );
             if pubb.is_none() && tmp_pubb.is_none() {
                 // first polynomial we see (instead of generating n empty commits)
                 tmp_pubb = Some(poly);
@@ -794,12 +813,12 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
                 }
             };
             return error.is_none();
-    	});
+        });
 
-    	if error.is_some() {
+        if error.is_some() {
             return Err(error.unwrap());
         }
-    	let (_, commits) = pubb.unwrap().info();
+        let (_, commits) = pubb.unwrap().info();
 
         Ok(DistKeyShare {
             commits: commits,
@@ -807,25 +826,24 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
                 i: self.nidx as usize,
                 v: sh,
             },
-            private_poly: self.dealer.private_poly().coefficients()
-        })    	
+            private_poly: self.dealer.private_poly().coefficients(),
+        })
     }
 
     fn resharing_key(&self) -> Result<DistKeyShare<SUITE::POINT>> {
-    	
         let cap = self.verifiers.len();
         // only old nodes sends shares
-    	let mut shares = Vec::with_capacity(cap);
+        let mut shares = Vec::with_capacity(cap);
         for _ in 0..cap {
             shares.push(None);
         }
-    	let mut coeffs = Vec::with_capacity(cap);
+        let mut coeffs = Vec::with_capacity(cap);
         for _ in 0..cap {
             coeffs.push(None);
         }
         let mut error = None;
-    	self.qual_iter(|i, v| {
-    		let mut deal = match v.deal() {
+        self.qual_iter(|i, v| {
+            let mut deal = match v.deal() {
                 Some(deal) => deal,
                 None => {
                     error = Some(anyhow::Error::msg("dkg: deals not found"));
@@ -833,124 +851,137 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
                 }
             };
             coeffs[i as usize] = Some(deal.commitments);
-    		// share of dist. secret. Invertion of rows/column
-    		deal.sec_share.i = i as usize;
-    		shares[i as usize] = Some(deal.sec_share);
-    		return true
-    	});
-        
+            // share of dist. secret. Invertion of rows/column
+            deal.sec_share.i = i as usize;
+            shares[i as usize] = Some(deal.sec_share);
+            return true;
+        });
 
-    	// the private polynomial is generated from the old nodes, thus inheriting
-    	// the old threshold condition
-    	let pri_poly = share::poly::recover_pri_poly(&self.suite, &shares, self.old_t, self.c.old_nodes.len())?;
-    	let private_share = share::poly::PriShare{
-    		i: self.nidx,
-    		v: pri_poly.secret(),
-    	};
+        // the private polynomial is generated from the old nodes, thus inheriting
+        // the old threshold condition
+        let pri_poly = share::poly::recover_pri_poly(
+            &self.suite,
+            &shares,
+            self.old_t,
+            self.c.old_nodes.len(),
+        )?;
+        let private_share = share::poly::PriShare {
+            i: self.nidx,
+            v: pri_poly.secret(),
+        };
 
-    	// recover public polynomial by interpolating coefficient-wise all
-    	// polynomials
-    	// the new public polynomial must however have "newT" coefficients since it
-    	// will be held by the new nodes.
-    	let mut final_coeffs = Vec::with_capacity(self.new_t);
-    	for i in 0..self.new_t {
-    		let mut tmp_coeffs = Vec::with_capacity(coeffs.len());
-    		// take all i-th coefficients
-    		for (j, _) in coeffs.iter().enumerate() {
-    			if coeffs[j] == None {
+        // recover public polynomial by interpolating coefficient-wise all
+        // polynomials
+        // the new public polynomial must however have "newT" coefficients since it
+        // will be held by the new nodes.
+        let mut final_coeffs = Vec::with_capacity(self.new_t);
+        for i in 0..self.new_t {
+            let mut tmp_coeffs = Vec::with_capacity(coeffs.len());
+            // take all i-th coefficients
+            for (j, _) in coeffs.iter().enumerate() {
+                if coeffs[j] == None {
                     tmp_coeffs.push(None);
-    				continue
-    			}
-    			tmp_coeffs.push(Some(share::poly::PubShare{
+                    continue;
+                }
+                tmp_coeffs.push(Some(share::poly::PubShare {
                     i: j,
                     v: coeffs[j].clone().unwrap()[i].clone(),
                 }));
-    		}
+            }
 
-    		// using the old threshold / length because there are at most
-    		// len(d.c.OldNodes) i-th coefficients since they are the one generating one
-    		// each, thus using the old threshold.
-    		let coeff = share::poly::recover_commit(self.suite, &tmp_coeffs, self.old_t, self.c.old_nodes.len())?;
-    		final_coeffs.push(coeff);
-    	}
+            // using the old threshold / length because there are at most
+            // len(d.c.OldNodes) i-th coefficients since they are the one generating one
+            // each, thus using the old threshold.
+            let coeff = share::poly::recover_commit(
+                self.suite,
+                &tmp_coeffs,
+                self.old_t,
+                self.c.old_nodes.len(),
+            )?;
+            final_coeffs.push(coeff);
+        }
 
-    	// Reconstruct the final public polynomial
-    	let pub_poly = share::poly::PubPoly::new(&self.suite, None, &final_coeffs);
+        // Reconstruct the final public polynomial
+        let pub_poly = share::poly::PubPoly::new(&self.suite, None, &final_coeffs);
 
-    	if !pub_poly.check(&private_share) {
-    		bail!("dkg: share do not correspond to public polynomial ><");
-    	}
-    	Ok(DistKeyShare{
-    		commits:     final_coeffs,
-    		share:       private_share,
-    		private_poly: pri_poly.coefficients(),
-    	})
+        if !pub_poly.check(&private_share) {
+            bail!("dkg: share do not correspond to public polynomial ><");
+        }
+        Ok(DistKeyShare {
+            commits: final_coeffs,
+            share: private_share,
+            private_poly: pri_poly.coefficients(),
+        })
     }
 
     // Verifiers returns the verifiers keeping state of each deals
     pub fn verifiers(&self) -> &HashMap<u32, vss::pedersen::vss::Verifier<SUITE>> {
-    	return &self.verifiers
+        return &self.verifiers;
     }
 
     fn init_verifiers(&mut self, c: Config<SUITE, READ>) -> Result<()> {
-    	let mut already_taken = HashMap::new();
-    	let verifier_list = c.new_nodes;
-    	let dealer_list = c.old_nodes;
-    	let mut verifiers = HashMap::new();
-    	for (i, pubb) in dealer_list.iter().enumerate() {
-    		if already_taken.contains_key(&pubb.to_string()) {
-    			bail!("duplicate public key in NewNodes list")
-    		}
+        let mut already_taken = HashMap::new();
+        let verifier_list = c.new_nodes;
+        let dealer_list = c.old_nodes;
+        let mut verifiers = HashMap::new();
+        for (i, pubb) in dealer_list.iter().enumerate() {
+            if already_taken.contains_key(&pubb.to_string()) {
+                bail!("duplicate public key in NewNodes list")
+            }
             already_taken.insert(pubb.to_string(), true);
-    		let mut ver = vss::pedersen::vss::new_verifier(&c.suite, &c.longterm, pubb, &verifier_list)?;
-    		// set that the number of approval for this deal must be at the given
-    		// threshold regarding the new nodes. (see config.
-    		ver.set_threshold(c.threshold);
+            let mut ver =
+                vss::pedersen::vss::new_verifier(&c.suite, &c.longterm, pubb, &verifier_list)?;
+            // set that the number of approval for this deal must be at the given
+            // threshold regarding the new nodes. (see config.
+            ver.set_threshold(c.threshold);
             verifiers.insert(i as u32, ver);
-    	}
-    	self.verifiers = verifiers;
-    	Ok(())
+        }
+        self.verifiers = verifiers;
+        Ok(())
     }
 }
 
-
-
-impl<P: Point> DistKeyShare<P>{
+impl<P: Point> DistKeyShare<P> {
     /// Renew adds the new distributed key share g (with secret 0) to the distributed key share d.
-    fn renew<SUITE: Suite<POINT = P>>(&self, suite: SUITE, g: DistKeyShare<P>) -> Result<DistKeyShare<P>> 
-    {
-    	// Check G(0) = 0*G.
-    	if !g.public().equal(&suite.point().base().mul(&suite.scalar().zero(), None)) {
-    		bail!("wrong renewal function")
-    	}
-
-    	// Check whether they have the same index
-    	if self.share.i != g.share.i {
-    		bail!("not the same party")
-    	}
-
-    	let new_share = self.share.v.clone() + g.share.v;
-    	let mut new_commits = Vec::with_capacity(self.commits.len());
-    	for i  in 0..self.commits.len() {
-    		new_commits.push(suite.point().add(&self.commits[i], &g.commits[i]));
-    	}
-    	Ok( DistKeyShare{
-    		commits: new_commits,
-    		share: share::poly::PriShare{
-    			i: self.share.i,
-    			v: new_share,
-    		},
-            private_poly: Vec::new(),
+    fn renew<SUITE: Suite<POINT = P>>(
+        &self,
+        suite: SUITE,
+        g: DistKeyShare<P>,
+    ) -> Result<DistKeyShare<P>> {
+        // Check G(0) = 0*G.
+        if !g
+            .public()
+            .equal(&suite.point().base().mul(&suite.scalar().zero(), None))
+        {
+            bail!("wrong renewal function")
         }
-    	)
+
+        // Check whether they have the same index
+        if self.share.i != g.share.i {
+            bail!("not the same party")
+        }
+
+        let new_share = self.share.v.clone() + g.share.v;
+        let mut new_commits = Vec::with_capacity(self.commits.len());
+        for i in 0..self.commits.len() {
+            new_commits.push(suite.point().add(&self.commits[i], &g.commits[i]));
+        }
+        Ok(DistKeyShare {
+            commits: new_commits,
+            share: share::poly::PriShare {
+                i: self.share.i,
+                v: new_share,
+            },
+            private_poly: Vec::new(),
+        })
     }
 }
 
 fn get_pub<POINT: Point>(list: &[POINT], i: usize) -> (POINT, bool) {
-	if i >= list.len() {
-		return (Default::default(), false)
-	}
-	return (list[i].clone(), true)
+    if i >= list.len() {
+        return (Default::default(), false);
+    }
+    return (list[i].clone(), true);
 }
 
 fn find_pub<POINT: Point>(list: &[POINT], to_find: &POINT) -> (usize, bool) {
@@ -962,10 +993,10 @@ fn find_pub<POINT: Point>(list: &[POINT], to_find: &POINT) -> (usize, bool) {
     return (0, false);
 }
 
-fn checks_deal_certified<SUITE: Suite>(i: u32, v: vss::pedersen::vss::Verifier<SUITE>) -> bool 
+fn checks_deal_certified<SUITE: Suite>(i: u32, v: vss::pedersen::vss::Verifier<SUITE>) -> bool
 where
-<SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-SUITE::POINT: Serialize + DeserializeOwned
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
+    SUITE::POINT: Serialize + DeserializeOwned,
 {
-	return v.deal_certified()
+    return v.deal_certified();
 }

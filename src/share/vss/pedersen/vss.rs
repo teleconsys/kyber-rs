@@ -503,7 +503,7 @@ where
         pubb,
         index,
         hkdf_context: Vec::from(c),
-        aggregator: Some(new_empty_aggregator(suite.clone(), verifiers))
+        aggregator: Some(new_empty_aggregator(suite.clone(), verifiers)),
     })
 }
 
@@ -841,17 +841,20 @@ where
 
 /// NewEmptyAggregator returns a structure capable of storing Responses about a
 /// deal and check if the deal is certified or not.
-pub fn new_empty_aggregator<SUITE: Suite>(suite: SUITE, verifiers: &[SUITE::POINT]) -> Aggregator<SUITE> 
+pub fn new_empty_aggregator<SUITE: Suite>(
+    suite: SUITE,
+    verifiers: &[SUITE::POINT],
+) -> Aggregator<SUITE>
 where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
-	return Aggregator{
-		suite:     suite,
-		verifiers: verifiers.to_vec(),
-		responses: HashMap::new(),
+    return Aggregator {
+        suite: suite,
+        verifiers: verifiers.to_vec(),
+        responses: HashMap::new(),
         ..Default::default()
-	}
+    };
 }
 
 impl<SUITE: Suite> Aggregator<SUITE>
@@ -937,7 +940,11 @@ where
         <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
     {
         if !self.sid.is_empty() && r.session_id != self.sid {
-            bail!("vss: receiving inconsistent sessionID in response: {:?} vs {:?}", r.session_id, self.sid)
+            bail!(
+                "vss: receiving inconsistent sessionID in response: {:?} vs {:?}",
+                r.session_id,
+                self.sid
+            )
         }
 
         let public = find_pub(&self.verifiers, r.index as usize);
