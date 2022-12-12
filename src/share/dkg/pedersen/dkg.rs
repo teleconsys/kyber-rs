@@ -513,7 +513,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
 
     	agg.process_response(resp.response.clone())?;
     	if resp.index as usize != self.oidx {
-    		bail!("error")
+    		return Ok(None)
     	}
 
         if resp.response.status == vss::pedersen::vss::STATUS_APPROVAL {
@@ -888,7 +888,7 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     }
 
     // Verifiers returns the verifiers keeping state of each deals
-    fn verifiers(&self) -> &HashMap<u32, vss::pedersen::vss::Verifier<SUITE>> {
+    pub fn verifiers(&self) -> &HashMap<u32, vss::pedersen::vss::Verifier<SUITE>> {
     	return &self.verifiers
     }
 

@@ -580,500 +580,489 @@ SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder
     }
 }
 
-// // Test resharing of a DKG to the same set of nodes
-// func TestDKGResharing(t *testing.T) {
-// 	oldT := vss.MinimumT(defaultN)
-// 	publics, secrets, dkgs := generate(defaultN, oldT)
-// 	fullExchange(t, dkgs, true)
+/// Test resharing of a DKG to the same set of nodes
+#[test]
+fn test_dkg_resharing() {
+	let old_t = vss::pedersen::vss::minimum_t(DEFAULT_N);
+	let (publics, secrets, mut dkgs) = generate(DEFAULT_N, old_t);
+	full_exchange(&mut dkgs, true);
 
-// 	shares := make([]*DistKeyShare, len(dkgs))
-// 	sshares := make([]*share.PriShare, len(dkgs))
-// 	for i, dkg := range dkgs {
-// 		share, err := dkg.DistKeyShare()
-// 		require.NoError(t, err)
-// 		shares[i] = share
-// 		sshares[i] = shares[i].Share
-// 	}
-// 	// start resharing within the same group
-// 	newDkgs := make([]*DistKeyGenerator, len(dkgs))
-// 	var err error
-// 	for i := range dkgs {
-// 		c := &Config{
-// 			Suite:        suite,
-// 			Longterm:     secrets[i],
-// 			OldNodes:     publics,
-// 			NewNodes:     publics,
-// 			Share:        shares[i],
-// 			OldThreshold: oldT,
-// 		}
-// 		newDkgs[i], err = NewDistKeyHandler(c)
-// 		require.NoError(t, err)
-// 	}
-// 	fullExchange(t, newDkgs, true)
-// 	newShares := make([]*DistKeyShare, len(dkgs))
-// 	newSShares := make([]*share.PriShare, len(dkgs))
-// 	for i := range newDkgs {
-// 		dks, err := newDkgs[i].DistKeyShare()
-// 		require.NoError(t, err)
-// 		newShares[i] = dks
-// 		newSShares[i] = newShares[i].Share
-// 	}
-// 	// check
-// 	// 1. shares are different between the two rounds
-// 	// 2. shares reconstruct to the same secret
-// 	// 3. public polynomial is different but for the first coefficient /public
-// 	// key/
-// 	// 1.
-// 	for i := 0; i < len(dkgs); i++ {
-// 		require.False(t, shares[i].Share.V.Equal(newShares[i].Share.V))
-// 	}
-// 	thr := vss.MinimumT(defaultN)
-// 	// 2.
-// 	oldSecret, err := share.RecoverSecret(suite, sshares, thr, defaultN)
-// 	require.NoError(t, err)
-// 	newSecret, err := share.RecoverSecret(suite, newSShares, thr, defaultN)
-// 	require.NoError(t, err)
-// 	require.Equal(t, oldSecret.String(), newSecret.String())
-// }
+	let mut shares = Vec::with_capacity(dkgs.len());
+	let mut sshares = Vec::with_capacity(dkgs.len());
+	for dkg in dkgs.iter() {
+		let share = dkg.dist_key_share().unwrap();
+		sshares.push(Some(share.share.clone()));
+		shares.push(share);		
+	}
+	// start resharing within the same group
+	let mut new_dkgs: Vec<DistKeyGenerator<SuiteEd25519, &[u8]>> = Vec::with_capacity(dkgs.len());
+	for (i, _) in dkgs.iter().enumerate() {
+		let c = Config{
+			suite:        suite(),
+			longterm:     secrets[i].clone(),
+			old_nodes:     publics.clone(),
+			new_nodes:     publics.clone(),
+			share:        Some(shares[i].clone()),
+			old_threshold: old_t,
+			public_coeffs: None,
+			threshold: 0,
+			reader : None,
+			user_reader_only: false
 
-// // Test resharing functionality with one node less
-// func TestDKGResharingRemoveNode(t *testing.T) {
-// 	oldT := vss.MinimumT(defaultN)
-// 	publics, secrets, dkgs := generate(defaultN, oldT)
-// 	fullExchange(t, dkgs, true)
+		};
+		new_dkgs.push(new_dist_key_handler(c).unwrap());
+	}
+	full_exchange(&mut new_dkgs, true);
+	let mut new_shares  = Vec::with_capacity(dkgs.len());
+	let mut new_sshares = Vec::with_capacity(dkgs.len());
+	for  dkg in new_dkgs {
+		let dks = dkg.dist_key_share().unwrap();
+		new_sshares.push(Some(dks.share.clone()));
+		new_shares.push(dks);		
+	}
+	// check
+	// 1. shares are different between the two rounds
+	// 2. shares reconstruct to the same secret
+	// 3. public polynomial is different but for the first coefficient /public
+	// key/
+	// 1.
+	for i in 0..dkgs.len() {
+		assert!(!shares[i].share.v.eq(&new_shares[i].share.v))
+	}
+	let thr = vss::pedersen::vss::minimum_t(DEFAULT_N);
+	// 2.
+	let old_secret = share::poly::recover_secret(suite(), &sshares, thr, DEFAULT_N).unwrap();
+	let new_secret = share::poly::recover_secret(suite(), &new_sshares, thr, DEFAULT_N).unwrap();
+	assert_eq!(old_secret.to_string(), new_secret.to_string());
+}
 
-// 	newN := len(publics) - 1
-// 	shares := make([]*DistKeyShare, len(dkgs))
-// 	sshares := make([]*share.PriShare, len(dkgs))
-// 	for i, dkg := range dkgs {
-// 		share, err := dkg.DistKeyShare()
-// 		require.NoError(t, err)
-// 		shares[i] = share
-// 		sshares[i] = shares[i].Share
-// 	}
+/// Test resharing functionality with one node less
+#[test]
+fn test_dkg_resharing_remove_node() {
+	let old_t = vss::pedersen::vss::minimum_t(DEFAULT_N);
+	let (publics, secrets, mut dkgs) = generate(DEFAULT_N, old_t);
+	full_exchange(&mut dkgs, true);
 
-// 	// start resharing within the same group
-// 	newDkgs := make([]*DistKeyGenerator, len(dkgs))
-// 	var err error
-// 	for i := range dkgs {
-// 		c := &Config{
-// 			Suite:        suite,
-// 			Longterm:     secrets[i],
-// 			OldNodes:     publics,
-// 			NewNodes:     publics[:newN],
-// 			Share:        shares[i],
-// 			OldThreshold: oldT,
-// 		}
-// 		newDkgs[i], err = NewDistKeyHandler(c)
-// 		require.NoError(t, err)
-// 	}
+	let new_n = publics.len() - 1;
+	let mut shares = Vec::with_capacity(dkgs.len());
+	let mut sshares = Vec::with_capacity(dkgs.len());
+	for dkg in dkgs.iter() {
+		let share = dkg.dist_key_share().unwrap();
+		sshares.push(Some(share.share.clone()));
+		shares.push(share);		
+	}
 
-// 	fullExchange(t, newDkgs, false)
-// 	newShares := make([]*DistKeyShare, len(dkgs))
-// 	newSShares := make([]*share.PriShare, len(dkgs)-1)
-// 	for i := range newDkgs[:newN] {
-// 		dks, err := newDkgs[i].DistKeyShare()
-// 		require.NoError(t, err)
-// 		newShares[i] = dks
-// 		newSShares[i] = newShares[i].Share
-// 	}
+	// start resharing within the same group
+	let mut new_dkgs: Vec<DistKeyGenerator<SuiteEd25519, &[u8]>> = Vec::with_capacity(dkgs.len());
+	for (i, _) in dkgs.iter().enumerate() {
+		let c = Config{
+			suite:        suite(),
+			longterm:     secrets[i].clone(),
+			old_nodes:     publics.clone(),
+			new_nodes:     publics[..new_n].to_vec(),
+			share:        Some(shares[i].clone()),
+			old_threshold: old_t,
+			public_coeffs: None,
+			threshold: 0,
+			reader : None,
+			user_reader_only: false
 
-// 	// check
-// 	// 1. shares are different between the two rounds
-// 	// 2. shares reconstruct to the same secret
-// 	// 3. public polynomial is different but for the first coefficient /public
-// 	// key/
+		};
+		new_dkgs.push(new_dist_key_handler(c).unwrap());
+	}
+	full_exchange(&mut new_dkgs, false);
+	let mut new_shares  = Vec::with_capacity(dkgs.len());
+	let mut new_sshares = Vec::with_capacity(dkgs.len() - 1);
+	for  dkg in new_dkgs[..new_n].iter() {
+		let dks = dkg.dist_key_share().unwrap();
+		new_sshares.push(Some(dks.share.clone()));
+		new_shares.push(dks);		
+	}
+	
+	// check
+	// 1. shares are different between the two rounds
+	// 2. shares reconstruct to the same secret
+	// 3. public polynomial is different but for the first coefficient /public
+	// key/
 
-// 	// 1.
-// 	for i := 0; i < newN; i++ {
-// 		require.False(t, shares[i].Share.V.Equal(newShares[i].Share.V))
-// 	}
-// 	thr := vss.MinimumT(defaultN)
-// 	// 2.
-// 	oldSecret, err := share.RecoverSecret(suite, sshares[:newN], thr, newN)
-// 	require.NoError(t, err)
-// 	newSecret, err := share.RecoverSecret(suite, newSShares, thr, newN)
-// 	require.NoError(t, err)
-// 	require.Equal(t, oldSecret.String(), newSecret.String())
-// }
+	for i in 0..new_n {
+		assert!(!shares[i].share.v.eq(&new_shares[i].share.v))
+	}
+	let thr = vss::pedersen::vss::minimum_t(DEFAULT_N);
+	// 2.
+	let old_secret = share::poly::recover_secret(suite(), &sshares[..new_n], thr, new_n).unwrap();
+	let new_secret = share::poly::recover_secret(suite(), &new_sshares, thr, new_n).unwrap();
+	assert_eq!(old_secret.to_string(), new_secret.to_string());
+}
 
-// // Test to reshare to a different set of nodes with only a threshold of the old
-// // nodes present
-// func TestDKGResharingNewNodesThreshold(t *testing.T) {
-// 	oldN := defaultN
-// 	oldT := vss.MinimumT(oldN)
-// 	oldPubs, oldPrivs, dkgs := generate(oldN, oldT)
-// 	fullExchange(t, dkgs, true)
 
-// 	shares := make([]*DistKeyShare, len(dkgs))
-// 	sshares := make([]*share.PriShare, len(dkgs))
-// 	for i, dkg := range dkgs {
-// 		share, err := dkg.DistKeyShare()
-// 		require.NoError(t, err)
-// 		shares[i] = share
-// 		sshares[i] = shares[i].Share
-// 	}
-// 	// start resharing to a different group
-// 	newN := oldN + 3
-// 	newT := oldT + 2
-// 	newPrivs := make([]kyber.Scalar, newN)
-// 	newPubs := make([]kyber.Point, newN)
-// 	for i := 0; i < newN; i++ {
-// 		newPrivs[i], newPubs[i] = genPair()
-// 	}
+/// Test to reshare to a different set of nodes with only a threshold of the old
+/// nodes present
+#[test]
+fn test_dkg_resharing_new_nodes_threshold() {
+	let old_n = DEFAULT_N;
+	let old_t = vss::pedersen::vss::minimum_t(old_n);
+	let (old_pubs, old_privs, mut dkgs) = generate(old_n, old_t);
+	full_exchange(&mut dkgs, true);
 
-// 	// creating the old dkgs and new dkgs
-// 	oldDkgs := make([]*DistKeyGenerator, oldN)
-// 	newDkgs := make([]*DistKeyGenerator, newN)
-// 	var err error
-// 	for i := 0; i < oldN; i++ {
-// 		c := &Config{
-// 			Suite:        suite,
-// 			Longterm:     oldPrivs[i],
-// 			OldNodes:     oldPubs,
-// 			NewNodes:     newPubs,
-// 			Share:        shares[i],
-// 			Threshold:    newT,
-// 			OldThreshold: oldT,
-// 		}
-// 		oldDkgs[i], err = NewDistKeyHandler(c)
-// 		require.NoError(t, err)
-// 		require.False(t, oldDkgs[i].canReceive)
-// 		require.True(t, oldDkgs[i].canIssue)
-// 		require.True(t, oldDkgs[i].isResharing)
-// 		require.False(t, oldDkgs[i].newPresent)
-// 		require.Equal(t, oldDkgs[i].oidx, i)
-// 	}
+	let mut shares = Vec::with_capacity(dkgs.len());
+	let mut sshares = Vec::with_capacity(dkgs.len());
+	for dkg in dkgs.iter() {
+		let share = dkg.dist_key_share().unwrap();
+		sshares.push(Some(share.share.clone()));
+		shares.push(share);		
+	}
+	// start resharing to a different group
+	let new_n = old_n + 3;
+	let new_t = old_t + 2;
+	let mut new_privs = Vec::with_capacity(new_n);
+	let mut new_pubs = Vec::with_capacity(new_n);
+	for _ in 0..new_n {
+		let (new_priv, new_pub) = gen_pair();
+		new_privs.push(new_priv);
+		new_pubs.push(new_pub);
+	}
 
-// 	for i := 0; i < newN; i++ {
-// 		c := &Config{
-// 			Suite:        suite,
-// 			Longterm:     newPrivs[i],
-// 			OldNodes:     oldPubs,
-// 			NewNodes:     newPubs,
-// 			PublicCoeffs: shares[0].Commits,
-// 			Threshold:    newT,
-// 			OldThreshold: oldT,
-// 		}
-// 		newDkgs[i], err = NewDistKeyHandler(c)
-// 		require.NoError(t, err)
-// 		require.True(t, newDkgs[i].canReceive)
-// 		require.False(t, newDkgs[i].canIssue)
-// 		require.True(t, newDkgs[i].isResharing)
-// 		require.True(t, newDkgs[i].newPresent)
-// 		require.Equal(t, newDkgs[i].nidx, i)
-// 	}
+	// creating the old dkgs and new dkgs
+	let mut old_dkgs: Vec<DistKeyGenerator<SuiteEd25519, &[u8]>> = Vec::with_capacity(old_n);
+	let mut new_dkgs: Vec<DistKeyGenerator<SuiteEd25519, &[u8]>> = Vec::with_capacity(new_n);
+	for i in 0..old_n {
+		let c = Config{
+			suite:        suite(),
+			longterm:     old_privs[i].clone(),
+			old_nodes:     old_pubs.clone(),
+			new_nodes:     new_pubs.clone(),
+			share:        Some(shares[i].clone()),
+			threshold:    new_t,
+			old_threshold: old_t,
+			public_coeffs: None,
+			reader: None,
+			user_reader_only: false,
+		};
+		old_dkgs.push(new_dist_key_handler(c).unwrap());
+		assert!(!old_dkgs[i].can_receive);
+		assert!(old_dkgs[i].can_issue);
+		assert!(old_dkgs[i].is_resharing);
+		assert!(!old_dkgs[i].new_present);
+		assert_eq!(old_dkgs[i].oidx, i);
+	}
 
-// 	//alive := oldT - 1
-// 	alive := oldT
-// 	oldSelected := make([]*DistKeyGenerator, 0, alive)
-// 	selected := make(map[string]bool)
-// 	for len(selected) < alive {
-// 		i := mathRand.Intn(len(oldDkgs))
-// 		str := oldDkgs[i].pub.String()
-// 		if _, exists := selected[str]; exists {
-// 			continue
-// 		}
-// 		selected[str] = true
-// 		oldSelected = append(oldSelected, oldDkgs[i])
-// 	}
+	for i in 0..new_n {
+		let c = Config{
+			suite:        suite(),
+			longterm:     new_privs[i].clone(),
+			old_nodes:     old_pubs.clone(),
+			new_nodes:     new_pubs.clone(),
+			share:        None,
+			threshold:    new_t,
+			old_threshold: old_t,
+			public_coeffs: Some(shares[0].commits.clone()),
+			reader: None,
+			user_reader_only: false,
+		};
+		new_dkgs.push(new_dist_key_handler(c).unwrap());
+		
+		assert!(new_dkgs[i].can_receive);
+		assert!(!new_dkgs[i].can_issue);
+		assert!(new_dkgs[i].is_resharing);
+		assert!(new_dkgs[i].new_present);
+		assert_eq!(new_dkgs[i].nidx, i);
+	}
 
-// 	// 1. broadcast deals
-// 	deals := make([]map[int]*Deal, 0, newN*newN)
-// 	for _, dkg := range oldSelected {
-// 		localDeals, err := dkg.Deals()
-// 		require.Nil(t, err)
-// 		deals = append(deals, localDeals)
-// 	}
+	//alive = oldT - 1
+	let alive = old_t;
+	let mut old_selected = Vec::with_capacity(alive);
+	let mut selected = HashMap::new();
+	while selected.len() < alive {
+		let i = rand::thread_rng().gen_range(0..old_dkgs.len());
+		let str = old_dkgs[i].pubb.string();
+		if selected.contains_key(&str) {
+			continue
+		}
+		selected.insert(str, true);
+		old_selected.push(old_dkgs[i].clone())
+	}
 
-// 	resps := make(map[int][]*Response)
-// 	for i, localDeals := range deals {
-// 		for j, d := range localDeals {
-// 			dkg := newDkgs[j]
-// 			resp, err := dkg.ProcessDeal(d)
-// 			require.Nil(t, err)
-// 			require.Equal(t, vss.StatusApproval, resp.Response.Status)
-// 			resps[i] = append(resps[i], resp)
-// 		}
-// 	}
+	// 1. broadcast deals
+	let mut deals = Vec::with_capacity(new_n * new_n);
+	for dkg in old_selected.iter_mut() {
+		let local_deals = dkg.deals().unwrap();
+		deals.push(local_deals);
+	}
 
-// 	// 2. Broadcast responses
-// 	for _, dealResponses := range resps {
-// 		for _, resp := range dealResponses {
-// 			// dispatch to old selected dkgs
-// 			for _, dkg := range oldSelected {
-// 				// Ignore messages from ourselves
-// 				if resp.Response.Index == uint32(dkg.nidx) {
-// 					continue
-// 				}
-// 				j, err := dkg.ProcessResponse(resp)
-// 				//fmt.Printf("old dkg %d process responses from new dkg %d about deal %d\n", dkg.oidx, dkg.nidx, resp.Index)
-// 				if err != nil {
-// 					fmt.Printf("old dkg at (oidx %d, nidx %d) has received response from idx %d for dealer idx %d\n", dkg.oidx, dkg.nidx, resp.Response.Index, resp.Index)
-// 				}
-// 				require.Nil(t, err)
-// 				require.Nil(t, j)
-// 			}
-// 			// dispatch to the new dkgs
-// 			for _, dkg := range newDkgs {
-// 				// Ignore messages from ourselves
-// 				if resp.Response.Index == uint32(dkg.nidx) {
-// 					continue
-// 				}
-// 				j, err := dkg.ProcessResponse(resp)
-// 				//fmt.Printf("new dkg %d process responses from new dkg %d about deal %d\n", dkg.nidx, dkg.nidx, resp.Index)
-// 				if err != nil {
-// 					fmt.Printf("new dkg at nidx %d has received response from idx %d for deal %d\n", dkg.nidx, resp.Response.Index, resp.Index)
-// 				}
-// 				require.Nil(t, err)
-// 				require.Nil(t, j)
-// 			}
+	let mut resps = HashMap::new();
+	for (i, local_deals) in deals.iter().enumerate() {
+		resps.insert(i, vec![]);
+		for (j, d) in local_deals {
+			let dkg = &mut new_dkgs[j.clone()];
+			let resp = dkg.process_deal(d).unwrap();
+			assert_eq!(vss::pedersen::vss::STATUS_APPROVAL, resp.response.status);
+			resps.get_mut(&i).unwrap().push(resp);
+		}
+	}
 
-// 		}
-// 	}
+	// 2. Broadcast responses
+	for (_, deal_responses) in resps {
+		for resp in deal_responses {
+			// dispatch to old selected dkgs
+			for dkg in old_selected.iter_mut() {
+				// Ignore messages from ourselves
+				if resp.response.index == dkg.nidx as u32 {
+					continue
+				}
+				let j = dkg.process_response(&resp).expect(&format!("old dkg at (oidx {}, nidx {}) has received response from idx {} for dealer idx {}\n", dkg.oidx, dkg.nidx, resp.response.index, resp.index));
+				assert!(j.is_none());
+			}
+			// dispatch to the new dkgs
+			for dkg in new_dkgs.iter_mut() {
+				// Ignore messages from ourselves
+				if resp.response.index == dkg.nidx as u32 {
+					continue
+				}
+				let j= dkg.process_response(&resp).expect(&format!("new dkg at nidx {} has received response from idx {} for dealer idx {}\n", dkg.nidx, resp.response.index, resp.index));
+				assert!(j.is_none());
+			}
 
-// 	for _, dkg := range newDkgs {
-// 		for _, oldDkg := range oldSelected {
-// 			idx := oldDkg.oidx
-// 			require.True(t, dkg.verifiers[uint32(idx)].DealCertified(), "new dkg %d has not certified deal %d => %v", dkg.nidx, idx, dkg.verifiers[uint32(idx)].Responses())
-// 		}
-// 	}
+		}
+	}
 
-// 	// 3. make sure everyone has the same QUAL set
-// 	for _, dkg := range newDkgs {
-// 		require.Equal(t, alive, len(dkg.QUAL()))
-// 		for _, dkg2 := range oldSelected {
-// 			require.True(t, dkg.isInQUAL(uint32(dkg2.oidx)), "new dkg %d has not in qual old dkg %d (qual = %v)", dkg.nidx, dkg2.oidx, dkg.QUAL())
-// 		}
-// 	}
+	for dkg in new_dkgs.iter() {
+		for old_dkg in old_selected.iter() {
+			let idx = old_dkg.oidx;
+			assert!(dkg.verifiers.get(&(idx as u32)).unwrap().deal_certified(), "new dkg {} has not certified deal {} => {:?}", dkg.nidx, idx, dkg.verifiers.get(&(idx as u32)).unwrap().responses());
+		}
+	}
 
-// 	newShares := make([]*DistKeyShare, newN)
-// 	newSShares := make([]*share.PriShare, newN)
-// 	for i := range newDkgs {
-// 		dks, err := newDkgs[i].DistKeyShare()
-// 		require.NoError(t, err)
-// 		newShares[i] = dks
-// 		newSShares[i] = newShares[i].Share
-// 	}
-// 	// check shares reconstruct to the same secret
-// 	oldSecret, err := share.RecoverSecret(suite, sshares, oldT, oldN)
-// 	require.NoError(t, err)
-// 	newSecret, err := share.RecoverSecret(suite, newSShares, newT, newN)
-// 	require.NoError(t, err)
-// 	require.Equal(t, oldSecret.String(), newSecret.String())
+	// 3. make sure everyone has the same QUAL set
+	for dkg in new_dkgs.iter() {
+		assert_eq!(alive, dkg.qual().len());
+		for dkg2 in old_selected.iter() {
+			assert!(dkg.is_in_qual(dkg2.oidx as u32), "new dkg {} has not in qual old dkg {} (qual = {:?})", dkg.nidx, dkg2.oidx, dkg.qual())
+		}
+	}
 
-// }
+	let mut new_shares  = Vec::with_capacity(new_n);
+	let mut new_sshares = Vec::with_capacity(new_n);
+	for  dkg in new_dkgs.iter() {
+		let dks = dkg.dist_key_share().unwrap();
+		new_sshares.push(Some(dks.share.clone()));
+		new_shares.push(dks);		
+	}
 
-// // Test resharing to a different set of nodes with two common.
-// func TestDKGResharingNewNodes(t *testing.T) {
-// 	oldPubs, oldPrivs, dkgs := generate(defaultN, vss.MinimumT(defaultN))
-// 	fullExchange(t, dkgs, true)
+	// check shares reconstruct to the same secret
+	let old_secret = share::poly::recover_secret(suite(), &sshares, old_t, old_n).unwrap();
+	let new_secret = share::poly::recover_secret(suite(), &new_sshares, new_t, new_n).unwrap();
+	assert_eq!(old_secret.to_string(), new_secret.to_string());
+}
 
-// 	shares := make([]*DistKeyShare, len(dkgs))
-// 	sshares := make([]*share.PriShare, len(dkgs))
+/// Test resharing to a different set of nodes with two common.
+#[test]
+fn test_dkg_resharing_new_nodes() {
+	let (old_pubs, old_privs, mut dkgs) = generate(DEFAULT_N, vss::pedersen::vss::minimum_t(DEFAULT_N));
+	full_exchange(&mut dkgs, true);
 
-// 	for i, dkg := range dkgs {
-// 		share, err := dkg.DistKeyShare()
-// 		require.NoError(t, err)
-// 		shares[i] = share
-// 		sshares[i] = shares[i].Share
-// 	}
+	let mut shares = Vec::with_capacity(dkgs.len());
+	let mut sshares = Vec::with_capacity(dkgs.len());
+	for dkg in dkgs.iter() {
+		let share = dkg.dist_key_share().unwrap();
+		sshares.push(Some(share.share.clone()));
+		shares.push(share);		
+	}
 
-// 	// start resharing to a different group
+	// start resharing to a different group
 
-// 	oldN := defaultN
-// 	oldT := len(shares[0].Commits)
-// 	newN := oldN + 1
-// 	newT := oldT + 1
-// 	newPrivs := make([]kyber.Scalar, newN)
-// 	newPubs := make([]kyber.Point, newN)
+	let old_n = DEFAULT_N;
+	let old_t = shares[0].commits.len();
+	let new_n = old_n + 1;
+	let new_t = old_t + 1;
+	let mut new_privs = Vec::with_capacity(new_n);
+	let mut new_pubs = Vec::with_capacity(new_n);
 
-// 	// new[0], new[1] = old[-1], old[-2]
-// 	newPrivs[0] = oldPrivs[oldN-1]
-// 	newPubs[0] = oldPubs[oldN-1]
-// 	newPrivs[1] = oldPrivs[oldN-2]
-// 	newPubs[1] = oldPubs[oldN-2]
+	// new[0], new[1] = old[-1], old[-2]
+	new_privs.push(old_privs[old_n-1].clone());
+	new_pubs.push(old_pubs[old_n-1].clone());
+	new_privs.push(old_privs[old_n-2].clone());
+	new_pubs.push(old_pubs[old_n-2].clone());
 
-// 	for i := 2; i < newN; i++ {
-// 		newPrivs[i], newPubs[i] = genPair()
-// 	}
 
-// 	// creating the old dkgs
+	for _ in 2..new_n {
+		let (new_priv, new_pub) = gen_pair();
+		new_privs.push(new_priv);
+		new_pubs.push(new_pub);
+	}
 
-// 	oldDkgs := make([]*DistKeyGenerator, oldN)
-// 	var err error
-// 	for i := 0; i < oldN; i++ {
-// 		c := &Config{
-// 			Suite:        suite,
-// 			Longterm:     oldPrivs[i],
-// 			OldNodes:     oldPubs,
-// 			NewNodes:     newPubs,
-// 			Share:        shares[i],
-// 			Threshold:    newT,
-// 			OldThreshold: oldT,
-// 		}
+	// creating the old dkgs
 
-// 		oldDkgs[i], err = NewDistKeyHandler(c)
-// 		require.NoError(t, err)
+	let mut old_dkgs: Vec<DistKeyGenerator<SuiteEd25519, &[u8]>> = Vec::with_capacity(old_n);
+	for i in 0..old_n {
+		let c = Config{
+			suite:        suite(),
+			longterm:     old_privs[i].clone(),
+			old_nodes:     old_pubs.clone(),
+			new_nodes:     new_pubs.clone(),
+			share:        Some(shares[i].clone()),
+			threshold:    new_t,
+			old_threshold: old_t,
+			public_coeffs: None,
+			reader: None,
+			user_reader_only: false,
+		};
+		old_dkgs.push(new_dist_key_handler(c).unwrap());	
+	
+		// because the node's public key is already in newPubs
+		if i >= old_n-2 {
+			assert!(old_dkgs[i].can_receive);
+			assert!(old_dkgs[i].can_issue);
+			assert!(old_dkgs[i].is_resharing);
+			assert!(old_dkgs[i].new_present);
+			assert_eq!(old_dkgs[i].oidx, i);
+			assert_eq!(old_n-i-1, old_dkgs[i].nidx);
+			continue
+		}
 
-// 		// because the node's public key is already in newPubs
-// 		if i >= oldN-2 {
-// 			require.True(t, oldDkgs[i].canReceive)
-// 			require.True(t, oldDkgs[i].canIssue)
-// 			require.True(t, oldDkgs[i].isResharing)
-// 			require.True(t, oldDkgs[i].newPresent)
-// 			require.Equal(t, oldDkgs[i].oidx, i)
-// 			require.Equal(t, oldN-i-1, oldDkgs[i].nidx)
-// 			continue
-// 		}
+		assert!(!old_dkgs[i].can_receive);
+		assert!(old_dkgs[i].can_issue);
+		assert!(old_dkgs[i].is_resharing);
+		assert!(!old_dkgs[i].new_present);
+		assert_eq!(old_dkgs[i].nidx, 0);
+		assert_eq!(old_dkgs[i].oidx, i);
+	}
 
-// 		require.False(t, oldDkgs[i].canReceive)
-// 		require.True(t, oldDkgs[i].canIssue)
-// 		require.True(t, oldDkgs[i].isResharing)
-// 		require.False(t, oldDkgs[i].newPresent)
-// 		require.Equal(t, 0, oldDkgs[i].nidx) // default for nidx
-// 		require.Equal(t, oldDkgs[i].oidx, i)
-// 	}
+	// creating the new dkg
 
-// 	// creating the new dkg
+	let mut new_dkgs: Vec<DistKeyGenerator<SuiteEd25519, &[u8]>> = Vec::with_capacity(new_n);
 
-// 	newDkgs := make([]*DistKeyGenerator, newN)
+	new_dkgs.push(old_dkgs[old_n-1].clone()); // the first one is the last old one
+	new_dkgs.push(old_dkgs[old_n-2].clone()); // the second one is the before-last old one
 
-// 	newDkgs[0] = oldDkgs[oldN-1] // the first one is the last old one
-// 	newDkgs[1] = oldDkgs[oldN-2] // the second one is the before-last old one
+	for i in 2..new_n {
 
-// 	for i := 2; i < newN; i++ {
-// 		c := &Config{
-// 			Suite:        suite,
-// 			Longterm:     newPrivs[i],
-// 			OldNodes:     oldPubs,
-// 			NewNodes:     newPubs,
-// 			PublicCoeffs: shares[0].Commits,
-// 			Threshold:    newT,
-// 			OldThreshold: oldT,
-// 		}
+		let c = Config{
+			suite:        suite(),
+			longterm:     new_privs[i].clone(),
+			old_nodes:     old_pubs.clone(),
+			new_nodes:     new_pubs.clone(),
+			share:        None,
+			threshold:    new_t,
+			old_threshold: old_t,
+			public_coeffs: Some(shares[0].commits.clone()),
+			reader: None,
+			user_reader_only: false,
+		};
+		new_dkgs.push(new_dist_key_handler(c).unwrap());
+		
+		assert!(new_dkgs[i].can_receive);
+		assert!(!new_dkgs[i].can_issue);
+		assert!(new_dkgs[i].is_resharing);
+		assert!(new_dkgs[i].new_present);
+		assert_eq!(new_dkgs[i].nidx, i);
+		// each old dkg act as a verifier
+		assert_eq!(new_dkgs[i].verifiers().len(), old_n);		
+	}
 
-// 		newDkgs[i], err = NewDistKeyHandler(c)
+	// full secret sharing exchange
 
-// 		require.NoError(t, err)
-// 		require.True(t, newDkgs[i].canReceive)
-// 		require.False(t, newDkgs[i].canIssue)
-// 		require.True(t, newDkgs[i].isResharing)
-// 		require.True(t, newDkgs[i].newPresent)
-// 		require.Equal(t, newDkgs[i].nidx, i)
-// 		// each old dkg act as a verifier
-// 		require.Len(t, newDkgs[i].Verifiers(), oldN)
-// 	}
+	// 1. broadcast deals
+	let mut deals = Vec::with_capacity(old_dkgs.len());
 
-// 	// full secret sharing exchange
+	for  dkg in old_dkgs.iter_mut() {
+		let local_deals = dkg.deals().unwrap();
 
-// 	// 1. broadcast deals
-// 	deals := make([]map[int]*Deal, len(oldDkgs))
+		// each old DKG will sent a deal to each other dkg, including
+		// themselves.
+		assert_eq!(local_deals.len(), new_n);
 
-// 	for i, dkg := range oldDkgs {
-// 		localDeals, err := dkg.Deals()
-// 		require.NoError(t, err)
+		deals.push(local_deals);
 
-// 		// each old DKG will sent a deal to each other dkg, including
-// 		// themselves.
-// 		require.Len(t, localDeals, newN)
+		let exists = dkg.verifiers.contains_key(&(dkg.oidx as u32));
+		if dkg.can_receive && dkg.nidx <= 1 {
+			// staying nodes don't save their responses locally because they
+			// will broadcast them for the old comities.
+			assert!(exists);
+			assert_eq!(dkg.verifiers.get(&(dkg.oidx as u32)).unwrap().responses().len(), 0); 
+		} else {
+			// no verifiers since these dkg are not in the new list
+			assert!(!exists);
+		}
+	}
 
-// 		deals[i] = localDeals
+	// the index key indicates the dealer index for which the responses are for
+	let mut resps = HashMap::new();
+	for (i, local_deals) in deals.iter().enumerate() {
+		resps.insert(i, vec![]);
+		for (dest, d) in local_deals {
+			let dkg = &mut new_dkgs[dest.clone()];
+			let resp = dkg.process_deal(d).unwrap();
+			assert_eq!(vss::pedersen::vss::STATUS_APPROVAL, resp.response.status);
+			resps.get_mut(&i).unwrap().push(resp);
+		}
+	}
 
-// 		v, exists := dkg.verifiers[uint32(dkg.oidx)]
-// 		if dkg.canReceive && dkg.nidx <= 1 {
-// 			// staying nodes don't save their responses locally because they
-// 			// will broadcast them for the old comities.
-// 			require.Len(t, v.Responses(), 0)
-// 			require.True(t, exists)
-// 		} else {
-// 			// no verifiers since these dkg are not in in the new list
-// 			require.False(t, exists)
-// 		}
-// 	}
+	// all new dkgs should have the same length of verifiers map
+	for dkg in new_dkgs.iter() {
+		// one deal per old participants
+		assert_eq!(dkg.verifiers.len(), old_n, "dkg nidx {} failing", dkg.nidx)
+	}
 
-// 	// the index key indicates the dealer index for which the responses are for
-// 	resps := make(map[int][]*Response)
+	// 2. Broadcast responses
+	for (_, deal_responses) in resps {
+		for resp in deal_responses {
+			// the two last ones will be processed while doing this step on the
+			// newDkgs, since they are in the new set.
+			for dkg in old_dkgs[..old_n-2].iter_mut() {
+				let j = dkg.process_response(&resp).expect(&format!("old dkg at (oidx {}, nidx {}) has received response from idx {} for dealer idx {}\n", dkg.oidx, dkg.nidx, resp.response.index, resp.index));
+				assert!(j.is_none());
+			}
+			// dispatch to the new dkgs
+			for dkg in new_dkgs.iter_mut() {
+				// Ignore messages from ourselves
+				if resp.response.index == dkg.nidx as u32 {
+					continue
+				}
+				let j= dkg.process_response(&resp).expect(&format!("new dkg at nidx {} has received response from idx {} for dealer idx {}\n", dkg.nidx, resp.response.index, resp.index));
+				assert!(j.is_none());
+			}
 
-// 	for i, localDeals := range deals {
-// 		for dest, d := range localDeals {
-// 			dkg := newDkgs[dest]
-// 			resp, err := dkg.ProcessDeal(d)
-// 			require.NoError(t, err)
-// 			require.Equal(t, vss.StatusApproval, resp.Response.Status)
-// 			resps[i] = append(resps[i], resp)
-// 		}
-// 	}
+		}
+	}
 
-// 	// all new dkgs should have the same length of verifiers map
-// 	for _, dkg := range newDkgs {
-// 		// one deal per old participants
-// 		require.Len(t, dkg.verifiers, oldN, "dkg nidx %d failing", dkg.nidx)
-// 	}
+	for dkg in new_dkgs.iter() {
+		for i in 0..old_n {
+			assert!(dkg.verifiers.get(&(i as u32)).unwrap().deal_certified(), "new dkg {} has not certified deal {} => {:?}", dkg.nidx, i, dkg.verifiers.get(&(i as u32)).unwrap().responses())
+		}
+	}
 
-// 	// 2. Broadcast responses
-// 	for _, dealResponses := range resps {
-// 		for _, resp := range dealResponses {
-// 			// the two last ones will be processed while doing this step on the
-// 			// newDkgs, since they are in the new set.
-// 			for _, dkg := range oldDkgs[:oldN-2] {
-// 				j, err := dkg.ProcessResponse(resp)
-// 				require.NoError(t, err, "old dkg at (oidx %d, nidx %d) has received response from idx %d for dealer idx %d\n", dkg.oidx, dkg.nidx, resp.Response.Index, resp.Index)
-// 				require.Nil(t, j)
-// 			}
+	// 3. make sure everyone has the same QUAL set
+	for dkg in new_dkgs.iter() {
+		for dkg2 in old_dkgs.iter() {
+			assert!(dkg.is_in_qual(dkg2.oidx as u32), "new dkg {} has not in qual old dkg {} (qual = {:?})", dkg.nidx, dkg2.oidx, dkg.qual())
+		}
+	}
 
-// 			for _, dkg := range newDkgs {
-// 				// Ignore messages from ourselves
-// 				if resp.Response.Index == uint32(dkg.nidx) {
-// 					continue
-// 				}
-// 				j, err := dkg.ProcessResponse(resp)
-// 				require.NoError(t, err, "new dkg at nidx %d has received response from idx %d for deal %d\n", dkg.nidx, resp.Response.Index, resp.Index)
-// 				require.Nil(t, j)
-// 			}
+	// make sure the new dkg members can certify
+	for dkg in new_dkgs.iter() {
+		assert!(dkg.certified(), "new dkg {} can't certify", dkg.nidx);
+	}
 
-// 		}
-// 	}
+	// make sure the old dkg members can certify
+	for dkg in old_dkgs[..old_n-2].iter() {
+		assert!(dkg.certified(),  "old dkg {} can't certify", dkg.oidx);	
+	}
 
-// 	for _, dkg := range newDkgs {
-// 		for i := 0; i < oldN; i++ {
-// 			require.True(t, dkg.verifiers[uint32(i)].DealCertified(), "new dkg %d has not certified deal %d => %v", dkg.nidx, i, dkg.verifiers[uint32(i)].Responses())
-// 		}
-// 	}
+	let mut new_shares  = Vec::with_capacity(new_n);
+	let mut new_sshares = Vec::with_capacity(new_n);
+	for  dkg in new_dkgs.iter() {
+		let dks = dkg.dist_key_share().unwrap();
+		new_sshares.push(Some(dks.share.clone()));
+		new_shares.push(dks);		
+	}
 
-// 	// 3. make sure everyone has the same QUAL set
-// 	for _, dkg := range newDkgs {
-// 		for _, dkg2 := range oldDkgs {
-// 			require.True(t, dkg.isInQUAL(uint32(dkg2.oidx)), "new dkg %d has not in qual old dkg %d (qual = %v)", dkg.nidx, dkg2.oidx, dkg.QUAL())
-// 		}
-// 	}
+	// check shares reconstruct to the same secret
+	let old_secret = share::poly::recover_secret(suite(), &sshares, old_t, old_n).unwrap();
+	let new_secret = share::poly::recover_secret(suite(), &new_sshares, new_t, new_n).unwrap();
+	assert_eq!(old_secret.to_string(), new_secret.to_string());
 
-// 	// make sure the new dkg members can certify
-// 	for _, dkg := range newDkgs {
-// 		require.True(t, dkg.Certified(), "new dkg %d can't certify", dkg.nidx)
-// 	}
-
-// 	// make sure the old dkg members can certify
-// 	for _, dkg := range oldDkgs {
-// 		require.True(t, dkg.Certified(), "old dkg %d can't certify", dkg.oidx)
-// 	}
-
-// 	newShares := make([]*DistKeyShare, newN)
-// 	newSShares := make([]*share.PriShare, newN)
-// 	for i := range newDkgs {
-// 		dks, err := newDkgs[i].DistKeyShare()
-// 		require.NoError(t, err)
-// 		newShares[i] = dks
-// 		newSShares[i] = newShares[i].Share
-// 	}
-
-// 	// check shares reconstruct to the same secret
-// 	oldSecret, err := share.RecoverSecret(suite, sshares, oldT, oldN)
-// 	require.NoError(t, err)
-// 	newSecret, err := share.RecoverSecret(suite, newSShares, newT, newN)
-// 	require.NoError(t, err)
-// 	require.Equal(t, oldSecret.String(), newSecret.String())
-// }
+}
 
 // func TestDKGResharingPartialNewNodes(t *testing.T) {
 // 	oldPubs, oldPrivs, dkgs := generate(defaultN, vss.MinimumT(defaultN))

@@ -936,8 +936,8 @@ where
         SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
         <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
     {
-        if r.session_id != self.sid {
-            bail!("vss: receiving inconsistent sessionID in response")
+        if !self.sid.is_empty() && r.session_id != self.sid {
+            bail!("vss: receiving inconsistent sessionID in response: {:?} vs {:?}", r.session_id, self.sid)
         }
 
         let public = find_pub(&self.verifiers, r.index as usize);
