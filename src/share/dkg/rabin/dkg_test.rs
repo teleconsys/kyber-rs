@@ -4,7 +4,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::{
     group::edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
     share::{
-        dkg::{DistKeyShare, ReconstructCommits, SecretCommits},
+        dkg::rabin::{DistKeyShare, ReconstructCommits, SecretCommits},
         poly::recover_secret,
         vss::{self, suite::Suite},
     },
