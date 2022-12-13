@@ -3,6 +3,7 @@ extern crate impl_ops;
 
 pub mod cipher;
 pub mod encoding;
+pub mod encrypt;
 mod examples;
 pub mod group;
 pub mod random;

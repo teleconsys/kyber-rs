@@ -98,6 +98,11 @@ impl Group for SuiteEd25519 {
     fn point(&self) -> Point {
         self.curve.point()
     }
+
+    /// PointLen returns 32, the size in bytes of an encoded Point on the Ed25519 curve.
+    fn point_len(&self) -> usize {
+        return 32;
+    }
 }
 
 impl Default for SuiteEd25519 {

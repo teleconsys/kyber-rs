@@ -33,6 +33,11 @@ impl Group for Curve {
     fn point(&self) -> Point {
         Point::default()
     }
+
+    /// PointLen returns 32, the size in bytes of an encoded Point on the Ed25519 curve.
+    fn point_len(&self) -> usize {
+        return 32;
+    }
 }
 
 impl Curve {
@@ -43,11 +48,6 @@ impl Curve {
     /// ScalarLen returns 32, the size in bytes of an encoded scalar
     /// for the Ed25519 curve.
     fn scalar_len() -> usize {
-        return 32;
-    }
-
-    // PointLen returns 32, the size in bytes of an encoded Point on the Ed25519 curve.
-    fn point_len() -> usize {
         return 32;
     }
 

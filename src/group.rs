@@ -174,7 +174,7 @@ pub trait Group: Clone + Default {
     fn scalar(&self) -> <Self::POINT as Point>::SCALAR;
 
     // Max length of point in bytes
-    // PointLen() int
+    fn point_len(&self) -> usize;
 
     /// Create new point
     fn point(&self) -> Self::POINT;
