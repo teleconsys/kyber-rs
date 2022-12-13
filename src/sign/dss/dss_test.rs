@@ -28,7 +28,7 @@ struct TestData<SUITE: Suite, DKS: DistKeyShare<SUITE::POINT>> {
 }
 const NB_PARTICIPANTS: usize = 7;
 
-fn new_test_data() -> TestData<SuiteEd25519, dkg::DistKeyShare<EdPoint>> {
+fn new_test_data() -> TestData<SuiteEd25519, dkg::rabin::DistKeyShare<EdPoint>> {
     let mut part_pubs = Vec::with_capacity(NB_PARTICIPANTS);
     let mut part_sec = Vec::with_capacity(NB_PARTICIPANTS);
     for _ in 0..NB_PARTICIPANTS {
@@ -39,7 +39,7 @@ fn new_test_data() -> TestData<SuiteEd25519, dkg::DistKeyShare<EdPoint>> {
     let longterms = gen_dist_secret(&part_sec, &part_pubs, suite());
     let randoms = gen_dist_secret(&part_sec, &part_pubs, suite());
 
-    return TestData::<SuiteEd25519, dkg::DistKeyShare<EdPoint>> {
+    return TestData::<SuiteEd25519, dkg::rabin::DistKeyShare<EdPoint>> {
         suite: suite(),
         nb_participants: NB_PARTICIPANTS,
         part_pubs,
@@ -177,7 +177,7 @@ fn gen_dist_secret<SUITE: crate::share::vss::suite::Suite>(
     part_sec: &[<SUITE::POINT as Point>::SCALAR],
     part_pubs: &[SUITE::POINT],
     suite: SUITE,
-) -> Vec<dkg::DistKeyShare<SUITE::POINT>>
+) -> Vec<dkg::rabin::DistKeyShare<SUITE::POINT>>
 where
     <SUITE::POINT as Point>::SCALAR:
         Scalar + Serialize + DeserializeOwned + ScalarCanCheckCanonical,
@@ -185,7 +185,7 @@ where
 {
     let mut dkgs = Vec::with_capacity(NB_PARTICIPANTS);
     for i in 0..NB_PARTICIPANTS {
-        let dkg = dkg::new_dist_key_generator::<SUITE>(
+        let dkg = dkg::rabin::new_dist_key_generator::<SUITE>(
             suite,
             part_sec[i].clone(),
             part_pubs,

@@ -43,7 +43,7 @@ use crate::{
     group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
     share::{
         poly::{recover_pri_poly, PriShare, PubPoly},
-        vss::{self, suite::Suite},
+        vss::{self, rabin::EncryptedDeal, suite::Suite},
     },
     sign::{dss, schnorr},
     Point, Scalar,
@@ -90,7 +90,7 @@ pub struct Deal<POINT: Point + Serialize> {
     /// Index of the Dealer in the list of participants
     pub index: u32,
     /// Deal issued for another participant
-    pub deal: vss::EncryptedDeal<POINT>,
+    pub deal: EncryptedDeal<POINT>,
 }
 
 /// Response holds the Response from another participant as well as the index of
@@ -100,7 +100,7 @@ pub struct Response {
     /// Index of the Dealer for which this response is for
     pub index: u32,
     /// Response issued from another participant
-    pub response: vss::Response,
+    pub response: vss::rabin::vss::Response,
 }
 
 /// Justification holds the Justification from a Dealer as well as the index of
@@ -108,13 +108,13 @@ pub struct Response {
 #[derive(Clone)]
 pub struct Justification<SUITE: Suite>
 where
-    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
     SUITE::POINT: Serialize + DeserializeOwned,
 {
     /// Index of the Dealer who answered with this Justification
     pub index: u32,
     /// Justification issued from the Dealer
-    pub justification: vss::Justification<SUITE>,
+    pub justification: vss::rabin::vss::Justification<SUITE>,
 }
 
 /// SecretCommits is sent during the distributed public key reconstruction phase,
@@ -158,7 +158,7 @@ where
     pub dealer_index: u32,
     /// Deal that has been given from the Dealer (at DealerIndex) to this node
     /// (at Index)
-    pub deal: vss::Deal<SUITE>,
+    pub deal: vss::rabin::vss::Deal<SUITE>,
     /// Signature made by the verifier
     pub signature: Vec<u8>,
 }
@@ -225,8 +225,8 @@ where
 
     t: usize,
 
-    pub dealer: vss::Dealer<SUITE>,
-    pub verifiers: HashMap<u32, vss::Verifier<SUITE>>,
+    pub dealer: vss::rabin::vss::Dealer<SUITE>,
+    pub verifiers: HashMap<u32, vss::rabin::vss::Verifier<SUITE>>,
 
     /// list of commitments to each secret polynomial
     pub commitments: HashMap<u32, PubPoly<SUITE>>,
@@ -291,7 +291,8 @@ where
     }
     // generate our dealer / deal
     let own_sec = suite.scalar().pick(&mut suite.random_stream());
-    let dealer = vss::new_dealer(suite, longterm.clone(), own_sec, participants.clone(), t)?;
+    let dealer =
+        vss::rabin::vss::new_dealer(suite, longterm.clone(), own_sec, participants.clone(), t)?;
 
     Ok(DistKeyGenerator {
         dealer: dealer,
@@ -370,7 +371,8 @@ where
         }
 
         // verifier receiving the dealer's deal
-        let mut ver = vss::new_verifier(&self.suite, &self.long, &pubb, &self.participants)?;
+        let mut ver =
+            vss::rabin::vss::new_verifier(&self.suite, &self.long, &pubb, &self.participants)?;
 
         let resp = ver.process_encrypted_deal(&dd.deal)?;
 
@@ -472,7 +474,7 @@ where
 
     fn qual_iter<F>(&self, mut f: F)
     where
-        F: FnMut(u32, &vss::Verifier<SUITE>) -> bool,
+        F: FnMut(u32, &vss::rabin::vss::Verifier<SUITE>) -> bool,
     {
         for (i, v) in self.verifiers.iter() {
             if v.deal_certified() {

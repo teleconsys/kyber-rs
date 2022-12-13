@@ -24,11 +24,11 @@ where
     SUITE::POINT: Serialize + DeserializeOwned,
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
 {
-    dkg: dkg::DistKeyGenerator<SUITE>,
+    dkg: dkg::rabin::DistKeyGenerator<SUITE>,
     pub_key: SUITE::POINT,
     priv_key: <SUITE::POINT as Point>::SCALAR,
-    deals: Vec<dkg::Deal<SUITE::POINT>>,
-    resps: Vec<dkg::Response>,
+    deals: Vec<dkg::rabin::Deal<SUITE::POINT>>,
+    resps: Vec<dkg::rabin::Response>,
     secret_share: share::poly::PriShare<<SUITE::POINT as Point>::SCALAR>,
     distributed_public_key: SUITE::POINT,
 }
@@ -58,8 +58,9 @@ fn test_example_dkg() {
 
     // 2. Create the DKGs on each node
     for node in nodes.iter_mut() {
-        let dkg = dkg::new_dist_key_generator(suite, node.priv_key.clone(), &pub_keys, THRESHOLD)
-            .unwrap();
+        let dkg =
+            dkg::rabin::new_dist_key_generator(suite, node.priv_key.clone(), &pub_keys, THRESHOLD)
+                .unwrap();
         node.dkg = dkg;
     }
 
@@ -132,7 +133,7 @@ fn test_example_dkg() {
 
     // 8. Generate and broadcast secret commits
     let mut scs = Vec::new();
-    for (i, node) in nodes.iter_mut().enumerate() {
+    for (_, node) in nodes.iter_mut().enumerate() {
         let sc = node.dkg.secret_commits().unwrap();
         scs.push(sc);
     }

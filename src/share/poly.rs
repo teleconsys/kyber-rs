@@ -107,11 +107,11 @@ where
 /// CoefficientsToPriPoly returns a PriPoly based on the given coefficients
 pub fn coefficients_to_pri_poly<GROUP: Group>(
     g: &GROUP,
-    coeffs: Vec<<GROUP::POINT as Point>::SCALAR>,
+    coeffs: &[<GROUP::POINT as Point>::SCALAR],
 ) -> PriPoly<GROUP> {
     return PriPoly {
         g: g.clone(),
-        coeffs: coeffs,
+        coeffs: coeffs.to_vec(),
     };
 }
 
@@ -387,6 +387,7 @@ impl<POINT: Point> PubShare<POINT> {
 }
 
 /// PubPoly represents a public commitment polynomial to a secret sharing polynomial.
+#[derive(Clone)]
 pub struct PubPoly<GROUP>
 where
     GROUP: Group,
@@ -397,6 +398,16 @@ where
     b: Option<GROUP::POINT>,
     /// Commitments to coefficients of the secret sharing polynomial
     commits: Vec<GROUP::POINT>,
+}
+
+impl<GROUP: Group> Default for PubPoly<GROUP> {
+    fn default() -> Self {
+        Self {
+            g: Default::default(),
+            b: Default::default(),
+            commits: Default::default(),
+        }
+    }
 }
 
 impl<GROUP: Group> PubPoly<GROUP> {

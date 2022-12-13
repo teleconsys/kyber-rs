@@ -367,7 +367,7 @@ fn test_pri_poly_coefficients() {
     let coeffs = a.coefficients();
     assert_eq!(coeffs.len(), t);
 
-    let b = coefficients_to_pri_poly(&suite, coeffs);
+    let b = coefficients_to_pri_poly(&suite, &coeffs);
     assert_eq!(a.coeffs, b.coeffs);
 }
 

@@ -74,7 +74,7 @@ pub trait PointCanCheckCanonicalAndSmallOrder {
 /// this is a number modulo the prime P in a DSA-style Schnorr group,
 /// or an (x, y) point on an elliptic curve.
 /// A Point can contain a Diffie-Hellman public key, an ElGamal ciphertext, etc.
-pub trait Point: Marshaling + Clone + PartialEq + Default {
+pub trait Point: Marshaling + Clone + PartialEq + Default + ToString {
     type SCALAR: Scalar;
 
     /// Equality test for two Points derived from the same Group.

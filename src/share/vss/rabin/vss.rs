@@ -32,7 +32,7 @@ use std::collections::HashMap;
 use crate::encoding::{self, unmarshal_binary, BinaryMarshaler, Marshaling};
 use crate::group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical};
 use crate::share::poly::{self, new_pri_poly, PriShare, PubPoly};
-use crate::share::vss::dh::{context, dh_exchange, AEAD};
+use crate::share::vss::rabin::dh::{context, dh_exchange, AEAD};
 use crate::share::vss::suite::Suite;
 use crate::sign::schnorr;
 use crate::Point;
