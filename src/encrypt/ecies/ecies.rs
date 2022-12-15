@@ -46,7 +46,7 @@ pub fn encrypt<GROUP: Group>(
     // HKDF-derived key for AES-GCM, the nonce for AES-GCM can be an arbitrary
     // (even static) value. We derive it here simply via HKDF as well.)
     let len = 32 + 12;
-    let buf = derive_key(h, dh, len)?;
+    let buf = GROUP::derive_key(&dh, len)?;
 
     let key = &buf.clone()[..32];
     let nonce_p = &buf.clone()[32..len];
@@ -95,7 +95,7 @@ pub fn decrypt<GROUP: Group>(
     // Compute shared DH key and derive the symmetric key and nonce via HKDF
     let dh = group.point().mul(&private, Some(&r_caps));
     let len = 32 + 12;
-    let buf = derive_key(h, dh, len)?;
+    let buf = GROUP::derive_key(&dh, len)?;
     let key = &buf.clone()[..32];
     let nonce_p = &buf.clone()[32..len];
 
@@ -107,26 +107,4 @@ pub fn decrypt<GROUP: Group>(
     // Decrypt message using AES-GCM
     let gcm = AEAD::new(r_caps.clone(), &buf)?;
     return gcm.open(None, &nonce, &ctx[l..], None);
-}
-
-fn derive_key<POINT: Point>(
-    _hash: fn() -> Box<dyn Hasher>,
-    dh: POINT,
-    len: usize,
-) -> Result<Vec<u8>> {
-    let dhb = dh.marshal_binary()?;
-    let mut out = Vec::with_capacity(len);
-    for _ in 0..len {
-        out.push(0u8);
-    }
-    let hkdf_c = Hkdf::<Sha256>::new(None, &dhb);
-    let res = hkdf_c.expand(&vec![], &mut out);
-    if res.is_err() {
-        bail!("hdfk error");
-    }
-    let k = out.to_vec();
-    if k.len() < len {
-        bail!("ecies: hkdf-derived key too short")
-    }
-    Ok(k)
 }

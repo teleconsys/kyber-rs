@@ -2,7 +2,7 @@ use aes_gcm::{
     aead::{Aead, Payload},
     Aes256Gcm, KeyInit,
 };
-use anyhow::{Error, Result};
+use anyhow::{bail, Error, Result};
 use digest::{generic_array::GenericArray, OutputSizeUser};
 use hkdf::{hmac::Hmac, Hkdf, HmacImpl};
 use sha2::Sha256;
@@ -109,6 +109,24 @@ pub trait Dh {
         let decrypted = Self::aes_decrypt(&key, nonce, cipher, Some(info))?;
 
         Ok(decrypted)
+    }
+
+    fn derive_key<POINT: Point>(dh: &POINT, len: usize) -> Result<Vec<u8>> {
+        let dhb = dh.marshal_binary()?;
+        let mut out = Vec::with_capacity(len);
+        for _ in 0..len {
+            out.push(0u8);
+        }
+        let hkdf_c = Hkdf::<Sha256>::new(None, &dhb);
+        let res = hkdf_c.expand(&vec![], &mut out);
+        if res.is_err() {
+            bail!("hdfk error");
+        }
+        let k = out.to_vec();
+        if k.len() < len {
+            bail!("ecies: hkdf-derived key too short")
+        }
+        Ok(k)
     }
 }
 
