@@ -5,15 +5,13 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
+    dh::{Dh, DhStandard, AEAD},
     encoding::{self, unmarshal_binary, BinaryMarshaler, Marshaling},
     group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
     share::{
         self,
         poly::{new_pri_poly, PriShare},
-        vss::{
-            pedersen::dh::{context, dh_exchange, AEAD},
-            suite::Suite,
-        },
+        vss::suite::Suite,
     },
     sign::schnorr,
     Point, Scalar,
@@ -293,7 +291,7 @@ where
         });
     }
 
-    let hkdf_context = context(&suite, &d_pubb, &verifiers).to_vec();
+    let hkdf_context = DhStandard::context(&suite, &d_pubb, &verifiers).to_vec();
     Ok(Dealer {
         suite: suite,
         long: longterm,
@@ -343,7 +341,7 @@ where
         let signature = schnorr::sign(&self.suite, &self.long, &dh_public_buff)?;
 
         // AES128-GCM
-        let pre = dh_exchange(self.suite, dh_secret, v_pub);
+        let pre = DhStandard::dh_exchange(self.suite, dh_secret, v_pub);
         let gcm = AEAD::new(pre, &self.hkdf_context)?;
 
         let nonce = [0u8; AEAD::nonce_size()];
@@ -494,7 +492,7 @@ where
     if !ok {
         bail!("vss: public key not found in the list of verifiers");
     }
-    let c = context(suite, dealer_key, verifiers);
+    let c = DhStandard::context(suite, dealer_key, verifiers);
     Ok(Verifier {
         suite: suite.clone(),
         longterm: longterm.clone(),
@@ -609,7 +607,7 @@ where
         )?;
 
         // compute shared key and AES526-GCM cipher
-        let pre = dh_exchange(self.suite, self.longterm.clone(), e.dhkey.clone());
+        let pre = DhStandard::dh_exchange(self.suite, self.longterm.clone(), e.dhkey.clone());
         let gcm = AEAD::new(pre, &self.hkdf_context)?;
         let decrypted = gcm.open(
             None,

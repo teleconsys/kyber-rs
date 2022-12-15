@@ -2,12 +2,10 @@ use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
+    dh::{Dh, DhXofContext},
     encoding::BinaryMarshaler,
     group::edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
-    share::vss::rabin::{
-        dh::{context, dh_exchange, KEY_SIZE},
-        vss::{find_pub, new_verifier, recover_secret, session_id, Response},
-    },
+    share::vss::rabin::vss::{find_pub, new_verifier, recover_secret, session_id, Response},
     sign::schnorr,
     Group, Point, Random, Scalar, Suite,
 };
@@ -786,19 +784,19 @@ fn test_vss_dhexchange() {
         .suite
         .scalar()
         .pick(&mut test_data.suite.random_stream());
-    let point = dh_exchange(test_data.suite, privv.clone(), pubb.clone());
+    let point = DhXofContext::dh_exchange(test_data.suite, privv.clone(), pubb.clone());
     assert_eq!(pubb.mul(&privv, None).string(), point.string());
 }
 
 #[test]
 fn test_vss_context() {
     let test_data = new_test_data();
-    let c = context(
+    let c = DhXofContext::context(
         &test_data.suite,
         &test_data.dealer_pub,
         &test_data.verifiers_pub,
     );
-    assert_eq!(c.len(), KEY_SIZE);
+    assert_eq!(c.len(), DhXofContext::KEY_SIZE);
 }
 
 fn gen_pair() -> (EdScalar, EdPoint) {
