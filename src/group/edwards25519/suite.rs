@@ -4,6 +4,7 @@ use sha2::{Digest, Sha256};
 use std::ops::Deref;
 
 use crate::cipher::Stream;
+use crate::dh::Dh;
 use crate::group::edwards25519::curve::Curve;
 use crate::group::edwards25519::scalar::Scalar;
 use crate::group::HashFactory;
@@ -138,6 +139,7 @@ impl HashFactory for SuiteEd25519 {
     }
 }
 
+impl Dh for SuiteEd25519 {}
 impl Suite for SuiteEd25519 {}
 impl dss::Suite for SuiteEd25519 {}
 impl KeySuite for SuiteEd25519 {}

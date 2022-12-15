@@ -2,7 +2,7 @@
 // package ecies
 use crate::{
     dh::AEAD,
-    encoding::{BinaryUnmarshaler, Marshaling},
+    encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling},
     group::Hasher,
     util::random::Randstream,
     Group, Point, Scalar,

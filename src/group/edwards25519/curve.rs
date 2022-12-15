@@ -1,3 +1,4 @@
+use crate::dh::Dh;
 use crate::group::edwards25519::Point;
 use crate::group::edwards25519::Scalar;
 use crate::group::Group;
@@ -12,6 +13,8 @@ use sha2::{Digest, Sha512};
 /// because it supports only this one specific curve.
 #[derive(Clone, Copy, Debug)]
 pub struct Curve {}
+
+impl Dh for Curve {}
 
 impl Group for Curve {
     type POINT = Point;

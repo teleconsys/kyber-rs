@@ -180,7 +180,7 @@ where
         new_threshold = vss::pedersen::vss::minimum_t(c.new_nodes.len());
     }
 
-    let mut dealer = vss::pedersen::Dealer::default();
+    let mut dealer = vss::pedersen::vss::Dealer::default();
     let mut can_issue = false;
     if c.share.is_some() {
         // resharing case

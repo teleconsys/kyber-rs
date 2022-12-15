@@ -9,8 +9,8 @@ use crate::{
         HashFactory,
     },
     share::vss::{
+        pedersen::vss::{self, recover_secret, Response, STATUS_APPROVAL, STATUS_COMPLAINT},
         pedersen::vss::{find_pub, session_id},
-        pedersen::vss::{recover_secret, Response, STATUS_APPROVAL, STATUS_COMPLAINT},
     },
     sign::schnorr,
     Group, Point, Random, Scalar, Suite,
@@ -772,7 +772,7 @@ fn test_vss_dhexchange() {
 #[test]
 fn test_vss_context() {
     let test_data = new_test_data();
-    let c = DhStandard::context(
+    let c = vss::context(
         &test_data.suite,
         &test_data.dealer_pub,
         &test_data.verifiers_pub,

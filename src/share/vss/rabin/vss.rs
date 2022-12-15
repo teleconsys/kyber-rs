@@ -29,7 +29,7 @@
 use core::fmt;
 use std::collections::HashMap;
 
-use crate::dh::{Dh, DhXofContext, AEAD};
+use crate::dh::{Dh, AEAD};
 use crate::encoding::{self, unmarshal_binary, BinaryMarshaler, Marshaling};
 use crate::group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical};
 use crate::share::poly::{self, new_pri_poly, PriShare, PubPoly};
@@ -318,7 +318,7 @@ where
         });
     }
 
-    let hkdf_context = DhXofContext::context(&suite, &d_pubb, &verifiers).to_vec();
+    let hkdf_context = context(&suite, &d_pubb, &verifiers).to_vec();
 
     Ok(Dealer {
         suite: suite,
@@ -368,7 +368,7 @@ where
         let signature = schnorr::sign(&self.suite, &self.long, &dh_public_buff)?;
 
         // AES128-GCM
-        let pre = DhXofContext::dh_exchange(self.suite, dh_secret, v_pub);
+        let pre = SUITE::dh_exchange(self.suite, dh_secret, v_pub);
         let gcm = AEAD::new(pre, &self.hkdf_context)?;
 
         let nonce = [0u8; AEAD::nonce_size()];
@@ -519,7 +519,7 @@ where
     if !ok {
         bail!("vss: public key not found in the list of verifiers");
     }
-    let c = DhXofContext::context(suite, dealer_key, verifiers);
+    let c = context(suite, dealer_key, verifiers);
     Ok(Verifier {
         suite: *suite,
         longterm: longterm.clone(),
@@ -645,7 +645,7 @@ where
         )?;
 
         // compute shared key and AES526-GCM cipher
-        let pre = DhXofContext::dh_exchange(self.suite, self.longterm.clone(), e.dhkey.clone());
+        let pre = SUITE::dh_exchange(self.suite, self.longterm.clone(), e.dhkey.clone());
         let gcm = AEAD::new(pre, &self.hkdf_context)?;
         let decrypted = gcm.open(
             None,
@@ -1069,4 +1069,23 @@ where
         }
     }
     poly::recover_secret(suite, &shares, t, n)
+}
+
+// KEY_SIZE is arbitrary, make it long enough to seed the XOF
+pub const KEY_SIZE: usize = 128;
+
+pub fn context<SUITE: Suite>(
+    suite: &SUITE,
+    dealer: &SUITE::POINT,
+    verifiers: &[SUITE::POINT],
+) -> Vec<u8> {
+    let mut h = suite.xof(Some("vss-dealer".as_bytes()));
+    dealer.marshal_to(&mut h).unwrap();
+    h.write("vss-verifiers".as_bytes()).unwrap();
+    for v in verifiers {
+        v.marshal_to(&mut h).unwrap();
+    }
+    let mut sum = [0 as u8; KEY_SIZE];
+    h.read(&mut sum).unwrap();
+    sum.to_vec()
 }

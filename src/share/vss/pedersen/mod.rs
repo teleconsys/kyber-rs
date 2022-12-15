@@ -2,4 +2,4 @@ pub mod vss;
 #[cfg(test)]
 mod vss_test;
 
-pub use vss::*;
+pub use vss::context;

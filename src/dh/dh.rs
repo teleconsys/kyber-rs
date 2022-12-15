@@ -22,22 +22,6 @@ pub trait Dh {
         sk.mul(&own_private, Some(&remote_public))
     }
 
-    /// context returns the context slice to be used when encrypting a share
-    fn context<SUITE: Suite>(
-        suite: &SUITE,
-        dealer: &SUITE::POINT,
-        verifiers: &[SUITE::POINT],
-    ) -> Vec<u8> {
-        let mut h = suite.hash();
-        h.write("vss-dealer".as_bytes()).unwrap();
-        dealer.marshal_to(&mut h).unwrap();
-        h.write("vss-verifiers".as_bytes()).unwrap();
-        for v in verifiers {
-            v.marshal_to(&mut h).unwrap();
-        }
-        h.finalize().to_vec()
-    }
-
     fn hkdf<H, I>(buff: &[u8], info: &[u8]) -> Result<[u8; 32]>
     where
         H: OutputSizeUser,
@@ -130,31 +114,6 @@ pub trait Dh {
 
 pub struct DhStandard {}
 impl Dh for DhStandard {}
-
-pub struct DhXofContext {}
-
-impl DhXofContext {
-    // KEY_SIZE is arbitrary, make it long enough to seed the XOF
-    pub const KEY_SIZE: usize = 128;
-}
-
-impl Dh for DhXofContext {
-    fn context<SUITE: Suite>(
-        suite: &SUITE,
-        dealer: &SUITE::POINT,
-        verifiers: &[SUITE::POINT],
-    ) -> Vec<u8> {
-        let mut h = suite.xof(Some("vss-dealer".as_bytes()));
-        dealer.marshal_to(&mut h).unwrap();
-        h.write("vss-verifiers".as_bytes()).unwrap();
-        for v in verifiers {
-            v.marshal_to(&mut h).unwrap();
-        }
-        let mut sum = [0 as u8; Self::KEY_SIZE];
-        h.read(&mut sum).unwrap();
-        sum.to_vec()
-    }
-}
 
 pub struct AEAD {
     key: [u8; 32],
