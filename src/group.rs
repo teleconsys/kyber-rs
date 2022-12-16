@@ -111,7 +111,7 @@ pub trait Point: Marshaling + Clone + PartialEq + Default + ToString {
     fn add(self, a: &Self, b: &Self) -> Self;
 
     /// Subtract points so that their scalars subtract homomorphically.
-    fn sub(&mut self, a: &Self, b: &Self) -> &mut Self;
+    fn sub(self, a: &Self, b: &Self) -> Self;
 
     /// Set to the negation of point a.
     fn neg(&self, a: &Self) -> &mut Self;
