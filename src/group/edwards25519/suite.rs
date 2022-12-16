@@ -4,10 +4,12 @@ use sha2::{Digest, Sha256};
 use std::ops::Deref;
 
 use crate::cipher::Stream;
+use crate::dh::Dh;
 use crate::group::edwards25519::curve::Curve;
 use crate::group::edwards25519::scalar::Scalar;
 use crate::group::HashFactory;
 use crate::group::{Group, Hasher};
+use crate::sign::dss;
 use crate::util::key::Generator;
 use crate::util::key::Suite as KeySuite;
 use crate::util::random;
@@ -17,11 +19,11 @@ use super::Point;
 
 /// SuiteEd25519 implements some basic functionalities such as Group, HashFactory,
 /// and XOFFactory.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct SuiteEd25519 {
     // Curve
     // r: Box<dyn Stream>,
-    curve: Curve<Scalar>,
+    curve: Curve,
 }
 
 impl SuiteEd25519 {
@@ -63,7 +65,7 @@ impl SuiteEd25519 {
 }
 
 impl Deref for SuiteEd25519 {
-    type Target = Curve<Scalar>;
+    type Target = Curve;
 
     fn deref(&self) -> &Self::Target {
         &self.curve
@@ -76,13 +78,16 @@ impl DerefMut for SuiteEd25519 {
     }
 }
 
-impl Generator<Scalar> for SuiteEd25519 {
+impl Generator for SuiteEd25519 {
+    type SCALAR = Scalar;
     fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> anyhow::Result<Scalar> {
         self.curve.new_key(stream)
     }
 }
 
-impl Group<Scalar, Point> for SuiteEd25519 {
+impl Group for SuiteEd25519 {
+    type POINT = Point;
+
     fn string(&self) -> String {
         self.curve.string()
     }
@@ -93,6 +98,11 @@ impl Group<Scalar, Point> for SuiteEd25519 {
 
     fn point(&self) -> Point {
         self.curve.point()
+    }
+
+    /// PointLen returns 32, the size in bytes of an encoded Point on the Ed25519 curve.
+    fn point_len(&self) -> usize {
+        return 32;
     }
 }
 
@@ -129,5 +139,7 @@ impl HashFactory for SuiteEd25519 {
     }
 }
 
-impl Suite<Scalar, Point> for SuiteEd25519 {}
-impl KeySuite<Scalar, Point> for SuiteEd25519 {}
+impl Dh for SuiteEd25519 {}
+impl Suite for SuiteEd25519 {}
+impl dss::Suite for SuiteEd25519 {}
+impl KeySuite for SuiteEd25519 {}

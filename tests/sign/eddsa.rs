@@ -3,12 +3,15 @@ use scanner_rust::Scanner;
 use std::fs::File;
 
 use kyber_rs::{
+    cipher::cipher,
     encoding::BinaryMarshaler,
     group::edwards25519::SuiteEd25519,
     sign::eddsa::{verify, EdDSA},
     util::random,
     Random,
 };
+
+use anyhow::Result;
 
 /// Test the property of a EdDSA signature
 #[test]
@@ -32,7 +35,6 @@ pub fn test_eddsa_signing_random() {
 /// Adapted from golang.org/x/crypto/ed25519.
 #[test]
 fn test_golden() {
-    use kyber_rs::sign::eddsa::eddsa_test::constant_stream;
     // sign.input.gz is a selection of test cases from
     // https://ed25519.cr.yp.to/python/sign.input
     let test_data_z = File::open("src/sign/eddsa/testdata/sign.input.gz").unwrap();
@@ -100,4 +102,22 @@ fn test_golden() {
 
         verify(&ed.public, &msg, &sig2).unwrap();
     }
+}
+
+pub struct ConstantStream {
+    pub seed: Vec<u8>,
+}
+
+impl cipher::Stream for ConstantStream {
+    fn xor_key_stream(&mut self, dst: &mut [u8], _: &[u8]) -> Result<()> {
+        Ok(dst.copy_from_slice(&self.seed))
+    }
+}
+
+// ConstantStream is a cipher.Stream which always returns
+// the same value.
+pub fn constant_stream(buff: Vec<u8>) -> Box<dyn cipher::Stream> {
+    return Box::new(ConstantStream {
+        seed: buff[..32].to_vec(),
+    });
 }

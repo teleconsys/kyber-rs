@@ -6,6 +6,7 @@ use anyhow::Result;
 use digest::DynDigest;
 
 use crate::cipher::cipher::Stream;
+use crate::dh::Dh;
 use crate::encoding::Marshaling;
 use std::fmt::Debug;
 use std::io::Write;
@@ -38,17 +39,17 @@ pub trait Scalar:
     // Set to the modular difference a - b.
     fn sub(self, a: &Self, b: &Self) -> Self;
 
-    // // Set to the modular negation of scalar a.
-    // Neg(a scalar) scalar
-    //
-    // // Set to the multiplicative identity (1).
-    // One() scalar
+    // Set to the modular negation of scalar a.
+    fn neg(self, a: &Self) -> Self;
 
-    // // Set to the modular division of scalar a by scalar b.
-    // Div(a, b scalar) scalar
-    //
-    // // Set to the modular inverse of scalar a.
-    // Inv(a scalar) scalar
+    // Set to the multiplicative identity (1).
+    fn one(self) -> Self;
+
+    // Set to the modular division of scalar a by scalar b.
+    fn div(self, a: &Self, b: &Self) -> Self;
+
+    // Set to the modular inverse of scalar a.
+    fn inv(self, a: &Self) -> Self;
 
     // Set to a fresh random or pseudo-random scalar.
     fn pick(self, rand: &mut impl Stream) -> Self;
@@ -60,15 +61,11 @@ pub trait Scalar:
     fn set_bytes(self, bytes: &[u8]) -> Self;
 }
 
-pub trait ScalarCanCheckCanonical<SCALAR: Scalar> {
+pub trait ScalarCanCheckCanonical {
     fn is_canonical(&self, b: &[u8]) -> bool;
 }
 
-pub trait PointCanCheckCanonicalAndSmallOrder<SCALAR, POINT>
-where
-    SCALAR: Scalar,
-    POINT: Point<SCALAR>,
-{
+pub trait PointCanCheckCanonicalAndSmallOrder {
     fn has_small_order(&self) -> bool;
     fn is_canonical(&self, b: &[u8]) -> bool;
 }
@@ -78,12 +75,14 @@ where
 /// this is a number modulo the prime P in a DSA-style Schnorr group,
 /// or an (x, y) point on an elliptic curve.
 /// A Point can contain a Diffie-Hellman public key, an ElGamal ciphertext, etc.
-pub trait Point<SCALAR: Scalar>: Marshaling + Clone + PartialEq + Default{
+pub trait Point: Marshaling + Clone + PartialEq + Default + ToString {
+    type SCALAR: Scalar;
+
     /// Equality test for two Points derived from the same Group.
     fn equal(&self, s2: &Self) -> bool;
 
     /// Null sets the receiver to the neutral identity element.
-    fn null(&mut self) -> &mut Self;
+    fn null(self) -> Self;
 
     /// Base sets the receiver to this group's standard base point.
     fn base(self) -> Self;
@@ -112,14 +111,14 @@ pub trait Point<SCALAR: Scalar>: Marshaling + Clone + PartialEq + Default{
     fn add(self, a: &Self, b: &Self) -> Self;
 
     /// Subtract points so that their scalars subtract homomorphically.
-    fn sub(&mut self, a: &Self, b: &Self) -> &mut Self;
+    fn sub(self, a: &Self, b: &Self) -> Self;
 
     /// Set to the negation of point a.
     fn neg(&self, a: &Self) -> &mut Self;
 
     /// Multiply point p by the scalar s.
     /// If p == nil, multiply with the standard base point Base().
-    fn mul(self, s: &SCALAR, p: Option<&Self>) -> Self;
+    fn mul(self, s: &Self::SCALAR, p: Option<&Self>) -> Self;
 }
 
 /// AllowsVarTime allows callers to determine if a given kyber.scalar
@@ -164,24 +163,22 @@ pub trait AllowsVarTime {
 /// Any implementation is also expected to satisfy
 /// the standard homomorphism properties that Diffie-Hellman
 /// and the associated body of public-key cryptography are based on.
-pub trait Group<SCALAR, POINT>: Clone
-where
-    SCALAR: Scalar,
-    POINT: Point<SCALAR>,
-{
+pub trait Group: Dh + Clone + Default {
+    type POINT: Point;
+
     fn string(&self) -> String;
 
     // /// Max length of scalars in bytes
     // fn scalar_len(&self) -> i32;
 
     /// Create new scalar
-    fn scalar(&self) -> SCALAR;
+    fn scalar(&self) -> <Self::POINT as Point>::SCALAR;
 
     // Max length of point in bytes
-    // PointLen() int
+    fn point_len(&self) -> usize;
 
     /// Create new point
-    fn point(&self) -> POINT;
+    fn point(&self) -> Self::POINT;
 }
 
 /// A HashFactory is an interface that can be mixed in to local suite definitions.

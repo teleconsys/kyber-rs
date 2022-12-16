@@ -1,3 +1,3 @@
-mod rabin;
-
-pub use rabin::Suite;
+pub mod pedersen;
+pub mod rabin;
+pub mod suite;

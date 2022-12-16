@@ -45,9 +45,9 @@ pub fn random_int(modulus: &BigInt, rand: &mut impl Stream) -> BigInt {
 }
 
 // Bytes fills a slice with random bytes from rand.
-pub fn bytes(b: &mut [u8], rand: &mut impl Stream) -> Result<()>{
+pub fn bytes(b: &mut [u8], rand: &mut impl Stream) -> Result<()> {
     let src_buff = vec![0u8; b.len()];
-	rand.xor_key_stream(b, &src_buff)?;
+    rand.xor_key_stream(b, &src_buff)?;
     Ok(())
 }
 
@@ -71,7 +71,6 @@ impl Randstream {
     /// Otherwise, for each source, 32 bytes are read. They are concatenated and
     /// then hashed, and the resulting hash is used as a seed to a PRNG.
     /// The resulting cipher.Stream can be used in multiple threads.
-    #[cfg(test)]
     pub fn new(readers: Vec<Box<dyn Read>>) -> Randstream {
         if readers.len() == 0 {
             return Randstream::default();

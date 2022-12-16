@@ -14,13 +14,13 @@ use crate::group::integer_field::integer_field::ByteOrder::LittleEndian;
 use crate::group::integer_field::integer_field::Int;
 use subtle::ConstantTimeEq;
 
-use super::constants::FULL_ORDER;
+use super::constants::{FULL_ORDER, L_MINUS2};
 
 const MARSHAL_SCALAR_ID: [u8; 8] = [
     'e' as u8, 'd' as u8, '.' as u8, 's' as u8, 'c' as u8, 'a' as u8, 'l' as u8, 'a' as u8,
 ];
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Scalar {
     pub v: [u8; 32],
 }
@@ -57,7 +57,7 @@ impl Scalar {
     }
 }
 
-impl ScalarCanCheckCanonical<Scalar> for Scalar {
+impl ScalarCanCheckCanonical for Scalar {
     /// IsCanonical whether the scalar in sb is in the range 0<=s<L as required by RFC8032, Section 5.1.7.
     /// Also provides Strong Unforgeability under Chosen Message Attacks (SUF-CMA)
     /// See paper https://eprint.iacr.org/2020/823.pdf for definitions and theorems
@@ -74,16 +74,16 @@ impl ScalarCanCheckCanonical<Scalar> for Scalar {
             return true;
         }
 
-        let (_, mut L) = PRIME_ORDER.to_bytes_be();
-        L.reverse();
+        let (_, mut l) = PRIME_ORDER.to_bytes_be();
+        l.reverse();
 
         let mut c = 0u8;
         let mut n = 1u8;
         for i in (0..=31).rev() {
             // subtraction might lead to an underflow which needs
             // to be accounted for in the right shift
-            c |= (((sb[i] as u16) - (L[i] as u16)) >> 8) as u8 & n;
-            n &= (((sb[i] as u16) ^ (L[i] as u16) - 1) >> 8) as u8;
+            c |= (((sb[i] as u16) - (l[i] as u16)) >> 8) as u8 & n;
+            n &= (((sb[i] as u16) ^ (l[i] as u16) - 1) >> 8) as u8;
         }
 
         c != 0
@@ -120,7 +120,7 @@ impl BinaryUnmarshaler for Scalar {
 
 impl ToString for Scalar {
     fn to_string(&self) -> String {
-        todo!()
+        self.string()
     }
 }
 
@@ -170,6 +170,49 @@ impl group::Scalar for Scalar {
 
     fn set_bytes(self, bytes: &[u8]) -> Self {
         self.set_int(&Int::new_int_bytes(bytes, &PRIME_ORDER, LittleEndian))
+    }
+
+    fn one(mut self) -> Self {
+        self.v = [0u8; 32];
+        self.v[0] = 1;
+        self
+    }
+
+    fn div(mut self, a: &Self, b: &Self) -> Self {
+        let mut i = Scalar::default();
+        i = i.inv(b);
+        sc_mul(&mut self.v, &a.v, &i.v);
+        self
+    }
+
+    fn inv(mut self, ac: &Self) -> Self {
+        let mut res = Scalar::default();
+        res = res.one();
+        // Modular inversion in a multiplicative group is a^(phi(m)-1) = a^-1 mod m
+        // Since m is prime, phi(m) = m - 1 => a^(m-2) = a^-1 mod m.
+        // The inverse is computed using the exponentation-and-square algorithm.
+        // Implementation is constant time regarding the value a, it only depends on
+        // the modulo.
+        for i in (0..=255).rev() {
+            let bit_is_set = L_MINUS2.bit(i);
+            // square step
+            let res_v_clone = res.v.clone();
+            sc_mul(&mut res.v, &res_v_clone, &res_v_clone);
+            if bit_is_set {
+                // multiply step
+                let res_v_clone = res.v.clone();
+                sc_mul(&mut res.v, &res_v_clone, &ac.v);
+            }
+        }
+        self.v = res.v;
+        self
+    }
+
+    fn neg(mut self, a: &Self) -> Self {
+        let mut z = Scalar::default();
+        z = z.zero();
+        sc_sub(&mut self.v, &z.v, &a.v);
+        return self;
     }
 }
 
@@ -1977,7 +2020,7 @@ fn sc_mul(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32]) {
     s[31] = (s11 >> 17) as u8;
 }
 
-pub(crate) fn newScalarInt(i: BigInt) -> Scalar {
+pub(crate) fn new_scalar_int(i: BigInt) -> Scalar {
     let s = Scalar::default();
     s.set_int(&Int::new_int(i, FULL_ORDER.clone()))
 }

@@ -1,8 +1,11 @@
 #[macro_use]
 extern crate impl_ops;
 
-mod cipher;
+pub mod cipher;
+pub mod dh;
 pub mod encoding;
+pub mod encrypt;
+mod examples;
 pub mod group;
 pub mod random;
 mod share;
@@ -16,5 +19,5 @@ pub use group::Group;
 pub use group::Point;
 pub use group::Scalar;
 pub use random::Random;
-pub use share::Suite;
+pub use share::vss::suite::Suite;
 pub use xof::{XOFFactory, XOF};
