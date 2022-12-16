@@ -1,3 +1,4 @@
+use crate::dh::Dh;
 use crate::group::edwards25519::Point;
 use crate::group::edwards25519::Scalar;
 use crate::group::Group;
@@ -12,6 +13,8 @@ use sha2::{Digest, Sha512};
 /// because it supports only this one specific curve.
 #[derive(Clone, Copy, Debug)]
 pub struct Curve {}
+
+impl Dh for Curve {}
 
 impl Group for Curve {
     type POINT = Point;
@@ -33,6 +36,11 @@ impl Group for Curve {
     fn point(&self) -> Point {
         Point::default()
     }
+
+    /// PointLen returns 32, the size in bytes of an encoded Point on the Ed25519 curve.
+    fn point_len(&self) -> usize {
+        return 32;
+    }
 }
 
 impl Curve {
@@ -43,11 +51,6 @@ impl Curve {
     /// ScalarLen returns 32, the size in bytes of an encoded scalar
     /// for the Ed25519 curve.
     fn scalar_len() -> usize {
-        return 32;
-    }
-
-    // PointLen returns 32, the size in bytes of an encoded Point on the Ed25519 curve.
-    fn point_len() -> usize {
         return 32;
     }
 

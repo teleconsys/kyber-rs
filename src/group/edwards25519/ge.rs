@@ -243,21 +243,24 @@ impl CompletedGroupElement {
         fe_sub(&mut self.t, &t0, &self_t);
     }
 
-    // func (c *completedGroupElement) Sub(p *extendedGroupElement, q *cachedGroupElement) {
-    // 	var t0 fieldElement
+    pub fn sub(&mut self, p: &ExtendedGroupElement, q: &CachedGroupElement) {
+    	let mut t0 = FieldElement::default();
 
-    // 	feAdd(&c.X, &p.Y, &p.X)
-    // 	feSub(&c.Y, &p.Y, &p.X)
-    // 	feMul(&c.Z, &c.X, &q.yMinusX)
-    // 	feMul(&c.Y, &c.Y, &q.yPlusX)
-    // 	feMul(&c.T, &q.T2d, &p.T)
-    // 	feMul(&c.X, &p.Z, &q.Z)
-    // 	feAdd(&t0, &c.X, &c.X)
-    // 	feSub(&c.X, &c.Z, &c.Y)
-    // 	feAdd(&c.Y, &c.Z, &c.Y)
-    // 	feSub(&c.Z, &t0, &c.T)
-    // 	feAdd(&c.T, &t0, &c.T)
-    // }
+        fe_add(&mut self.x, &p.y, &p.x);
+        fe_sub(&mut self.y, &p.y, &p.x);
+        fe_mul(&mut self.z, &self.x, &q.y_minus_x);
+        let self_y = self.y.clone();
+        fe_mul(&mut self.y, &self_y, &q.y_plus_x);
+        fe_mul(&mut self.t, &q.t2d, &p.t);
+        fe_mul(&mut self.x, &p.z, &q.z);
+        fe_add(&mut t0, &self.x, &self.x);
+        fe_sub(&mut self.x, &self.z, &self.y);
+        let self_y = self.y.clone();
+        fe_add(&mut self.y, &self.z, &self_y);
+        fe_sub(&mut self.z, &t0, &self.t);
+        let self_t = self.t.clone();
+        fe_add(&mut self.t, &t0, &self_t);
+    }
 
     // func (c *completedGroupElement) MixedSub(p *extendedGroupElement, q *preComputedGroupElement) {
     // 	var t0 fieldElement

@@ -2,20 +2,15 @@ use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
+    dh::{Dh, DhStandard},
     encoding::BinaryMarshaler,
     group::{
         edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
         HashFactory,
     },
     share::vss::{
-        pedersen::{
-            dh::context,
-            vss::{find_pub, session_id},
-        },
-        pedersen::{
-            dh::dh_exchange,
-            vss::{recover_secret, Response, STATUS_APPROVAL, STATUS_COMPLAINT},
-        },
+        pedersen::vss::{self, recover_secret, Response, STATUS_APPROVAL, STATUS_COMPLAINT},
+        pedersen::vss::{find_pub, session_id},
     },
     sign::schnorr,
     Group, Point, Random, Scalar, Suite,
@@ -770,14 +765,14 @@ fn test_vss_dhexchange() {
         .suite
         .scalar()
         .pick(&mut test_data.suite.random_stream());
-    let point = dh_exchange(test_data.suite, privv.clone(), pubb.clone());
+    let point = DhStandard::dh_exchange(test_data.suite, privv.clone(), pubb.clone());
     assert_eq!(pubb.mul(&privv, None).string(), point.string());
 }
 
 #[test]
 fn test_vss_context() {
     let test_data = new_test_data();
-    let c = context(
+    let c = vss::context(
         &test_data.suite,
         &test_data.dealer_pub,
         &test_data.verifiers_pub,

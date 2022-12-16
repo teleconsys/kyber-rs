@@ -95,6 +95,12 @@ pub struct Config<SUITE: Suite, READ: Read + Clone> {
     pub user_reader_only: bool,
 }
 
+impl<SUITE: Suite, READ: Read + Clone> Default for Config<SUITE, READ> {
+    fn default() -> Self {
+        Self { suite: Default::default(), longterm: Default::default(), old_nodes: Default::default(), public_coeffs: Default::default(), new_nodes: Default::default(), share: Default::default(), threshold: Default::default(), old_threshold: Default::default(), reader: Default::default(), user_reader_only: Default::default() }
+    }
+}
+
 /// DistKeyGenerator is the struct that runs the DKG protocol.
 #[derive(Clone)]
 pub struct DistKeyGenerator<SUITE: Suite, READ: Read + Clone>
@@ -138,6 +144,15 @@ where
     timeout: bool,
 }
 
+impl<SUITE: Suite, READ: Read + Clone> Default for DistKeyGenerator<SUITE, READ> 
+where
+    SUITE::POINT: Serialize + DeserializeOwned,
+    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned{
+        fn default() -> Self {
+        Self { c: Default::default(), suite: Default::default(), long: Default::default(), pubb: Default::default(), dpub: Default::default(), dealer: Default::default(), verifiers: Default::default(), old_aggregators: Default::default(), oidx: Default::default(), nidx: Default::default(), old_t: Default::default(), new_t: Default::default(), is_resharing: Default::default(), can_issue: Default::default(), can_receive: Default::default(), new_present: Default::default(), old_present: Default::default(), processed: Default::default(), timeout: Default::default() }
+    }
+    }
+
 /// NewDistKeyHandler takes a Config and returns a DistKeyGenerator that is able
 /// to drive the DKG or resharing protocol.
 pub fn new_dist_key_handler<SUITE: Suite, READ: Read + Clone + 'static>(
@@ -180,7 +195,7 @@ where
         new_threshold = vss::pedersen::vss::minimum_t(c.new_nodes.len());
     }
 
-    let mut dealer = vss::pedersen::Dealer::default();
+    let mut dealer = vss::pedersen::vss::Dealer::default();
     let mut can_issue = false;
     if c.share.is_some() {
         // resharing case

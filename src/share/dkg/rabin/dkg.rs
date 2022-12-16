@@ -43,7 +43,7 @@ use crate::{
     group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
     share::{
         poly::{recover_pri_poly, PriShare, PubPoly},
-        vss::{self, rabin::EncryptedDeal, suite::Suite},
+        vss::{self, rabin::vss::EncryptedDeal, suite::Suite},
     },
     sign::{dss, schnorr},
     Point, Scalar,

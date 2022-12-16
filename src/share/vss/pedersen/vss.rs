@@ -5,15 +5,13 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
+    dh::{Dh, AEAD},
     encoding::{self, unmarshal_binary, BinaryMarshaler, Marshaling},
     group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
     share::{
         self,
         poly::{new_pri_poly, PriShare},
-        vss::{
-            pedersen::dh::{context, dh_exchange, AEAD},
-            suite::Suite,
-        },
+        vss::suite::Suite,
     },
     sign::schnorr,
     Point, Scalar,
@@ -343,7 +341,7 @@ where
         let signature = schnorr::sign(&self.suite, &self.long, &dh_public_buff)?;
 
         // AES128-GCM
-        let pre = dh_exchange(self.suite, dh_secret, v_pub);
+        let pre = SUITE::dh_exchange(self.suite, dh_secret, v_pub);
         let gcm = AEAD::new(pre, &self.hkdf_context)?;
 
         let nonce = [0u8; AEAD::nonce_size()];
@@ -609,7 +607,7 @@ where
         )?;
 
         // compute shared key and AES526-GCM cipher
-        let pre = dh_exchange(self.suite, self.longterm.clone(), e.dhkey.clone());
+        let pre = SUITE::dh_exchange(self.suite, self.longterm.clone(), e.dhkey.clone());
         let gcm = AEAD::new(pre, &self.hkdf_context)?;
         let decrypted = gcm.open(
             None,
@@ -1101,4 +1099,20 @@ pub(crate) fn session_id<SUITE: Suite>(
     h.write_u32::<LittleEndian>(t as u32)?;
 
     Ok(h.finalize().to_vec())
+}
+
+/// context returns the context slice to be used when encrypting a share
+pub fn context<SUITE: Suite>(
+    suite: &SUITE,
+    dealer: &SUITE::POINT,
+    verifiers: &[SUITE::POINT],
+) -> Vec<u8> {
+    let mut h = suite.hash();
+    h.write("vss-dealer".as_bytes()).unwrap();
+    dealer.marshal_to(&mut h).unwrap();
+    h.write("vss-verifiers".as_bytes()).unwrap();
+    for v in verifiers {
+        v.marshal_to(&mut h).unwrap();
+    }
+    h.finalize().to_vec()
 }

@@ -4,6 +4,7 @@ use sha2::{Digest, Sha256};
 use std::ops::Deref;
 
 use crate::cipher::Stream;
+use crate::dh::Dh;
 use crate::group::edwards25519::curve::Curve;
 use crate::group::edwards25519::scalar::Scalar;
 use crate::group::HashFactory;
@@ -98,6 +99,11 @@ impl Group for SuiteEd25519 {
     fn point(&self) -> Point {
         self.curve.point()
     }
+
+    /// PointLen returns 32, the size in bytes of an encoded Point on the Ed25519 curve.
+    fn point_len(&self) -> usize {
+        return 32;
+    }
 }
 
 impl Default for SuiteEd25519 {
@@ -133,6 +139,7 @@ impl HashFactory for SuiteEd25519 {
     }
 }
 
+impl Dh for SuiteEd25519 {}
 impl Suite for SuiteEd25519 {}
 impl dss::Suite for SuiteEd25519 {}
 impl KeySuite for SuiteEd25519 {}

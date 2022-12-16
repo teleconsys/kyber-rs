@@ -1,18 +1,17 @@
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
+use vss::KEY_SIZE;
 
 use crate::{
+    dh::Dh,
     encoding::BinaryMarshaler,
     group::edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
-    share::vss::rabin::{
-        dh::{context, dh_exchange, KEY_SIZE},
-        vss::{find_pub, new_verifier, recover_secret, session_id, Response},
-    },
+    share::vss::rabin::vss::{self, find_pub, new_verifier, recover_secret, session_id, Response},
     sign::schnorr,
     Group, Point, Random, Scalar, Suite,
 };
 
-use super::{minimum_t, new_dealer, Dealer, Verifier};
+use super::vss::{minimum_t, new_dealer, Dealer, Verifier};
 
 fn suite() -> SuiteEd25519 {
     SuiteEd25519::new_blake_sha256ed25519()
@@ -786,14 +785,14 @@ fn test_vss_dhexchange() {
         .suite
         .scalar()
         .pick(&mut test_data.suite.random_stream());
-    let point = dh_exchange(test_data.suite, privv.clone(), pubb.clone());
+    let point = SuiteEd25519::dh_exchange(test_data.suite, privv.clone(), pubb.clone());
     assert_eq!(pubb.mul(&privv, None).string(), point.string());
 }
 
 #[test]
 fn test_vss_context() {
     let test_data = new_test_data();
-    let c = context(
+    let c = vss::context(
         &test_data.suite,
         &test_data.dealer_pub,
         &test_data.verifiers_pub,

@@ -6,6 +6,7 @@ use anyhow::Result;
 use digest::DynDigest;
 
 use crate::cipher::cipher::Stream;
+use crate::dh::Dh;
 use crate::encoding::Marshaling;
 use std::fmt::Debug;
 use std::io::Write;
@@ -110,7 +111,7 @@ pub trait Point: Marshaling + Clone + PartialEq + Default + ToString {
     fn add(self, a: &Self, b: &Self) -> Self;
 
     /// Subtract points so that their scalars subtract homomorphically.
-    fn sub(&mut self, a: &Self, b: &Self) -> &mut Self;
+    fn sub(self, a: &Self, b: &Self) -> Self;
 
     /// Set to the negation of point a.
     fn neg(&self, a: &Self) -> &mut Self;
@@ -162,7 +163,7 @@ pub trait AllowsVarTime {
 /// Any implementation is also expected to satisfy
 /// the standard homomorphism properties that Diffie-Hellman
 /// and the associated body of public-key cryptography are based on.
-pub trait Group: Clone + Default {
+pub trait Group: Dh + Clone + Default {
     type POINT: Point;
 
     fn string(&self) -> String;
@@ -174,7 +175,7 @@ pub trait Group: Clone + Default {
     fn scalar(&self) -> <Self::POINT as Point>::SCALAR;
 
     // Max length of point in bytes
-    // PointLen() int
+    fn point_len(&self) -> usize;
 
     /// Create new point
     fn point(&self) -> Self::POINT;
