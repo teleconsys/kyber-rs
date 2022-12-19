@@ -712,10 +712,9 @@ where
         }
 
         let mut sh = self.suite.scalar().zero();
-        let mut tmp_pubb = None;
         let mut pubb: Option<PubPoly<SUITE>> = None;
 
-        // TODO: fix this weird error management and the messy pubb
+        // TODO: fix this weird error management
         let mut error: Option<anyhow::Error> = None;
 
         self.qual_iter(|i, v| {
@@ -739,22 +738,17 @@ where
                 return false;
             }
             let poly = self.commitments.get(&i).unwrap();
-            if pubb.is_none() && tmp_pubb.is_none() {
-                // first polynomial we see (instead of generating n empty commits)
-                tmp_pubb = Some(poly);
-                return true;
+            match &pubb {
+                Some(pubb_val) => match pubb_val.add(poly) {
+                    Ok(res) => pubb = Some(res),
+                    Err(e) => error = Some(e),
+                },
+                None => {
+                    // first polynomial we see (instead of generating n empty commits)
+                    pubb = Some(poly.clone());
+                    return true;
+                }
             }
-            if pubb.is_none() {
-                match tmp_pubb.unwrap().add(&poly) {
-                    Ok(p) => pubb = Some(p),
-                    Err(e) => error = Some(anyhow::Error::msg(e.to_string())),
-                }
-            } else {
-                match pubb.as_ref().unwrap().add(&poly) {
-                    Ok(p) => pubb = Some(p),
-                    Err(e) => error = Some(anyhow::Error::msg(e.to_string())),
-                }
-            };
             return error.is_none();
         });
 
