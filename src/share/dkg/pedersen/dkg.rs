@@ -1,7 +1,6 @@
 use std::{collections::HashMap, io::Read};
 
 use rand::{rngs::StdRng, RngCore, SeedableRng};
-use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     encoding::BinaryMarshaler,
@@ -65,7 +64,7 @@ pub struct Config<SUITE: Suite, READ: Read + Clone> {
     /// join or create a group. To be able to issue new fresh shares to a new group,
     /// one's share must be specified here, along with the public key inside the
     /// OldNodes field.
-    pub share: Option<DistKeyShare<SUITE::POINT>>,
+    pub share: Option<DistKeyShare<SUITE>>,
 
     /// The threshold to use in order to reconstruct the secret with the produced
     /// shares. This threshold is with respect to the number of nodes in the
@@ -97,17 +96,24 @@ pub struct Config<SUITE: Suite, READ: Read + Clone> {
 
 impl<SUITE: Suite, READ: Read + Clone> Default for Config<SUITE, READ> {
     fn default() -> Self {
-        Self { suite: Default::default(), longterm: Default::default(), old_nodes: Default::default(), public_coeffs: Default::default(), new_nodes: Default::default(), share: Default::default(), threshold: Default::default(), old_threshold: Default::default(), reader: Default::default(), user_reader_only: Default::default() }
+        Self {
+            suite: Default::default(),
+            longterm: Default::default(),
+            old_nodes: Default::default(),
+            public_coeffs: Default::default(),
+            new_nodes: Default::default(),
+            share: Default::default(),
+            threshold: Default::default(),
+            old_threshold: Default::default(),
+            reader: Default::default(),
+            user_reader_only: Default::default(),
+        }
     }
 }
 
 /// DistKeyGenerator is the struct that runs the DKG protocol.
 #[derive(Clone)]
-pub struct DistKeyGenerator<SUITE: Suite, READ: Read + Clone>
-where
-    SUITE::POINT: Serialize + DeserializeOwned,
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-{
+pub struct DistKeyGenerator<SUITE: Suite, READ: Read + Clone> {
     /// config driving the behavior of DistKeyGenerator
     pub c: Config<SUITE, READ>,
     suite: SUITE,
@@ -144,14 +150,31 @@ where
     timeout: bool,
 }
 
-impl<SUITE: Suite, READ: Read + Clone> Default for DistKeyGenerator<SUITE, READ> 
-where
-    SUITE::POINT: Serialize + DeserializeOwned,
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned{
-        fn default() -> Self {
-        Self { c: Default::default(), suite: Default::default(), long: Default::default(), pubb: Default::default(), dpub: Default::default(), dealer: Default::default(), verifiers: Default::default(), old_aggregators: Default::default(), oidx: Default::default(), nidx: Default::default(), old_t: Default::default(), new_t: Default::default(), is_resharing: Default::default(), can_issue: Default::default(), can_receive: Default::default(), new_present: Default::default(), old_present: Default::default(), processed: Default::default(), timeout: Default::default() }
+impl<SUITE: Suite, READ: Read + Clone> Default for DistKeyGenerator<SUITE, READ> {
+    fn default() -> Self {
+        Self {
+            c: Default::default(),
+            suite: Default::default(),
+            long: Default::default(),
+            pubb: Default::default(),
+            dpub: Default::default(),
+            dealer: Default::default(),
+            verifiers: Default::default(),
+            old_aggregators: Default::default(),
+            oidx: Default::default(),
+            nidx: Default::default(),
+            old_t: Default::default(),
+            new_t: Default::default(),
+            is_resharing: Default::default(),
+            can_issue: Default::default(),
+            can_receive: Default::default(),
+            new_present: Default::default(),
+            old_present: Default::default(),
+            processed: Default::default(),
+            timeout: Default::default(),
+        }
     }
-    }
+}
 
 /// NewDistKeyHandler takes a Config and returns a DistKeyGenerator that is able
 /// to drive the DKG or resharing protocol.
@@ -159,8 +182,8 @@ pub fn new_dist_key_handler<SUITE: Suite, READ: Read + Clone + 'static>(
     mut c: Config<SUITE, READ>,
 ) -> Result<DistKeyGenerator<SUITE, READ>>
 where
-    SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder,
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned + ScalarCanCheckCanonical,
+    SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
+    <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
 {
     if c.new_nodes.len() == 0 && c.old_nodes.len() == 0 {
         bail!("dkg: can't run with empty node list")
@@ -308,8 +331,8 @@ pub fn new_dist_key_generator<SUITE: Suite, READ: Read + Clone + 'static>(
     t: usize,
 ) -> Result<DistKeyGenerator<SUITE, READ>>
 where
-    SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder,
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned + ScalarCanCheckCanonical,
+    SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
+    <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
 {
     let c = Config {
         suite: suite,
@@ -328,8 +351,8 @@ where
 
 impl<SUITE: Suite, READ: Read + Clone + 'static> DistKeyGenerator<SUITE, READ>
 where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned + ScalarCanCheckCanonical,
-    SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder,
+    <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
+    SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
 {
     /// Deals returns all the deals that must be broadcasted to all participants in
     /// the new list. The deal corresponding to this DKG is already added to this DKG
@@ -525,11 +548,7 @@ where
     fn process_resharing_response(
         &mut self,
         resp: &Response,
-    ) -> Result<Option<Justification<SUITE>>>
-    where
-        <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-        SUITE::POINT: Serialize + DeserializeOwned,
-    {
+    ) -> Result<Option<Justification<SUITE>>> {
         let agg = match self.old_aggregators.contains_key(&resp.index) {
             true => self.old_aggregators.get_mut(&resp.index).unwrap(),
             false => {
@@ -773,7 +792,7 @@ where
     /// of all aggregated individual public commits of each individual secrets.
     /// The share is evaluated from the global Private Polynomial, basically SUM of
     /// fj(i) for a receiver i.
-    pub fn dist_key_share(&self) -> Result<DistKeyShare<SUITE::POINT>> {
+    pub fn dist_key_share(&self) -> Result<DistKeyShare<SUITE>> {
         if !self.threshold_certified() {
             bail!("dkg: distributed key not certified")
         }
@@ -788,7 +807,7 @@ where
         return self.dkg_key();
     }
 
-    fn dkg_key(&self) -> Result<DistKeyShare<SUITE::POINT>> {
+    fn dkg_key(&self) -> Result<DistKeyShare<SUITE>> {
         let mut sh = self.suite.scalar().zero();
         let mut tmp_pubb = None;
         let mut pubb: Option<share::poly::PubPoly<SUITE>> = None;
@@ -845,7 +864,7 @@ where
         })
     }
 
-    fn resharing_key(&self) -> Result<DistKeyShare<SUITE::POINT>> {
+    fn resharing_key(&self) -> Result<DistKeyShare<SUITE>> {
         let cap = self.verifiers.len();
         // only old nodes sends shares
         let mut shares = Vec::with_capacity(cap);
@@ -956,13 +975,9 @@ where
     }
 }
 
-impl<P: Point> DistKeyShare<P> {
+impl<SUITE: Suite> DistKeyShare<SUITE> {
     /// Renew adds the new distributed key share g (with secret 0) to the distributed key share d.
-    fn renew<SUITE: Suite<POINT = P>>(
-        &self,
-        suite: SUITE,
-        g: DistKeyShare<P>,
-    ) -> Result<DistKeyShare<P>> {
+    fn renew(&self, suite: SUITE, g: DistKeyShare<SUITE>) -> Result<DistKeyShare<SUITE>> {
         // Check G(0) = 0*G.
         if !g
             .public()
@@ -1010,8 +1025,8 @@ fn find_pub<POINT: Point>(list: &[POINT], to_find: &POINT) -> (usize, bool) {
 
 fn checks_deal_certified<SUITE: Suite>(i: u32, v: vss::pedersen::vss::Verifier<SUITE>) -> bool
 where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
+    SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
+    <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
 {
     return v.deal_certified();
 }

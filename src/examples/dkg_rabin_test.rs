@@ -6,8 +6,6 @@ shares that will form the final private key. The example uses 3 nodes and shows
 the "happy" path where each node does its job correctly.
 */
 
-use serde::{de::DeserializeOwned, Serialize};
-
 use crate::{
     encoding::BinaryMarshaler,
     group::edwards25519::SuiteEd25519,
@@ -19,13 +17,9 @@ use crate::{
 const NUM_NODES: usize = 3;
 const THRESHOLD: usize = NUM_NODES;
 
-struct Node<SUITE: Suite>
-where
-    SUITE::POINT: Serialize + DeserializeOwned,
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-{
+struct Node<SUITE: Suite> {
     dkg: dkg::rabin::DistKeyGenerator<SUITE>,
-    pub_key: SUITE::POINT,
+    _pub_key: SUITE::POINT,
     priv_key: <SUITE::POINT as Point>::SCALAR,
     deals: Vec<dkg::rabin::Deal<SUITE::POINT>>,
     resps: Vec<dkg::rabin::Response>,
@@ -47,7 +41,7 @@ fn test_example_dkg() {
         pub_keys.push(pub_key.clone());
         nodes.push(Node::<SuiteEd25519> {
             dkg: Default::default(),
-            pub_key,
+            _pub_key: pub_key,
             priv_key,
             deals: Vec::new(),
             resps: Vec::new(),

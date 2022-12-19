@@ -1,27 +1,40 @@
-use crate::{Group, Point, util::random::Randstream, Scalar, share::vss::suite, group::edwards25519::SuiteEd25519, Random};
+use crate::{
+    group::edwards25519::SuiteEd25519, util::random::Randstream, Group, Point, Random, Scalar,
+};
 use anyhow::Result;
 
-pub fn el_gamal_encrypt<GROUP: Group>(group: GROUP, pubkey: &GROUP::POINT, message: &[u8]) -> (GROUP::POINT, GROUP::POINT, Vec<u8>) {
-	// Embed the message (or as much of it as will fit) into a curve point.
-	let m = group.point().embed(Some(message), &mut Randstream::default());
-	let mut max = group.point().embed_len();
-	if max > message.len() {
-		max = message.len()
-	}
-	let remainder = message[max..].to_vec();
-	// ElGamal-encrypt the point to produce ciphertext (K,C).
-	let k = group.scalar().pick(&mut Randstream::default()); // ephemeral private key
-	let k_caps = group.point().mul(&k, None);          // ephemeral DH public key
-	let s = group.point().mul(&k, Some(&pubkey));      // ephemeral DH shared secret
-	let c = s.clone().add(&s, &m);                        // message blinded with secret
-	(k_caps, c, remainder)
+pub fn el_gamal_encrypt<GROUP: Group>(
+    group: GROUP,
+    pubkey: &GROUP::POINT,
+    message: &[u8],
+) -> (GROUP::POINT, GROUP::POINT, Vec<u8>) {
+    // Embed the message (or as much of it as will fit) into a curve point.
+    let m = group
+        .point()
+        .embed(Some(message), &mut Randstream::default());
+    let mut max = group.point().embed_len();
+    if max > message.len() {
+        max = message.len()
+    }
+    let remainder = message[max..].to_vec();
+    // ElGamal-encrypt the point to produce ciphertext (K,C).
+    let k = group.scalar().pick(&mut Randstream::default()); // ephemeral private key
+    let k_caps = group.point().mul(&k, None); // ephemeral DH public key
+    let s = group.point().mul(&k, Some(&pubkey)); // ephemeral DH shared secret
+    let c = s.clone().add(&s, &m); // message blinded with secret
+    (k_caps, c, remainder)
 }
 
-pub fn el_gamal_decrypt<GROUP: Group>(group: GROUP, prikey: &<GROUP::POINT as Point>::SCALAR, k: GROUP::POINT, c: GROUP::POINT) -> Result<Vec<u8>> {
-	// ElGamal-decrypt the ciphertext (K,C) to reproduce the message.
-	let s = group.point().mul(&prikey, Some(&k)); // regenerate shared secret
-	let mut p = group.point();
-    let m = p.sub(&c, &s);      // use to un-blind the message
+pub fn el_gamal_decrypt<GROUP: Group>(
+    group: GROUP,
+    prikey: &<GROUP::POINT as Point>::SCALAR,
+    k: GROUP::POINT,
+    c: GROUP::POINT,
+) -> Result<Vec<u8>> {
+    // ElGamal-decrypt the ciphertext (K,C) to reproduce the message.
+    let s = group.point().mul(&prikey, Some(&k)); // regenerate shared secret
+    let p = group.point();
+    let m = p.sub(&c, &s); // use to un-blind the message
     m.data()
 }
 
@@ -52,27 +65,33 @@ one of several possible receivers forming an explicit anonymity set.
 fn example_el_gamal_encryption() {
     let suite = SuiteEd25519::new_blake_sha256ed25519();
 
-	// Create a public/private keypair
-	let a = suite.scalar().pick(&mut suite.random_stream()); // Alice's private key
-	let a_caps = suite.point().mul(&a, None);                 // Alice's public key
+    // Create a public/private keypair
+    let a = suite.scalar().pick(&mut suite.random_stream()); // Alice's private key
+    let a_caps = suite.point().mul(&a, None); // Alice's public key
 
-	// ElGamal-encrypt a message using the public key.
-	let m = "The quick brown fox".as_bytes();
-	let (k, c, _) = el_gamal_encrypt(suite, &a_caps, m);
+    // ElGamal-encrypt a message using the public key.
+    let m = "The quick brown fox".as_bytes();
+    let (k, c, _) = el_gamal_encrypt(suite, &a_caps, m);
 
-	// Decrypt it using the corresponding private key.
-	let dec_res = el_gamal_decrypt(suite, &a, k, c);
+    // Decrypt it using the corresponding private key.
+    let dec_res = el_gamal_decrypt(suite, &a, k, c);
 
-	// Make sure it worked!
+    // Make sure it worked!
     if dec_res.is_err() {
         panic!("decryption failed: {}", dec_res.err().unwrap())
     }
     let mm = dec_res.unwrap();
-	if std::str::from_utf8(&mm).unwrap() != std::str::from_utf8(m).unwrap() {
-        panic!("decryption produced wrong output: {}", std::str::from_utf8(&mm).unwrap());
-	}
-	println!("Decryption succeeded: {}", std::str::from_utf8(&mm).unwrap())
+    if std::str::from_utf8(&mm).unwrap() != std::str::from_utf8(m).unwrap() {
+        panic!(
+            "decryption produced wrong output: {}",
+            std::str::from_utf8(&mm).unwrap()
+        );
+    }
+    println!(
+        "Decryption succeeded: {}",
+        std::str::from_utf8(&mm).unwrap()
+    )
 
-	// Output:
-	// Decryption succeeded: The quick brown fox
+    // Output:
+    // Decryption succeeded: The quick brown fox
 }

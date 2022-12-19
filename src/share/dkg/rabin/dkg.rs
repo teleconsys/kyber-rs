@@ -36,7 +36,6 @@
 use std::collections::HashMap;
 
 use byteorder::{LittleEndian, WriteBytesExt};
-use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     encoding::{BinaryMarshaler, Marshaling},
@@ -53,30 +52,30 @@ use anyhow::{bail, Result};
 
 /// DistKeyShare holds the share of a distributed key for a participant.
 #[derive(Clone)]
-pub struct DistKeyShare<POINT: Point> {
+pub struct DistKeyShare<SUITE: Suite> {
     /// Coefficients of the public polynomial holding the public key
-    pub commits: Vec<POINT>,
+    pub commits: Vec<SUITE::POINT>,
     /// Share of the distributed secret
-    pub share: PriShare<POINT::SCALAR>,
+    pub share: PriShare<<SUITE::POINT as Point>::SCALAR>,
 }
 
-impl<POINT: Point> DistKeyShare<POINT> {
+impl<SUITE: Suite> DistKeyShare<SUITE> {
     /// Public returns the public key associated with the distributed private key.
-    pub fn public(&self) -> POINT {
+    pub fn public(&self) -> SUITE::POINT {
         return self.commits[0].clone();
     }
 }
 
-impl<POINT: Point> dss::DistKeyShare<POINT> for DistKeyShare<POINT> {
+impl<SUITE: Suite> dss::DistKeyShare<SUITE> for DistKeyShare<SUITE> {
     /// PriShare implements the dss.DistKeyShare interface so either pedersen or
     /// rabin dkg can be used with dss.
-    fn pri_share(&self) -> PriShare<POINT::SCALAR> {
+    fn pri_share(&self) -> PriShare<<SUITE::POINT as Point>::SCALAR> {
         return self.share.clone();
     }
 
     /// Commitments implements the dss.DistKeyShare interface so either pedersen or
     /// rabin dkg can be used with dss.
-    fn commitments(&self) -> Vec<POINT> {
+    fn commitments(&self) -> Vec<SUITE::POINT> {
         return self.commits.clone();
     }
 }
@@ -86,7 +85,7 @@ impl<POINT: Point> dss::DistKeyShare<POINT> for DistKeyShare<POINT> {
 ///  NOTE: Doing that in vss.go would be possible but then the Dealer is always
 ///  assumed to be a member of the participants. It's only the case here.
 #[derive(Clone)]
-pub struct Deal<POINT: Point + Serialize> {
+pub struct Deal<POINT: Point> {
     /// Index of the Dealer in the list of participants
     pub index: u32,
     /// Deal issued for another participant
@@ -106,11 +105,7 @@ pub struct Response {
 /// Justification holds the Justification from a Dealer as well as the index of
 /// the Dealer in question.
 #[derive(Clone)]
-pub struct Justification<SUITE: Suite>
-where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
+pub struct Justification<SUITE: Suite> {
     /// Index of the Dealer who answered with this Justification
     pub index: u32,
     /// Justification issued from the Dealer
@@ -147,11 +142,7 @@ impl<SUITE: Suite> SecretCommits<SUITE> {
 /// ComplaintCommits is sent if the secret commitments revealed by a peer are not
 /// valid.
 #[derive(Clone)]
-pub struct ComplaintCommits<SUITE: Suite>
-where
-    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
+pub struct ComplaintCommits<SUITE: Suite> {
     /// Index of the Verifier _issuing_ the ComplaintCommit
     pub index: u32,
     /// DealerIndex being the index of the Dealer who issued the SecretCommits
@@ -163,11 +154,7 @@ where
     pub signature: Vec<u8>,
 }
 
-impl<SUITE: Suite> ComplaintCommits<SUITE>
-where
-    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
+impl<SUITE: Suite> ComplaintCommits<SUITE> {
     /// Hash returns the hash value of this struct used in the signature process.
     pub fn hash(&self, s: &SUITE) -> Result<Vec<u8>> {
         let mut h = s.hash();
@@ -210,11 +197,7 @@ impl<SUITE: Suite> ReconstructCommits<SUITE> {
 }
 
 /// DistKeyGenerator is the struct that runs the DKG protocol.
-pub struct DistKeyGenerator<SUITE: Suite>
-where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
+pub struct DistKeyGenerator<SUITE: Suite> {
     suite: SUITE,
 
     pub index: u32,
@@ -239,11 +222,7 @@ where
     pub reconstructed: HashMap<u32, bool>,
 }
 
-impl<SUITE: Suite> Default for DistKeyGenerator<SUITE>
-where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
+impl<SUITE: Suite> Default for DistKeyGenerator<SUITE> {
     fn default() -> Self {
         Self {
             suite: Default::default(),
@@ -270,11 +249,7 @@ pub fn new_dist_key_generator<SUITE: Suite>(
     longterm: <SUITE::POINT as Point>::SCALAR,
     participants: &[SUITE::POINT],
     t: usize,
-) -> Result<DistKeyGenerator<SUITE>>
-where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
+) -> Result<DistKeyGenerator<SUITE>> {
     let pubb = suite.point().mul(&longterm, None);
     // find our index
     let mut found = false;
@@ -311,8 +286,8 @@ where
 
 impl<SUITE: Suite> DistKeyGenerator<SUITE>
 where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned + ScalarCanCheckCanonical,
-    SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder,
+    <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
+    SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
 {
     /// Deals returns all the deals that must be broadcasted to all
     /// participants. The deal corresponding to this DKG is already added
@@ -731,7 +706,7 @@ where
     /// of all aggregated individual public commits of each individual secrets.
     /// the share is evaluated from the global Private Polynomial, basically SUM of
     /// fj(i) for a receiver i.
-    pub fn dist_key_share(&self) -> Result<DistKeyShare<SUITE::POINT>> {
+    pub fn dist_key_share(&self) -> Result<DistKeyShare<SUITE>> {
         if !self.certified() {
             bail!("dkg: distributed key not certified")
         }

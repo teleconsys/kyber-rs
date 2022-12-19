@@ -14,7 +14,6 @@ use crate::{
 };
 use lazy_static::lazy_static;
 use rand::Rng;
-use serde::{de::DeserializeOwned, Serialize};
 
 use super::{
     dkg::{new_dist_key_generator, new_dist_key_handler, Config, DistKeyGenerator},
@@ -559,7 +558,7 @@ fn random_bytes(n: usize) -> Vec<u8> {
     return buff;
 }
 
-fn check_dks<POINT: Point>(dks1: &DistKeyShare<POINT>, dks2: &DistKeyShare<POINT>) -> bool {
+fn check_dks<SUITE: Suite>(dks1: &DistKeyShare<SUITE>, dks2: &DistKeyShare<SUITE>) -> bool {
     if dks1.commits.len() != dks2.commits.len() {
         return false;
     }
@@ -575,8 +574,8 @@ fn full_exchange<SUITE: Suite, READ: Read + Clone + 'static>(
     dkgs: &mut Vec<DistKeyGenerator<SUITE, READ>>,
     check_qual: bool,
 ) where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned + ScalarCanCheckCanonical,
-    SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder,
+    <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
+    SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
 {
     // full secret sharing exchange
     // 1. broadcast deals

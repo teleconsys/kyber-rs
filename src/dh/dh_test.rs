@@ -1,7 +1,4 @@
-use hkdf::hmac::Hmac;
-use sha2::Sha256;
-
-use crate::dh::{Dh, DhStandard, AES_NONCE_LENGTH};
+use crate::dh::{Dh, DhStandard, NONCE_SIZE};
 use crate::encoding::BinaryUnmarshaler;
 use crate::group::edwards25519::Point;
 
@@ -20,7 +17,7 @@ fn test_hkdf_sha256() {
         185, 0, 146, 44, 234, 119, 9, 71, 89, 36, 197, 161,
     ];
 
-    let key = DhStandard::hkdf::<Sha256, Hmac<Sha256>>(&pre_shared_key, &hkdf_context).unwrap();
+    let key = DhStandard::hkdf(&pre_shared_key, &hkdf_context, None).unwrap();
 
     assert_eq!(key.to_vec(), known_key);
 }
@@ -33,7 +30,7 @@ fn test_aes_gcm_interop() {
     ];
 
     let data = b"test-data".to_vec();
-    let nonce = [0u8; AES_NONCE_LENGTH];
+    let nonce = [0u8; NONCE_SIZE];
 
     let ciphertext = DhStandard::aes_encrypt(&key, &nonce, &data, None).unwrap();
     let decrypted = DhStandard::aes_decrypt(&key, &nonce, &ciphertext, None).unwrap();
@@ -80,7 +77,7 @@ fn test_aes_gcm_encrypt() {
         175, 73, 104, 204, 142, 217, 190, 127, 58, 180, 87, 124, 161, 208, 18, 78, 75, 45, 136, 55,
         75, 48, 139, 93, 101, 9, 57, 172, 38, 192,
     ];
-    let nonce = [0u8; AES_NONCE_LENGTH];
+    let nonce = [0u8; NONCE_SIZE];
 
     let ciphertext = DhStandard::aes_encrypt(&key, &nonce, &data, Some(&hdfk_context)).unwrap();
 
@@ -125,14 +122,14 @@ fn test_aead_whole() {
         88, 71, 70, 230, 74, 255, 157, 216, 162, 199, 155, 39, 83, 23, 60, 114, 54, 174, 227, 173,
         34, 184, 245, 220, 67, 205, 73, 222, 61, 176, 193, 214,
     ];
-    let nonce = [0u8; AES_NONCE_LENGTH];
+    let nonce = [0u8; NONCE_SIZE];
 
     let mut point = Point::default();
     point.unmarshal_binary(&p).unwrap();
 
-    let encrypted = DhStandard::aead_encrypt(&point, &hdfk_context, &nonce, &deal_buff).unwrap();
+    let encrypted = DhStandard::encrypt(&point, &hdfk_context, &nonce, &deal_buff).unwrap();
     assert_eq!(encrypted, known_encrypted);
 
-    let decrypted = DhStandard::aead_decrypt(&point, &hdfk_context, &nonce, &encrypted).unwrap();
+    let decrypted = DhStandard::decrypt(&point, &hdfk_context, &nonce, &encrypted).unwrap();
     assert_eq!(decrypted, deal_buff);
 }

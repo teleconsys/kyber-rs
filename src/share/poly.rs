@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use std::vec;
 
 use crate::encoding::BinaryMarshaler;
+
 use crate::group::HashFactory;
 use crate::{cipher::Stream, Group, Point, Scalar};
 
@@ -29,7 +30,7 @@ const ERROR_COEFFS: &str = "different number of coefficients";
 
 /// PriShare represents a private share.
 #[derive(Clone, Serialize, Deserialize)]
-pub struct PriShare<SCALAR: Scalar> {
+pub struct PriShare<SCALAR> {
     /// Index of the private share
     pub i: usize,
     /// Value of the private share
@@ -388,10 +389,7 @@ impl<POINT: Point> PubShare<POINT> {
 
 /// PubPoly represents a public commitment polynomial to a secret sharing polynomial.
 #[derive(Clone)]
-pub struct PubPoly<GROUP>
-where
-    GROUP: Group,
-{
+pub struct PubPoly<GROUP: Group> {
     /// Cryptographic group
     g: GROUP,
     /// Base point, nil for standard base

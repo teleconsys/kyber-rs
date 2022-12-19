@@ -1,5 +1,4 @@
 use rand::Rng;
-use serde::{de::DeserializeOwned, Serialize};
 use vss::KEY_SIZE;
 
 use crate::{
@@ -818,11 +817,7 @@ fn gen_commits(n: usize) -> (Vec<EdScalar>, Vec<EdPoint>) {
     (secrets, publics)
 }
 
-fn gen_dealer<SUITE: Suite>(test_data: &TestData<SUITE>) -> Dealer<SUITE>
-where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
+fn gen_dealer<SUITE: Suite>(test_data: &TestData<SUITE>) -> Dealer<SUITE> {
     let test_data = test_data.clone();
     let d = new_dealer(
         test_data.suite,
@@ -835,11 +830,7 @@ where
     d
 }
 
-fn gen_all<SUITE: Suite>(test_data: &TestData<SUITE>) -> (Dealer<SUITE>, Vec<Verifier<SUITE>>)
-where
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
+fn gen_all<SUITE: Suite>(test_data: &TestData<SUITE>) -> (Dealer<SUITE>, Vec<Verifier<SUITE>>) {
     let dealer = gen_dealer(&test_data);
     let mut verifiers = vec![];
     for i in 0..NB_VERIFIERS {

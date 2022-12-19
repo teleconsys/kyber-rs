@@ -244,7 +244,7 @@ impl CompletedGroupElement {
     }
 
     pub fn sub(&mut self, p: &ExtendedGroupElement, q: &CachedGroupElement) {
-    	let mut t0 = FieldElement::default();
+        let mut t0 = FieldElement::default();
 
         fe_add(&mut self.x, &p.y, &p.x);
         fe_sub(&mut self.y, &p.y, &p.x);

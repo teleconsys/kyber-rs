@@ -1,5 +1,5 @@
 // var marshalPointID = [8]byte{'e', 'd', '.', 'p', 'o', 'i', 'n', 't'}
-use anyhow::{Error, Result, bail};
+use anyhow::{bail, Error, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -182,13 +182,13 @@ impl group::Point for Point {
     }
 
     fn data(&self) -> anyhow::Result<Vec<u8>> {
-        let mut b = [0u8;32];
+        let mut b = [0u8; 32];
         self.ge.to_bytes(&mut b);
         let dl = b[0] as usize; // extract length byte
         if dl > self.embed_len() {
             bail!("invalid embedded data length");
         }
-        Ok(b[1..1+dl].to_vec())
+        Ok(b[1..1 + dl].to_vec())
     }
 
     fn add(mut self, p1: &Self, p2: &Self) -> Self {
@@ -210,7 +210,7 @@ impl group::Point for Point {
         r.sub(&p1.ge, &t2);
         r.to_extended(&mut self.ge);
 
-        return self
+        return self;
     }
 
     fn neg(&self, _a: &Self) -> &mut Self {
