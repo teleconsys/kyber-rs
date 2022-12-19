@@ -2,14 +2,14 @@ use aes_gcm::{
     aead::{Aead, Payload},
     Aes256Gcm, KeyInit,
 };
-use anyhow::{bail, Error, Result};
-use digest::{generic_array::GenericArray, OutputSizeUser};
-use hkdf::{hmac::Hmac, Hkdf, HmacImpl};
+use anyhow::{bail, Error, Result, Ok};
+use digest::{generic_array::GenericArray};
+use hkdf::Hkdf;
 use sha2::Sha256;
 
-use crate::{encoding::Marshaling, Point, Suite};
+use crate::{Point, Suite};
 
-pub const AES_NONCE_LENGTH: usize = 12;
+pub(crate) const NONCE_SIZE: usize = 12;
 
 pub trait Dh {
     /// dhExchange computes the shared key from a private key and a public key
@@ -22,13 +22,17 @@ pub trait Dh {
         sk.mul(&own_private, Some(&remote_public))
     }
 
-    fn hkdf<H, I>(buff: &[u8], info: &[u8]) -> Result<[u8; 32]>
-    where
-        H: OutputSizeUser,
-        I: HmacImpl<H>,
+    fn hkdf(buff: &[u8], info: &[u8], output_size: Option<usize>) -> Result<Vec<u8>>
     {
-        let h = Hkdf::<H, I>::new(None, buff);
-        let mut out = [0u8; 32];
+        let size = match output_size {
+            Some(s) => s,
+            None => 32,
+        };
+        let h = Hkdf::<Sha256>::new(None, buff);
+        let mut out = Vec::with_capacity(size);
+        for _ in 0..size {
+            out.push(0u8);
+        }
         h.expand(info, &mut out)
             .map_err(|_| Error::msg("unexpected error in hkdf_sha256"))?;
 
@@ -36,13 +40,16 @@ pub trait Dh {
     }
 
     fn aes_encrypt(
-        key: &[u8; 32],
-        nonce: &[u8; AES_NONCE_LENGTH],
+        key: &[u8],
+        nonce: &[u8; NONCE_SIZE],
         data: &[u8],
         additional_data: Option<&[u8]>,
     ) -> Result<Vec<u8>> {
+        if key.len() != 32 {
+            bail!("Key length should be 32")
+        }
         let key = GenericArray::from_slice(key);
-        let aead = Aes256Gcm::new(key);
+        let aes_gcm = Aes256Gcm::new(key);
         let nonce = GenericArray::from_slice(nonce);
 
         let payload: Payload = match additional_data {
@@ -53,7 +60,7 @@ pub trait Dh {
             },
         };
 
-        let ciphertext = aead
+        let ciphertext = aes_gcm
             .encrypt(nonce, payload)
             .map_err(|_| Error::msg("aes encryption failed"))?;
 
@@ -61,13 +68,16 @@ pub trait Dh {
     }
 
     fn aes_decrypt(
-        key: &[u8; 32],
-        nonce: &[u8; AES_NONCE_LENGTH],
+        key: &[u8],
+        nonce: &[u8; NONCE_SIZE],
         ciphertext: &[u8],
         additional_data: Option<&[u8]>,
     ) -> Result<Vec<u8>> {
+        if key.len() != 32 {
+            bail!("Key length should be 32")
+        }
         let key = GenericArray::from_slice(key);
-        let aead = Aes256Gcm::new(key);
+        let aes_gcm = Aes256Gcm::new(key);
         let nonce = GenericArray::from_slice(nonce);
 
         let payload: Payload = match additional_data {
@@ -78,70 +88,56 @@ pub trait Dh {
             },
         };
 
-        let decrypted = aead
+        let decrypted = aes_gcm
             .decrypt(nonce, payload)
             .map_err(|e| Error::msg(format!("aes decryption failed: {:#?}", e)))?;
 
         Ok(decrypted)
     }
 
-    fn aead_encrypt<POINT: Point>(
+    fn encrypt<POINT: Point>(
         pre_key: &POINT,
         info: &[u8],
-        nonce: &[u8; AES_NONCE_LENGTH],
+        nonce: &[u8; NONCE_SIZE],
         data: &[u8],
     ) -> Result<Vec<u8>> {
         let pre_buff = pre_key.marshal_binary()?;
-        let key = Self::hkdf::<Sha256, Hmac<Sha256>>(&pre_buff, info)?;
+        let key = Self::hkdf(&pre_buff, info, None)?;
         let encrypted = Self::aes_encrypt(&key, nonce, data, Some(info))?;
 
         Ok(encrypted)
     }
 
-    fn aead_decrypt<POINT: Point>(
+    fn decrypt<POINT: Point>(
         pre_key: &POINT,
         info: &[u8],
-        nonce: &[u8; AES_NONCE_LENGTH],
+        nonce: &[u8; NONCE_SIZE],
         cipher: &[u8],
     ) -> Result<Vec<u8>> {
         let pre_buff = pre_key.marshal_binary()?;
-        let key = Self::hkdf::<Sha256, Hmac<Sha256>>(&pre_buff, info)?;
+        let key = Self::hkdf(&pre_buff, info, None)?;
         let decrypted = Self::aes_decrypt(&key, nonce, cipher, Some(info))?;
 
         Ok(decrypted)
     }
-
-    fn derive_key<POINT: Point>(dh: &POINT, len: usize) -> Result<Vec<u8>> {
-        let dhb = dh.marshal_binary()?;
-        let mut out = Vec::with_capacity(len);
-        for _ in 0..len {
-            out.push(0u8);
-        }
-        let hkdf_c = Hkdf::<Sha256>::new(None, &dhb);
-        let res = hkdf_c.expand(&vec![], &mut out);
-        if res.is_err() {
-            bail!("hdfk error");
-        }
-        let k = out.to_vec();
-        if k.len() < len {
-            bail!("ecies: hkdf-derived key too short")
-        }
-        Ok(k)
-    }
+   
 }
 
 pub struct DhStandard {}
 impl Dh for DhStandard {}
 
 pub struct AEAD {
-    key: [u8; 32],
+    key: Vec<u8>,
 }
 
 impl AEAD {
     pub fn new<POINT: Point>(pre: POINT, hkfd_context: &Vec<u8>) -> Result<Self> {
         let pre_buff = pre.marshal_binary()?;
-        let key = DhStandard::hkdf::<Sha256, Hmac<Sha256>>(&pre_buff, &hkfd_context)?;
-        Ok(AEAD { key })
+        let key = DhStandard::hkdf(&pre_buff, &hkfd_context, None)?;
+        if key.len() != 32 {
+            bail!("Key length should be 32")
+        }
+        Ok(AEAD {key})
     }
 
     /// Seal encrypts and authenticates plaintext, authenticates the
@@ -154,11 +150,14 @@ impl AEAD {
     pub fn seal(
         &self,
         dst: Option<&mut [u8]>,
-        nonce: &[u8; AES_NONCE_LENGTH],
+        nonce: &[u8; NONCE_SIZE],
         plaintext: &[u8],
         additional_data: Option<&[u8]>,
     ) -> Result<Vec<u8>> {
         let encrypted = DhStandard::aes_encrypt(&self.key, nonce, plaintext, additional_data)?;
+        if dst.is_some(){
+            dst.unwrap().copy_from_slice(&encrypted);
+        }
         Ok(encrypted)
     }
 
@@ -175,15 +174,19 @@ impl AEAD {
     /// may be overwritten.
     pub fn open(
         &self,
-        dst: Option<&[u8]>,
-        nonce: &[u8; AES_NONCE_LENGTH],
+        dst: Option<&mut [u8]>,
+        nonce: &[u8; NONCE_SIZE],
         ciphertext: &[u8],
         additional_data: Option<&[u8]>,
     ) -> Result<Vec<u8>> {
-        DhStandard::aes_decrypt(&self.key, nonce, ciphertext, additional_data)
+        let decrypted = DhStandard::aes_decrypt(&self.key, nonce, ciphertext, additional_data)?;
+        if dst.is_some(){
+            dst.unwrap().copy_from_slice(&decrypted);
+        }
+        Ok(decrypted)
     }
 
     pub const fn nonce_size() -> usize {
-        AES_NONCE_LENGTH
+        NONCE_SIZE
     }
 }

@@ -3,19 +3,10 @@
 use crate::{
     dh::AEAD,
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling},
-    group::Hasher,
     util::random::Randstream,
     Group, Point, Scalar,
 };
 use anyhow::{bail, Result};
-use blake2::Digest;
-use byteorder::WriteBytesExt;
-use hkdf::Hkdf;
-use sha2::Sha256;
-
-fn std_hash() -> Box<dyn Hasher> {
-    Box::new(Sha256::new())
-}
 
 /// Encrypt first computes a shared DH key using the given public key, then
 /// HKDF-derives a symmetric key (and nonce) from that, and finally uses these
@@ -27,12 +18,7 @@ pub fn encrypt<GROUP: Group>(
     group: GROUP,
     public: GROUP::POINT,
     message: &[u8],
-    hash: Option<fn() -> Box<dyn Hasher>>,
 ) -> Result<Vec<u8>> {
-    let h = match hash {
-        Some(h) => h,
-        None => std_hash,
-    };
 
     // Generate an ephemeral elliptic curve scalar and point
     let r = group.scalar().pick(&mut Randstream::default());
@@ -45,16 +31,11 @@ pub fn encrypt<GROUP: Group>(
     // ephemeral key for every ECIES encryption and thus have a fresh
     // HKDF-derived key for AES-GCM, the nonce for AES-GCM can be an arbitrary
     // (even static) value. We derive it here simply via HKDF as well.)
-    let len = 32 + 12;
-    let buf = GROUP::derive_key(&dh, len)?;
+    let len = 32 + AEAD::nonce_size();
+    let buf = derive_key::<GROUP>(&dh, len)?;
 
-    let key = &buf.clone()[..32];
-    let nonce_p = &buf.clone()[32..len];
-
-    let mut nonce = [0u8; 12];
-    for i in 0..12 {
-        nonce[i] = nonce_p[i].clone();
-    }
+    let mut nonce = [0u8; AEAD::nonce_size()];
+    nonce.copy_from_slice(&buf.clone()[32..len]);
 
     let gcm = AEAD::new(r_caps.clone(), &buf)?;
 
@@ -62,7 +43,7 @@ pub fn encrypt<GROUP: Group>(
     let c = gcm.seal(None, &nonce, message, None)?;
 
     // Serialize ephemeral elliptic curve point and ciphertext
-    let mut ctx = vec![];
+    let mut ctx = Vec::new();
     r_caps.marshal_to(&mut ctx)?;
     for v in c {
         ctx.push(v.clone());
@@ -80,12 +61,7 @@ pub fn decrypt<GROUP: Group>(
     group: GROUP,
     private: <GROUP::POINT as Point>::SCALAR,
     ctx: &[u8],
-    hash: Option<fn() -> Box<dyn Hasher>>,
 ) -> Result<Vec<u8>> {
-    let h = match hash {
-        Some(h) => h,
-        None => std_hash,
-    };
 
     // Reconstruct the ephemeral elliptic curve point
     let mut r_caps = group.point();
@@ -94,17 +70,24 @@ pub fn decrypt<GROUP: Group>(
 
     // Compute shared DH key and derive the symmetric key and nonce via HKDF
     let dh = group.point().mul(&private, Some(&r_caps));
-    let len = 32 + 12;
-    let buf = GROUP::derive_key(&dh, len)?;
-    let key = &buf.clone()[..32];
-    let nonce_p = &buf.clone()[32..len];
+    let len = 32 + AEAD::nonce_size();
+    let buf = derive_key::<GROUP>(&dh, len)?;
 
-    let mut nonce = [0u8; 12];
-    for i in 0..12 {
-        nonce[i] = nonce_p[i].clone();
-    }
+    let mut nonce = [0u8; AEAD::nonce_size()];
+    nonce.copy_from_slice(&buf.clone()[32..len]);
 
     // Decrypt message using AES-GCM
     let gcm = AEAD::new(r_caps.clone(), &buf)?;
     return gcm.open(None, &nonce, &ctx[l..], None);
+}
+
+
+fn derive_key<GROUP: Group>(dh: &GROUP::POINT, len: usize) -> Result<Vec<u8>> {
+    let dhb = dh.marshal_binary()?;
+    let key = GROUP::hkdf(&dhb, &Vec::new(), Some(len))?;
+
+    if key.len() < len {
+        bail!("ecies: hkdf-derived key too short")
+    }
+    Ok(key)
 }
