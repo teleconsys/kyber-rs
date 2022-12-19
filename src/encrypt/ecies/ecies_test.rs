@@ -1,8 +1,4 @@
-use crate::{
-    group::{edwards25519::SuiteEd25519},
-    util::random::Randstream,
-    Group, Point, Scalar,
-};
+use crate::{group::edwards25519::SuiteEd25519, util::random::Randstream, Group, Point, Scalar};
 
 use super::{decrypt, encrypt};
 

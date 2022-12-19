@@ -25,7 +25,7 @@ where
     <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
 {
     dkg: dkg::rabin::DistKeyGenerator<SUITE>,
-    pub_key: SUITE::POINT,
+    _pub_key: SUITE::POINT,
     priv_key: <SUITE::POINT as Point>::SCALAR,
     deals: Vec<dkg::rabin::Deal<SUITE::POINT>>,
     resps: Vec<dkg::rabin::Response>,
@@ -47,7 +47,7 @@ fn test_example_dkg() {
         pub_keys.push(pub_key.clone());
         nodes.push(Node::<SuiteEd25519> {
             dkg: Default::default(),
-            pub_key,
+            _pub_key: pub_key,
             priv_key,
             deals: Vec::new(),
             resps: Vec::new(),

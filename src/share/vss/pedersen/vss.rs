@@ -5,7 +5,7 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    dh::{Dh, AEAD},
+    dh::AEAD,
     encoding::{self, unmarshal_binary, BinaryMarshaler, Marshaling},
     group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
     share::{

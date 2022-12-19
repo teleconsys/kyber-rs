@@ -19,7 +19,6 @@ pub fn encrypt<GROUP: Group>(
     public: GROUP::POINT,
     message: &[u8],
 ) -> Result<Vec<u8>> {
-
     // Generate an ephemeral elliptic curve scalar and point
     let r = group.scalar().pick(&mut Randstream::default());
     let r_caps = group.point().mul(&r, None);
@@ -62,7 +61,6 @@ pub fn decrypt<GROUP: Group>(
     private: <GROUP::POINT as Point>::SCALAR,
     ctx: &[u8],
 ) -> Result<Vec<u8>> {
-
     // Reconstruct the ephemeral elliptic curve point
     let mut r_caps = group.point();
     let l = group.point_len();
@@ -80,7 +78,6 @@ pub fn decrypt<GROUP: Group>(
     let gcm = AEAD::new(r_caps.clone(), &buf)?;
     return gcm.open(None, &nonce, &ctx[l..], None);
 }
-
 
 fn derive_key<GROUP: Group>(dh: &GROUP::POINT, len: usize) -> Result<Vec<u8>> {
     let dhb = dh.marshal_binary()?;

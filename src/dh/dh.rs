@@ -2,8 +2,8 @@ use aes_gcm::{
     aead::{Aead, Payload},
     Aes256Gcm, KeyInit,
 };
-use anyhow::{bail, Error, Result, Ok};
-use digest::{generic_array::GenericArray};
+use anyhow::{bail, Error, Ok, Result};
+use digest::generic_array::GenericArray;
 use hkdf::Hkdf;
 use sha2::Sha256;
 
@@ -22,8 +22,7 @@ pub trait Dh {
         sk.mul(&own_private, Some(&remote_public))
     }
 
-    fn hkdf(buff: &[u8], info: &[u8], output_size: Option<usize>) -> Result<Vec<u8>>
-    {
+    fn hkdf(buff: &[u8], info: &[u8], output_size: Option<usize>) -> Result<Vec<u8>> {
         let size = match output_size {
             Some(s) => s,
             None => 32,
@@ -120,7 +119,6 @@ pub trait Dh {
 
         Ok(decrypted)
     }
-   
 }
 
 pub struct DhStandard {}
@@ -137,7 +135,7 @@ impl AEAD {
         if key.len() != 32 {
             bail!("Key length should be 32")
         }
-        Ok(AEAD {key})
+        Ok(AEAD { key })
     }
 
     /// Seal encrypts and authenticates plaintext, authenticates the
@@ -155,7 +153,7 @@ impl AEAD {
         additional_data: Option<&[u8]>,
     ) -> Result<Vec<u8>> {
         let encrypted = DhStandard::aes_encrypt(&self.key, nonce, plaintext, additional_data)?;
-        if dst.is_some(){
+        if dst.is_some() {
             dst.unwrap().copy_from_slice(&encrypted);
         }
         Ok(encrypted)
@@ -180,7 +178,7 @@ impl AEAD {
         additional_data: Option<&[u8]>,
     ) -> Result<Vec<u8>> {
         let decrypted = DhStandard::aes_decrypt(&self.key, nonce, ciphertext, additional_data)?;
-        if dst.is_some(){
+        if dst.is_some() {
             dst.unwrap().copy_from_slice(&decrypted);
         }
         Ok(decrypted)
