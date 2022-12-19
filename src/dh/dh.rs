@@ -22,12 +22,12 @@ pub trait Dh {
         sk.mul(&own_private, Some(&remote_public))
     }
 
-    fn hkdf(buff: &[u8], info: &[u8], output_size: Option<usize>) -> Result<Vec<u8>> {
+    fn hkdf(ikm: &[u8], info: &[u8], output_size: Option<usize>) -> Result<Vec<u8>> {
         let size = match output_size {
             Some(s) => s,
             None => 32,
         };
-        let h = Hkdf::<Sha256>::new(None, buff);
+        let h = Hkdf::<Sha256>::new(None, ikm);
         let mut out = Vec::with_capacity(size);
         for _ in 0..size {
             out.push(0u8);

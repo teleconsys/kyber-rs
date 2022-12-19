@@ -50,11 +50,10 @@ pub fn sign<SUITE: Suite>(
 /// key public, or an error otherwise. Compared to `Verify`, it performs
 /// additional checks around the canonicality and ensures the public key
 /// does not have a small order when using `edwards25519` group.
-fn verify_with_checks<GROUP>(g: GROUP, pubb: &[u8], msg: &[u8], sig: &[u8]) -> Result<()>
+fn verify_with_checks<GROUP: Group>(g: GROUP, pubb: &[u8], msg: &[u8], sig: &[u8]) -> Result<()>
 where
-    <GROUP::POINT as Point>::SCALAR: Scalar + ScalarCanCheckCanonical,
-    GROUP::POINT: Point + PointCanCheckCanonicalAndSmallOrder,
-    GROUP: Group,
+    <GROUP::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
+    GROUP::POINT: PointCanCheckCanonicalAndSmallOrder,
 {
     let mut r = g.point();
     let mut s = g.scalar();

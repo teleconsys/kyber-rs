@@ -5,9 +5,6 @@ different phases that each node must perform in order to construct the private
 shares that will form the final private key. The example uses 3 nodes and shows
 the "happy" path where each node does its job correctly.
 */
-
-use serde::{de::DeserializeOwned, Serialize};
-
 use crate::{
     examples::enc_test::el_gamal_decrypt,
     group::edwards25519::SuiteEd25519,
@@ -21,11 +18,7 @@ use crate::{
 
 use super::enc_test::el_gamal_encrypt;
 
-struct Node<SUITE: Suite>
-where
-    SUITE::POINT: Serialize + DeserializeOwned,
-    <SUITE::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-{
+struct Node<SUITE: Suite> {
     dkg: dkg::pedersen::DistKeyGenerator<SUITE, &'static [u8]>,
     _pub_key: SUITE::POINT,
     priv_key: <SUITE::POINT as Point>::SCALAR,

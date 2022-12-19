@@ -1,5 +1,4 @@
 use rand::Rng;
-use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     group::edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
@@ -44,11 +43,7 @@ fn new_test_data() -> TestData<SuiteEd25519> {
     };
 }
 
-fn dkg_gen<SUITE: Suite>(t: &TestData<SUITE>) -> Vec<DistKeyGenerator<SUITE>>
-where
-    <SUITE::POINT as Point>::SCALAR: Scalar + Serialize + DeserializeOwned,
-    SUITE::POINT: Serialize + DeserializeOwned,
-{
+fn dkg_gen<SUITE: Suite>(t: &TestData<SUITE>) -> Vec<DistKeyGenerator<SUITE>> {
     let mut dkgs = Vec::with_capacity(t.nb_participants);
     for i in 0..t.nb_participants {
         let dkg = new_dist_key_generator(
@@ -667,7 +662,7 @@ fn random_bytes(n: usize) -> Vec<u8> {
     return buff;
 }
 
-fn check_dks<POINT: Point>(dks1: &DistKeyShare<POINT>, dks2: &DistKeyShare<POINT>) -> bool {
+fn check_dks<SUITE: Suite>(dks1: &DistKeyShare<SUITE>, dks2: &DistKeyShare<SUITE>) -> bool {
     if dks1.commits.len() != dks2.commits.len() {
         return false;
     }

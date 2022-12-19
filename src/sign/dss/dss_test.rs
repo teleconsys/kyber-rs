@@ -1,5 +1,4 @@
 use rand::Rng;
-use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     group::{
@@ -16,7 +15,7 @@ fn suite() -> SuiteEd25519 {
     SuiteEd25519::new_blake_sha256ed25519()
 }
 
-struct TestData<SUITE: Suite, DKS: DistKeyShare<SUITE::POINT>> {
+struct TestData<SUITE: Suite, DKS: DistKeyShare<SUITE>> {
     suite: SUITE,
     nb_participants: usize,
 
@@ -28,7 +27,7 @@ struct TestData<SUITE: Suite, DKS: DistKeyShare<SUITE::POINT>> {
 }
 const NB_PARTICIPANTS: usize = 7;
 
-fn new_test_data() -> TestData<SuiteEd25519, dkg::rabin::DistKeyShare<EdPoint>> {
+fn new_test_data() -> TestData<SuiteEd25519, dkg::rabin::DistKeyShare<SuiteEd25519>> {
     let mut part_pubs = Vec::with_capacity(NB_PARTICIPANTS);
     let mut part_sec = Vec::with_capacity(NB_PARTICIPANTS);
     for _ in 0..NB_PARTICIPANTS {
@@ -39,7 +38,7 @@ fn new_test_data() -> TestData<SuiteEd25519, dkg::rabin::DistKeyShare<EdPoint>> 
     let longterms = gen_dist_secret(&part_sec, &part_pubs, suite());
     let randoms = gen_dist_secret(&part_sec, &part_pubs, suite());
 
-    return TestData::<SuiteEd25519, dkg::rabin::DistKeyShare<EdPoint>> {
+    return TestData::<SuiteEd25519, dkg::rabin::DistKeyShare<SuiteEd25519>> {
         suite: suite(),
         nb_participants: NB_PARTICIPANTS,
         part_pubs,
@@ -156,7 +155,7 @@ fn test_dss_signature() {
     verify(&t.longterms[0].public(), &dss0.msg, &buff).unwrap();
 }
 
-fn get_dss<SUITE: Suite, DKS: DistKeyShare<SUITE::POINT>>(
+fn get_dss<SUITE: Suite, DKS: DistKeyShare<SUITE>>(
     t: &TestData<SUITE, DKS>,
     i: usize,
 ) -> DSS<SUITE, DKS> {
@@ -177,11 +176,10 @@ fn gen_dist_secret<SUITE: crate::share::vss::suite::Suite>(
     part_sec: &[<SUITE::POINT as Point>::SCALAR],
     part_pubs: &[SUITE::POINT],
     suite: SUITE,
-) -> Vec<dkg::rabin::DistKeyShare<SUITE::POINT>>
+) -> Vec<dkg::rabin::DistKeyShare<SUITE>>
 where
-    <SUITE::POINT as Point>::SCALAR:
-        Scalar + Serialize + DeserializeOwned + ScalarCanCheckCanonical,
-    SUITE::POINT: Serialize + DeserializeOwned + PointCanCheckCanonicalAndSmallOrder,
+    <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
+    SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
 {
     let mut dkgs = Vec::with_capacity(NB_PARTICIPANTS);
     for i in 0..NB_PARTICIPANTS {

@@ -4,6 +4,8 @@ mod internal;
 
 use anyhow::Result;
 use digest::DynDigest;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::cipher::cipher::Stream;
 use crate::dh::Dh;
@@ -26,6 +28,8 @@ pub trait Scalar:
     + Add<Self, Output = Self>
     + Mul<Self, Output = Self>
     + Default
+    + Serialize
+    + DeserializeOwned
 {
     //// Set sets the receiver equal to another scalar a.
     fn set(self, a: &Self) -> Self;
@@ -75,7 +79,9 @@ pub trait PointCanCheckCanonicalAndSmallOrder {
 /// this is a number modulo the prime P in a DSA-style Schnorr group,
 /// or an (x, y) point on an elliptic curve.
 /// A Point can contain a Diffie-Hellman public key, an ElGamal ciphertext, etc.
-pub trait Point: Marshaling + Clone + PartialEq + Default + ToString {
+pub trait Point:
+    Marshaling + Clone + PartialEq + Default + ToString + Serialize + DeserializeOwned
+{
     type SCALAR: Scalar;
 
     /// Equality test for two Points derived from the same Group.

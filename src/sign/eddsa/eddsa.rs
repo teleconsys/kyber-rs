@@ -3,7 +3,6 @@
 
 use anyhow::{bail, Result};
 use blake2::Digest;
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 
@@ -16,10 +15,7 @@ use crate::{Group, Point, Scalar};
 /// EdDSA is a structure holding the data necessary to make a series of
 /// EdDSA signatures.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct EdDSA<GROUP: Group>
-where
-    <GROUP::POINT as Point>::SCALAR: Serialize + DeserializeOwned,
-{
+pub struct EdDSA<GROUP: Group> {
     // Secret being already hashed + bit tweaked
     pub secret: <GROUP::POINT as Point>::SCALAR,
     // Public is the corresponding public key
