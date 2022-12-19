@@ -169,7 +169,7 @@ pub trait Group: Dh + Clone + Default {
     fn string(&self) -> String;
 
     // /// Max length of scalars in bytes
-    // fn scalar_len(&self) -> i32;
+    fn scalar_len(&self) -> usize;
 
     /// Create new scalar
     fn scalar(&self) -> <Self::POINT as Point>::SCALAR;

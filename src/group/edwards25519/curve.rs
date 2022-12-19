@@ -33,6 +33,12 @@ impl Group for Curve {
         Scalar::default()
     }
 
+    /// ScalarLen returns 32, the size in bytes of an encoded scalar
+    /// for the Ed25519 curve.
+    fn scalar_len(&self) -> usize {
+        return 32;
+    }
+
     fn point(&self) -> Point {
         Point::default()
     }
@@ -46,12 +52,6 @@ impl Group for Curve {
 impl Curve {
     pub const fn new() -> Self {
         Curve {}
-    }
-
-    /// ScalarLen returns 32, the size in bytes of an encoded scalar
-    /// for the Ed25519 curve.
-    fn scalar_len() -> usize {
-        return 32;
     }
 
     /// NewKeyAndSeedWithInput returns a formatted Ed25519 key (avoid subgroup attack by
