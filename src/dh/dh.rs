@@ -32,26 +32,24 @@ where
 }
 
 pub trait HmacCompatibleCore:
-    HmacFixedOutputCore + HashMarker + UpdateCore + BufferKindUser<BufferKind = Eager> + Default + Clone
+    FixedOutputCore<BlockSize = Self::B>
+    + HashMarker
+    + UpdateCore
+    + BufferKindUser<BufferKind = Eager>
+    + Default
+    + Clone
 {
-}
-
-impl<T> HmacCompatibleCore for T
-where
-    T: HmacFixedOutputCore,
-    T: HashMarker,
-    T: UpdateCore,
-    T: BufferKindUser<BufferKind = Eager>,
-    T: Default,
-    T: Clone,
-{
-}
-
-pub trait HmacFixedOutputCore: FixedOutputCore<BlockSize = Self::B> {
     type B: HmacBlockSize;
 }
 
-impl<T: FixedOutputCore> HmacFixedOutputCore for T
+impl<
+        T: HashMarker
+            + UpdateCore
+            + BufferKindUser<BufferKind = Eager>
+            + Default
+            + Clone
+            + FixedOutputCore,
+    > HmacCompatibleCore for T
 where
     Self::BlockSize: IsLess<U256>,
     Le<Self::BlockSize, U256>: NonZero,
