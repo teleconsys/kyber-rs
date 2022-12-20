@@ -13,6 +13,7 @@ use anyhow::Ok;
 use anyhow::Result;
 use byteorder::LittleEndian;
 use byteorder::WriteBytesExt;
+use digest::Digest;
 use serde::Deserialize;
 use serde::Serialize;
 

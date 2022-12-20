@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use aes_gcm::{
     aead::{Aead, Payload},
     Aes256Gcm, KeyInit,
@@ -12,9 +14,8 @@ use digest::{
     HashMarker, OutputSizeUser,
 };
 use hkdf::Hkdf;
-use sha2::Sha256;
 
-use crate::{Point, Suite};
+use crate::{group::HashFactory, Point, Suite};
 
 pub(crate) const NONCE_SIZE: usize = 12;
 
@@ -178,23 +179,26 @@ pub trait Dh {
     }
 }
 
-pub struct DhStandard {}
-impl Dh for DhStandard {
-    type H = Sha256;
+impl<T: HashFactory> Dh for T {
+    type H = T::T;
 }
 
-pub struct AEAD {
+pub struct AEAD<T: Dh> {
     key: Vec<u8>,
+    phantom: PhantomData<T>,
 }
 
-impl AEAD {
+impl<DH: Dh> AEAD<DH> {
     pub fn new<POINT: Point>(pre: POINT, hkfd_context: &Vec<u8>) -> Result<Self> {
         let pre_buff = pre.marshal_binary()?;
-        let key = DhStandard::hkdf(&pre_buff, &hkfd_context, None)?;
+        let key = DH::hkdf(&pre_buff, &hkfd_context, None)?;
         if key.len() != 32 {
             bail!("Key length should be 32")
         }
-        Ok(AEAD { key })
+        Ok(AEAD {
+            key,
+            phantom: PhantomData,
+        })
     }
 
     /// Seal encrypts and authenticates plaintext, authenticates the
@@ -211,7 +215,7 @@ impl AEAD {
         plaintext: &[u8],
         additional_data: Option<&[u8]>,
     ) -> Result<Vec<u8>> {
-        let encrypted = DhStandard::aes_encrypt(&self.key, nonce, plaintext, additional_data)?;
+        let encrypted = DH::aes_encrypt(&self.key, nonce, plaintext, additional_data)?;
         if dst.is_some() {
             dst.unwrap().copy_from_slice(&encrypted);
         }
@@ -236,7 +240,7 @@ impl AEAD {
         ciphertext: &[u8],
         additional_data: Option<&[u8]>,
     ) -> Result<Vec<u8>> {
-        let decrypted = DhStandard::aes_decrypt(&self.key, nonce, ciphertext, additional_data)?;
+        let decrypted = DH::aes_decrypt(&self.key, nonce, ciphertext, additional_data)?;
         if dst.is_some() {
             dst.unwrap().copy_from_slice(&decrypted);
         }

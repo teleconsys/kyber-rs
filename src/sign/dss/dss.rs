@@ -14,7 +14,7 @@
 // against the longterm distributed key.
 
 use anyhow::{bail, Ok, Result};
-use blake2::Digest;
+use digest::Digest;
 use sha2::Sha512;
 use std::collections::HashMap;
 

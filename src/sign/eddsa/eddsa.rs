@@ -2,7 +2,7 @@
 // RFC8032.
 
 use anyhow::{bail, Result};
-use blake2::Digest;
+use digest::Digest;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 

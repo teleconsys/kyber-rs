@@ -1,6 +1,15 @@
-use crate::dh::{Dh, DhStandard, NONCE_SIZE};
+use sha2::Sha256;
+
+use crate::dh::NONCE_SIZE;
 use crate::encoding::BinaryUnmarshaler;
 use crate::group::edwards25519::Point;
+
+use super::Dh;
+
+struct DhStandard {}
+impl Dh for DhStandard {
+    type H = Sha256;
+}
 
 #[test]
 fn test_hkdf_sha256() {

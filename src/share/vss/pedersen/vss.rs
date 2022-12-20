@@ -1,11 +1,12 @@
 use core::{fmt, ops::Deref};
-use std::{collections::HashMap, ops::DerefMut};
+use std::{collections::HashMap, io::Write, ops::DerefMut};
 
 use byteorder::{LittleEndian, WriteBytesExt};
+use digest::Digest;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    dh::AEAD,
+    dh::{AEAD, NONCE_SIZE},
     encoding::{self, unmarshal_binary, BinaryMarshaler, Marshaling},
     group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
     share::{
@@ -298,9 +299,9 @@ where
 
         // AES128-GCM
         let pre = SUITE::dh_exchange(self.suite, dh_secret, v_pub);
-        let gcm = AEAD::new(pre, &self.hkdf_context)?;
+        let gcm = AEAD::<SUITE>::new(pre, &self.hkdf_context)?;
 
-        let nonce = [0u8; AEAD::nonce_size()];
+        let nonce = [0u8; NONCE_SIZE];
         // let dealBuff = protobuf.Encode(self.deals[i])?;
         let deal_buf = self.deals[i].marshal_binary()?;
         let encrypted = gcm.seal(None, &nonce, &deal_buf, Some(&self.hkdf_context))?;
@@ -536,7 +537,7 @@ where
 
         // compute shared key and AES526-GCM cipher
         let pre = SUITE::dh_exchange(self.suite, self.longterm.clone(), e.dhkey.clone());
-        let gcm = AEAD::new(pre, &self.hkdf_context)?;
+        let gcm = AEAD::<SUITE>::new(pre, &self.hkdf_context)?;
         let decrypted = gcm.open(
             None,
             e.nonce.as_slice().try_into().unwrap(),

@@ -36,6 +36,7 @@
 use std::collections::HashMap;
 
 use byteorder::{LittleEndian, WriteBytesExt};
+use digest::Digest;
 
 use crate::{
     encoding::{BinaryMarshaler, Marshaling},
@@ -266,8 +267,7 @@ pub fn new_dist_key_generator<SUITE: Suite>(
     }
     // generate our dealer / deal
     let own_sec = suite.scalar().pick(&mut suite.random_stream());
-    let dealer =
-        vss::rabin::vss::new_dealer(suite, longterm.clone(), own_sec, participants.clone(), t)?;
+    let dealer = vss::rabin::vss::new_dealer(suite, longterm.clone(), own_sec, participants, t)?;
 
     Ok(DistKeyGenerator {
         dealer: dealer,

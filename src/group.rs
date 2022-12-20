@@ -3,12 +3,12 @@ pub mod integer_field;
 mod internal;
 
 use anyhow::Result;
-use digest::DynDigest;
+use digest::Digest;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::cipher::cipher::Stream;
-use crate::dh::Dh;
+use crate::dh::{Dh, HmacCompatible};
 use crate::encoding::Marshaling;
 use std::fmt::Debug;
 use std::io::Write;
@@ -189,14 +189,17 @@ pub trait Group: Dh + Clone + Default {
 
 /// A HashFactory is an interface that can be mixed in to local suite definitions.
 pub trait HashFactory {
-    fn hash(&self) -> Box<dyn Hasher>;
+    type T: Hasher + HmacCompatible + Default;
+    fn hash(&self) -> Self::T {
+        Default::default()
+    }
 }
 
-pub trait Hasher: DynDigest + Write {}
+pub trait Hasher: Digest + Write {}
 
 impl<T> Hasher for T
 where
-    T: DynDigest,
+    T: Digest,
     T: Write,
 {
 }

@@ -7,8 +7,8 @@ use crate::cipher::Stream;
 use crate::dh::Dh;
 use crate::group::edwards25519::curve::Curve;
 use crate::group::edwards25519::scalar::Scalar;
+use crate::group::Group;
 use crate::group::HashFactory;
-use crate::group::{Group, Hasher};
 use crate::sign::dss;
 use crate::util::key::Generator;
 use crate::util::key::Suite as KeySuite;
@@ -137,14 +137,9 @@ impl XOFFactory for SuiteEd25519 {
 }
 
 impl HashFactory for SuiteEd25519 {
-    fn hash(&self) -> Box<dyn Hasher> {
-        Box::new(Sha256::new())
-    }
+    type T = Sha256;
 }
 
-impl Dh for SuiteEd25519 {
-    type H = Sha256;
-}
 impl Suite for SuiteEd25519 {}
 impl dss::Suite for SuiteEd25519 {}
 impl KeySuite for SuiteEd25519 {}

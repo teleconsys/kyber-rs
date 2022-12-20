@@ -1,7 +1,8 @@
+use digest::DynDigest;
 use rand::Rng;
 
 use crate::{
-    dh::{Dh, DhStandard},
+    dh::Dh,
     encoding::BinaryMarshaler,
     group::{
         edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
@@ -764,7 +765,7 @@ fn test_vss_dhexchange() {
         .suite
         .scalar()
         .pick(&mut test_data.suite.random_stream());
-    let point = DhStandard::dh_exchange(test_data.suite, privv.clone(), pubb.clone());
+    let point = SuiteEd25519::dh_exchange(test_data.suite, privv.clone(), pubb.clone());
     assert_eq!(pubb.mul(&privv, None).string(), point.string());
 }
 

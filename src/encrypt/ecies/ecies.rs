@@ -1,7 +1,7 @@
 /// Package ecies implements the Elliptic Curve Integrated Encryption Scheme (ECIES).
 // package ecies
 use crate::{
-    dh::AEAD,
+    dh::{AEAD, NONCE_SIZE},
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling},
     util::random::Randstream,
     Group, Point, Scalar,
@@ -30,13 +30,13 @@ pub fn encrypt<GROUP: Group>(
     // ephemeral key for every ECIES encryption and thus have a fresh
     // HKDF-derived key for AES-GCM, the nonce for AES-GCM can be an arbitrary
     // (even static) value. We derive it here simply via HKDF as well.)
-    let len = 32 + AEAD::nonce_size();
+    let len = 32 + NONCE_SIZE;
     let buf = derive_key::<GROUP>(&dh, len)?;
 
-    let mut nonce = [0u8; AEAD::nonce_size()];
+    let mut nonce = [0u8; NONCE_SIZE];
     nonce.copy_from_slice(&buf.clone()[32..len]);
 
-    let gcm = AEAD::new(r_caps.clone(), &buf)?;
+    let gcm = AEAD::<GROUP>::new(r_caps.clone(), &buf)?;
 
     // Encrypt message using AES-GCM
     let c = gcm.seal(None, &nonce, message, None)?;
@@ -68,14 +68,14 @@ pub fn decrypt<GROUP: Group>(
 
     // Compute shared DH key and derive the symmetric key and nonce via HKDF
     let dh = group.point().mul(&private, Some(&r_caps));
-    let len = 32 + AEAD::nonce_size();
+    let len = 32 + NONCE_SIZE;
     let buf = derive_key::<GROUP>(&dh, len)?;
 
-    let mut nonce = [0u8; AEAD::nonce_size()];
+    let mut nonce = [0u8; NONCE_SIZE];
     nonce.copy_from_slice(&buf.clone()[32..len]);
 
     // Decrypt message using AES-GCM
-    let gcm = AEAD::new(r_caps.clone(), &buf)?;
+    let gcm = AEAD::<GROUP>::new(r_caps.clone(), &buf)?;
     return gcm.open(None, &nonce, &ctx[l..], None);
 }
 
