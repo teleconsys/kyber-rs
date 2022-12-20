@@ -89,16 +89,9 @@ trait HmacBlockSizeUser: BlockSizeUser<BlockSize = Self::B> + HmacBlockSizeWrapp
 
 impl<T: HmacBlockSizeWrapper + BlockSizeUser<BlockSize = Self::B>> HmacBlockSizeUser for T {}
 
-pub trait HCWrapper {
-    type H: HmacCompatible;
-}
-
-impl<T: HmacCompatible> HCWrapper for T {
-    type H = T;
-}
-
 pub trait Dh {
-    type H: HCWrapper;
+    type H: HmacCompatible;
+
     /// dhExchange computes the shared key from a private key and a public key
     fn dh_exchange<SUITE: Suite>(
         suite: SUITE,
@@ -114,7 +107,7 @@ pub trait Dh {
             Some(s) => s,
             None => 32,
         };
-        let h = Hkdf::<<Self::H as HCWrapper>::H>::new(None, ikm);
+        let h = Hkdf::<Self::H>::new(None, ikm);
         let mut out = Vec::with_capacity(size);
         for _ in 0..size {
             out.push(0u8);
