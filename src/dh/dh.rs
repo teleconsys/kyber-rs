@@ -34,12 +34,10 @@ where
 pub trait HmacCompatibleCore:
     HmacFixedOutputCore + HashMarker + UpdateCore + BufferKindUser<BufferKind = Eager> + Default + Clone
 {
-    type B: HmacBlockSizeWrapper;
 }
 
 impl<T> HmacCompatibleCore for T
 where
-    T: HmacBlockSizeWrapper,
     T: HmacFixedOutputCore,
     T: HashMarker,
     T: UpdateCore,
@@ -47,14 +45,13 @@ where
     T: Default,
     T: Clone,
 {
-    type B = Self;
 }
 
 pub trait HmacFixedOutputCore: FixedOutputCore<BlockSize = Self::B> {
     type B: HmacBlockSize;
 }
 
-impl<T: FixedOutputCore + HmacBlockSizeWrapper> HmacFixedOutputCore for T
+impl<T: FixedOutputCore> HmacFixedOutputCore for T
 where
     Self::BlockSize: IsLess<U256>,
     Le<Self::BlockSize, U256>: NonZero,
@@ -73,21 +70,13 @@ where
     type O = Self::Output;
 }
 
-pub trait HmacBlockSizeWrapper {
-    type B: HmacBlockSize;
+trait HmacBlockSizeUser: BlockSizeUser<BlockSize = Self::B> {
+    type B;
 }
 
-impl<T: BlockSizeUser> HmacBlockSizeWrapper for T
-where
-    T::BlockSize: IsLess<U256>,
-    Le<T::BlockSize, U256>: NonZero,
-{
+impl<T: BlockSizeUser> HmacBlockSizeUser for T {
     type B = T::BlockSize;
 }
-
-trait HmacBlockSizeUser: BlockSizeUser<BlockSize = Self::B> + HmacBlockSizeWrapper {}
-
-impl<T: HmacBlockSizeWrapper + BlockSizeUser<BlockSize = Self::B>> HmacBlockSizeUser for T {}
 
 pub trait Dh {
     type H: HmacCompatible;
