@@ -142,7 +142,9 @@ impl HashFactory for SuiteEd25519 {
     }
 }
 
-impl Dh for SuiteEd25519 {}
+impl Dh for SuiteEd25519 {
+    type H = Sha256;
+}
 impl Suite for SuiteEd25519 {}
 impl dss::Suite for SuiteEd25519 {}
 impl KeySuite for SuiteEd25519 {}

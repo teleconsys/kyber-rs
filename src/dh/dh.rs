@@ -1,17 +1,104 @@
 use aes_gcm::{
     aead::{Aead, Payload},
+    aes::Block,
     Aes256Gcm, KeyInit,
 };
 use anyhow::{bail, Error, Ok, Result};
-use digest::generic_array::GenericArray;
+use crypto::cipher::BlockSizeUser;
+use digest::{
+    block_buffer::Eager,
+    consts::{B0, B1, U256, U3},
+    core_api::{BufferKindUser, CoreProxy, FixedOutputCore, UpdateCore},
+    generic_array::{ArrayLength, GenericArray},
+    typenum::{Cmp, IsLess, Le, NonZero, UInt, UTerm},
+    HashMarker, OutputSizeUser,
+};
 use hkdf::Hkdf;
-use sha2::Sha256;
+use sha2::{Sha256, Sha256VarCore};
 
 use crate::{Point, Suite};
 
 pub(crate) const NONCE_SIZE: usize = 12;
 
+pub trait HmacCompatible: OutputSizeUser + CoreProxy<Core = Self::C> {
+    type C: HmacCompatibleCore;
+}
+
+impl<T: CoreProxy + OutputSizeUser> HmacCompatible for T
+where
+    <T as CoreProxy>::Core: HmacCompatibleCore,
+{
+    type C = T::Core;
+}
+
+pub trait HmacCompatibleCore:
+    HmacFixedOutputCore + HashMarker + UpdateCore + BufferKindUser<BufferKind = Eager> + Default + Clone
+{
+    type B: HmacBlockSizeWrapper;
+}
+
+impl<T> HmacCompatibleCore for T
+where
+    T: HmacBlockSizeWrapper,
+    T: HmacFixedOutputCore,
+    T: HashMarker,
+    T: UpdateCore,
+    T: BufferKindUser<BufferKind = Eager>,
+    T: Default,
+    T: Clone,
+{
+    type B = Self;
+}
+
+pub trait HmacFixedOutputCore: FixedOutputCore<BlockSize = Self::B> {
+    type B: HmacBlockSize;
+}
+
+impl<T: FixedOutputCore + HmacBlockSizeWrapper> HmacFixedOutputCore for T
+where
+    Self::BlockSize: IsLess<U256>,
+    Le<Self::BlockSize, U256>: NonZero,
+{
+    type B = Self::BlockSize;
+}
+
+pub trait HmacBlockSize: IsLess<U256, Output = Self::O> {
+    type O: NonZero;
+}
+
+impl<T: IsLess<U256>> HmacBlockSize for T
+where
+    Self::Output: NonZero,
+{
+    type O = Self::Output;
+}
+
+pub trait HmacBlockSizeWrapper {
+    type B: HmacBlockSize;
+}
+
+impl<T: BlockSizeUser> HmacBlockSizeWrapper for T
+where
+    T::BlockSize: IsLess<U256>,
+    Le<T::BlockSize, U256>: NonZero,
+{
+    type B = T::BlockSize;
+}
+
+trait HmacBlockSizeUser: BlockSizeUser<BlockSize = Self::B> + HmacBlockSizeWrapper {}
+
+impl<T: HmacBlockSizeWrapper + BlockSizeUser<BlockSize = Self::B>> HmacBlockSizeUser for T {}
+
+pub trait HCWrapper {
+    type H: HmacCompatible;
+}
+
+impl<T: HmacCompatible> HCWrapper for T {
+    type H = T;
+}
+
 pub trait Dh {
+    type H: HCWrapper;
     /// dhExchange computes the shared key from a private key and a public key
     fn dh_exchange<SUITE: Suite>(
         suite: SUITE,
@@ -27,7 +114,7 @@ pub trait Dh {
             Some(s) => s,
             None => 32,
         };
-        let h = Hkdf::<Sha256>::new(None, ikm);
+        let h = Hkdf::<<Self::H as HCWrapper>::H>::new(None, ikm);
         let mut out = Vec::with_capacity(size);
         for _ in 0..size {
             out.push(0u8);
@@ -122,7 +209,9 @@ pub trait Dh {
 }
 
 pub struct DhStandard {}
-impl Dh for DhStandard {}
+impl Dh for DhStandard {
+    type H = Sha256;
+}
 
 pub struct AEAD {
     key: Vec<u8>,

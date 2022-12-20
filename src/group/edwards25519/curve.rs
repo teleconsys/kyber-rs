@@ -6,6 +6,7 @@ use crate::util::key::Generator;
 use crate::util::random;
 use anyhow::Result;
 
+use sha2::Sha256;
 use sha2::{Digest, Sha512};
 
 /// Curve represents the Ed25519 group.
@@ -14,7 +15,9 @@ use sha2::{Digest, Sha512};
 #[derive(Clone, Copy, Debug)]
 pub struct Curve {}
 
-impl Dh for Curve {}
+impl Dh for Curve {
+    type H = Sha256;
+}
 
 impl Group for Curve {
     type POINT = Point;
