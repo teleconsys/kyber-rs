@@ -1,20 +1,18 @@
 use aes_gcm::{
     aead::{Aead, Payload},
-    aes::Block,
     Aes256Gcm, KeyInit,
 };
 use anyhow::{bail, Error, Ok, Result};
-use crypto::cipher::BlockSizeUser;
 use digest::{
     block_buffer::Eager,
-    consts::{B0, B1, U256, U3},
+    consts::U256,
     core_api::{BufferKindUser, CoreProxy, FixedOutputCore, UpdateCore},
-    generic_array::{ArrayLength, GenericArray},
-    typenum::{Cmp, IsLess, Le, NonZero, UInt, UTerm},
+    generic_array::GenericArray,
+    typenum::{IsLess, Le, NonZero},
     HashMarker, OutputSizeUser,
 };
 use hkdf::Hkdf;
-use sha2::{Sha256, Sha256VarCore};
+use sha2::Sha256;
 
 use crate::{Point, Suite};
 
@@ -66,14 +64,6 @@ where
     Self::Output: NonZero,
 {
     type O = Self::Output;
-}
-
-trait HmacBlockSizeUser: BlockSizeUser<BlockSize = Self::B> {
-    type B;
-}
-
-impl<T: BlockSizeUser> HmacBlockSizeUser for T {
-    type B = T::BlockSize;
 }
 
 pub trait Dh {
