@@ -10,10 +10,18 @@ use crate::{
     group::edwards25519::SuiteEd25519,
     share::{
         self,
-        dkg::{self, new_dist_key_handler, Config},
+        dkg::{
+            self,
+            pedersen::{
+                new_dist_key_handler,
+                structs::{Deal, Response},
+                Config,
+            },
+        },
+        vss::suite::Suite,
     },
     sign::dss::DistKeyShare,
-    Group, Point, Random, Scalar, Suite,
+    Group, Point, Random, Scalar,
 };
 
 use super::enc_test::el_gamal_encrypt;
@@ -22,8 +30,8 @@ struct Node<SUITE: Suite> {
     dkg: dkg::pedersen::DistKeyGenerator<SUITE, &'static [u8]>,
     _pub_key: SUITE::POINT,
     priv_key: <SUITE::POINT as Point>::SCALAR,
-    deals: Vec<dkg::pedersen::Deal<SUITE::POINT>>,
-    resps: Vec<dkg::pedersen::Response>,
+    deals: Vec<Deal<SUITE::POINT>>,
+    resps: Vec<Response>,
     secret_share: share::poly::PriShare<<SUITE::POINT as Point>::SCALAR>,
     distributed_public_key: SUITE::POINT,
 }

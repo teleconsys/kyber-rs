@@ -9,11 +9,12 @@ use crate::group::edwards25519::curve::Curve;
 use crate::group::edwards25519::scalar::Scalar;
 use crate::group::Group;
 use crate::group::HashFactory;
+use crate::share::vss::suite::Suite;
 use crate::sign::dss;
 use crate::util::key::Generator;
 use crate::util::key::Suite as KeySuite;
 use crate::util::random;
-use crate::{xof, Random, Suite, XOFFactory};
+use crate::{xof, Random, XOFFactory};
 
 use super::Point;
 

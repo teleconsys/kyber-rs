@@ -5,9 +5,12 @@ use crate::{
     dh::Dh,
     encoding::BinaryMarshaler,
     group::edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
-    share::vss::rabin::vss::{self, find_pub, new_verifier, recover_secret, session_id, Response},
+    share::vss::{
+        rabin::vss::{self, find_pub, new_verifier, recover_secret, session_id, Response},
+        suite::Suite,
+    },
     sign::schnorr,
-    Group, Point, Random, Scalar, Suite,
+    Group, Point, Random, Scalar,
 };
 
 use super::vss::{minimum_t, new_dealer, Dealer, Verifier};

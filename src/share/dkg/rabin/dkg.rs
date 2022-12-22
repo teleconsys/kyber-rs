@@ -246,8 +246,8 @@ impl<SUITE: Suite> Default for DistKeyGenerator<SUITE> {
 /// threshold t parameter. It returns an error if the secret key's
 /// commitment can't be found in the list of participants.
 pub fn new_dist_key_generator<SUITE: Suite>(
-    suite: SUITE,
-    longterm: <SUITE::POINT as Point>::SCALAR,
+    suite: &SUITE,
+    longterm: &<SUITE::POINT as Point>::SCALAR,
     participants: &[SUITE::POINT],
     t: usize,
 ) -> Result<DistKeyGenerator<SUITE>> {
@@ -267,20 +267,21 @@ pub fn new_dist_key_generator<SUITE: Suite>(
     }
     // generate our dealer / deal
     let own_sec = suite.scalar().pick(&mut suite.random_stream());
-    let dealer = vss::rabin::vss::new_dealer(suite, longterm.clone(), own_sec, participants, t)?;
+    let dealer =
+        vss::rabin::vss::new_dealer(suite.clone(), longterm.clone(), own_sec, participants, t)?;
 
     Ok(DistKeyGenerator {
-        dealer: dealer,
+        dealer,
         verifiers: HashMap::new(),
         commitments: HashMap::new(),
         pending_reconstruct: HashMap::new(),
         reconstructed: HashMap::new(),
-        t: t,
-        suite: suite,
-        long: longterm,
-        pubb: pubb,
+        t,
+        suite: suite.clone(),
+        long: longterm.clone(),
+        pubb,
         participants: participants.to_vec(),
-        index: index,
+        index,
     })
 }
 

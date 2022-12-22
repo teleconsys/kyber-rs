@@ -301,7 +301,7 @@ impl PointCanCheckCanonicalAndSmallOrder for Point {
 
         // subtraction might underflow
         c = (((c as u16) - 1) >> 8) as u8;
-        let d = ((0xed - 1 - (b[0] as u16)) >> 8) as u8;
+        let d = ((0xEDu16.wrapping_sub(1u16.wrapping_sub(b[0] as u16))) >> 8) as u8;
 
         1 - (c & d & 1) == 1
     }

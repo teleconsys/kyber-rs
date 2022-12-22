@@ -9,8 +9,11 @@ use crate::{
         edwards25519::{Point as EdPoint, Scalar as EdScalar},
         PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical,
     },
-    share::{self, vss},
-    Group, Point, Random, Scalar, Suite,
+    share::{
+        self,
+        vss::{self, suite::Suite},
+    },
+    Group, Point, Random, Scalar,
 };
 use lazy_static::lazy_static;
 use rand::Rng;

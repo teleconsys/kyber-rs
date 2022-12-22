@@ -11,9 +11,10 @@ use crate::{
     share::vss::{
         pedersen::vss::{self, recover_secret, Response, STATUS_APPROVAL, STATUS_COMPLAINT},
         pedersen::vss::{find_pub, session_id},
+        suite::Suite,
     },
     sign::schnorr,
-    Group, Point, Random, Scalar, Suite,
+    Group, Point, Random, Scalar,
 };
 
 use super::vss::{minimum_t, new_dealer, new_verifier, Dealer, Verifier};

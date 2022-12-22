@@ -3,7 +3,7 @@ use rand::Rng;
 use crate::{
     group::edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
     share::{
-        dkg::rabin::{DistKeyShare, ReconstructCommits, SecretCommits},
+        dkg::rabin::{new_dist_key_generator, DistKeyShare, ReconstructCommits, SecretCommits},
         poly::recover_secret,
         vss::{self, suite::Suite},
     },
@@ -11,7 +11,7 @@ use crate::{
     Group, Point, Random, Scalar,
 };
 
-use super::{new_dist_key_generator, DistKeyGenerator};
+use super::DistKeyGenerator;
 
 fn suite() -> SuiteEd25519 {
     SuiteEd25519::new_blake_sha256ed25519()
@@ -47,8 +47,8 @@ fn dkg_gen<SUITE: Suite>(t: &TestData<SUITE>) -> Vec<DistKeyGenerator<SUITE>> {
     let mut dkgs = Vec::with_capacity(t.nb_participants);
     for i in 0..t.nb_participants {
         let dkg = new_dist_key_generator(
-            t.suite,
-            t.part_sec[i].clone(),
+            &t.suite,
+            &t.part_sec[i],
             &t.part_pubs,
             t.nb_participants / 2 + 1,
         )
@@ -63,12 +63,12 @@ fn test_dkg_new_dist_key_generator() {
     let t = new_test_data();
     let long = t.part_sec[0].clone();
     let mut dkg =
-        new_dist_key_generator(t.suite, long, &t.part_pubs, t.nb_participants / 2 + 1).unwrap();
+        new_dist_key_generator(&t.suite, &long, &t.part_pubs, t.nb_participants / 2 + 1).unwrap();
     // quick testing here; easier.
     dkg.secret_commits().unwrap_err();
 
     let sec = gen_pair();
-    let res = new_dist_key_generator(t.suite, sec.0, &t.part_pubs, t.nb_participants / 2 + 1);
+    let res = new_dist_key_generator(&t.suite, &sec.0, &t.part_pubs, t.nb_participants / 2 + 1);
     if res.is_ok() {
         panic!("this should fail")
     }

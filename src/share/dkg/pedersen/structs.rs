@@ -5,10 +5,10 @@ use crate::{
     encoding::{self, BinaryMarshaler},
     share::{
         poly::PriShare,
-        vss::{self, pedersen},
+        vss::{self, pedersen, suite::Suite},
     },
     sign::dss,
-    Point, Suite,
+    Point,
 };
 
 /// DistKeyShare holds the share of a distributed key for a participant.

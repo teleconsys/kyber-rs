@@ -447,7 +447,7 @@ impl Default for CachedGroupElement {
 /// equal returns 1 if b == c and 0 otherwise.
 fn equal(b: i32, c: i32) -> i32 {
     let mut x = (b ^ c) as u32;
-    x -= 1;
+    x = x.wrapping_sub(1);
     return (x >> 31) as i32;
 }
 

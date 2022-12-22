@@ -5,10 +5,13 @@ use rand::{rngs::StdRng, RngCore, SeedableRng};
 use crate::{
     encoding::BinaryMarshaler,
     group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
-    share::{self, vss},
+    share::{
+        self,
+        vss::{self, suite::Suite},
+    },
     sign::schnorr,
     util::random::Randstream,
-    Point, Scalar, Suite,
+    Point, Scalar,
 };
 
 use super::structs::{Deal, DistKeyShare, Justification, Response};
