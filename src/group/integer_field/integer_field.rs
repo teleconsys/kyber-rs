@@ -89,7 +89,11 @@ impl Int {
         self.m = m.clone();
         self.bo = BigEndian;
         self.v = BigInt::from(v);
-        self.v = self.v % m;
+        match self.v.sign() {
+            num_bigint::Sign::Minus => self.v = (self.v % m.clone()) + m,
+            num_bigint::Sign::Plus => self.v = self.v % m,
+            num_bigint::Sign::NoSign => (),
+        }
         self
     }
 

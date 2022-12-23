@@ -87,12 +87,12 @@ pub struct ExtendedGroupElement {
 }
 
 impl ExtendedGroupElement {
-    // func (p *extendedGroupElement) Neg(s *extendedGroupElement) {
-    // 	feNeg(&p.X, &s.X)
-    // 	feCopy(&p.Y, &s.Y)
-    // 	feCopy(&p.Z, &s.Z)
-    // 	feNeg(&p.T, &s.T)
-    // }
+    pub fn neg(&mut self, s: &Self) {
+        fe_neg(&mut self.x, &s.x);
+        fe_copy(&mut self.y, &s.y);
+        fe_copy(&mut self.z, &s.z);
+        fe_neg(&mut self.t, &s.t);
+    }
 
     fn double(&mut self, r: &mut CompletedGroupElement) {
         let mut q = ProjectiveGroupElement::default();

@@ -1,30 +1,27 @@
 // package edwards25519
 
-// import (
-// 	"math"
-// 	"testing"
-
-// 	"github.com/stretchr/testify/assert"
-// 	"go.dedis.ch/kyber/v3/util/test"
-// )
-
 // var tSuite = NewBlakeSHA256Ed25519()
 // var groupBench = test.NewGroupBench(tSuite)
 
-// func TestSuite(t *testing.T) { test.SuiteTest(t, tSuite) }
+use crate::{
+    util::test::{self, new_group_bench, GroupBench},
+    Random,
+};
 
-// // Test that NewKey generates correct secret keys
-// func TestCurve_NewKey(t *testing.T) {
-// 	group := Curve{}
-// 	stream := tSuite.RandomStream()
+use super::{Curve, SuiteEd25519};
 
-// 	for i := 0.0; i < math.Pow(10, 6); i++ {
-// 		s := group.NewKey(stream).(*scalar)
+fn test_group() -> GroupBench<SuiteEd25519> {
+    let t_suite = SuiteEd25519::new_blake_sha256ed25519();
+    new_group_bench(t_suite)
+}
 
-// 		// little-endian check of a multiple of 8
-// 		assert.Equal(t, uint8(0), s.v[0]&7)
-// 	}
-// }
+impl test::Suite for SuiteEd25519 {}
+
+#[test]
+fn test_suite() {
+    test::group_test(Curve::new()).unwrap()
+    //test::suite_test(SuiteEd25519::new_blake_sha256ed25519())
+}
 
 // func BenchmarkScalarAdd(b *testing.B)    { groupBench.ScalarAdd(b.N) }
 // func BenchmarkScalarSub(b *testing.B)    { groupBench.ScalarSub(b.N) }

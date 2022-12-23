@@ -50,6 +50,10 @@ impl Group for Curve {
     fn point_len(&self) -> usize {
         return 32;
     }
+
+    fn is_prime_order(&self) -> Option<bool> {
+        None
+    }
 }
 
 impl Curve {
@@ -95,7 +99,7 @@ impl Generator for Curve {
 
     /// NewKey returns a formatted Ed25519 key (avoiding subgroup attack by requiring
     /// it to be a multiple of 8). NewKey implements the kyber/util/key.Generator interface.
-    fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> Result<Scalar> {
+    fn new_key<S: crate::cipher::Stream>(&self, stream: &mut S) -> Result<Scalar> {
         let (secret, _, _) = self.new_key_and_seed(stream)?;
         Ok(secret)
     }

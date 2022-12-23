@@ -108,8 +108,9 @@ impl group::Point for Point {
         self.embed(None, rand)
     }
 
-    fn set(&mut self, _p: Self) -> &mut Self {
-        todo!()
+    fn set(&mut self, p: Self) -> Self {
+        self.ge = p.ge.clone();
+        return self.clone();
     }
 
     fn embed_len(&self) -> usize {
@@ -213,8 +214,9 @@ impl group::Point for Point {
         return self;
     }
 
-    fn neg(&self, _a: &Self) -> &mut Self {
-        todo!()
+    fn neg(&mut self, a: &Self) -> Self {
+        self.ge.neg(&a.ge);
+        return self.clone();
     }
 
     /// Mul multiplies point p by scalar s using the repeated doubling method.

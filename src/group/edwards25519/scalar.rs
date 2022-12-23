@@ -3,7 +3,7 @@ use crate::group::internal::marshalling;
 use crate::group::{self, integer_field, ScalarCanCheckCanonical};
 use crate::util::random;
 use anyhow::bail;
-use num_bigint::BigInt;
+use num_bigint::{BigInt, Sign};
 use serde::{Deserialize, Serialize};
 
 use crate::cipher::cipher::Stream;
@@ -45,7 +45,10 @@ impl Scalar {
         return hex::encode(b);
     }
 
-    fn set_int(mut self, i: &Int) -> Self {
+    fn set_int(mut self, i: &mut Int) -> Self {
+        if i.v.sign() == Sign::Minus {
+            i.v = core::u64::MAX - i.v.clone() + 1;
+        }
         let b = i.little_endian(32, 32);
         self.v.as_mut_slice()[0..b.len()].copy_from_slice(b.as_ref());
         self
@@ -146,7 +149,7 @@ impl group::Scalar for Scalar {
 
     /// set_int64 sets the scalar to a small integer value.
     fn set_int64(self, v: i64) -> Self {
-        self.set_int(&Int::new_int64(v, constants::PRIME_ORDER.clone()))
+        self.set_int(&mut Int::new_int64(v, constants::PRIME_ORDER.clone()))
     }
 
     fn zero(mut self) -> Self {
@@ -161,15 +164,15 @@ impl group::Scalar for Scalar {
     }
 
     fn pick(self, rand: &mut impl Stream) -> Self {
-        let i = integer_field::integer_field::Int::new_int(
+        let mut i = integer_field::integer_field::Int::new_int(
             random::random_int(&PRIME_ORDER, rand),
             PRIME_ORDER.clone(),
         );
-        self.set_int(&i)
+        self.set_int(&mut i)
     }
 
     fn set_bytes(self, bytes: &[u8]) -> Self {
-        self.set_int(&Int::new_int_bytes(bytes, &PRIME_ORDER, LittleEndian))
+        self.set_int(&mut Int::new_int_bytes(bytes, &PRIME_ORDER, LittleEndian))
     }
 
     fn one(mut self) -> Self {
@@ -2022,5 +2025,5 @@ fn sc_mul(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32]) {
 
 pub(crate) fn new_scalar_int(i: BigInt) -> Scalar {
     let s = Scalar::default();
-    s.set_int(&Int::new_int(i, FULL_ORDER.clone()))
+    s.set_int(&mut Int::new_int(i, FULL_ORDER.clone()))
 }
