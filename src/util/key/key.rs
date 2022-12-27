@@ -10,10 +10,12 @@ use crate::{Group, Point, Random, Scalar};
 use anyhow::Result;
 
 /// Generator is a type that needs to implement a special case in order
-/// to correctly choose a key.
+/// to correctly choose a key. It should always be implemented for a suite
+/// if you want to use the 'key' utils, but if no generator should be provided
+/// the 'new_key' function shall return 'None'
 pub trait Generator {
     type SCALAR: Scalar;
-    fn new_key<S: crate::cipher::Stream>(&self, stream: &mut S) -> Result<Self::SCALAR>;
+    fn new_key<S: crate::cipher::Stream>(&self, stream: &mut S) -> Result<Option<Self::SCALAR>>;
 }
 
 /// Suite defines the capabilities required by this package.
@@ -21,6 +23,7 @@ pub trait Suite: Group + Random {}
 
 /// Pair represents a public/private keypair together with the
 /// ciphersuite the key was generated from.
+#[derive(Debug)]
 pub struct Pair<POINT: Point> {
     pub public: POINT,          // Public key
     pub private: POINT::SCALAR, // Private key
@@ -41,22 +44,19 @@ impl<POINT: Point> Pair<POINT> {
     /// suite implements key.Generator, then suite.NewKey is called
     /// to generate the private key, otherwise the normal technique
     /// of choosing a random scalar from the group is used.
-    fn gen<SUITE: Suite<POINT = POINT> + Generator<SCALAR = POINT::SCALAR>>(
+    pub(crate) fn gen<
+        SUITE: Suite<POINT = POINT> + Generator<SCALAR = <POINT as Point>::SCALAR>,
+    >(
         &mut self,
         suite: &SUITE,
     ) -> Result<()> {
         let mut random = suite.random_stream();
-        self.private = suite.new_key(&mut random)?;
+        self.private = match suite.new_key(&mut random)? {
+            Some(key) => key,
+            None => suite.scalar().pick(&mut random),
+        };
         self.public = suite.point().mul(&self.private, None);
         Ok(())
-
-        // SHOULD IMPLEMENT THIS (non Generator cases must be adressed)
-        // if g, ok := suite.(Generator); ok {
-        // 	p.Private = g.NewKey(random)
-        // } else {
-        // 	p.Private = suite.Scalar().Pick(random)
-        // }
-        // p.Public = suite.Point().Mul(p.Private, nil)
     }
 }
 

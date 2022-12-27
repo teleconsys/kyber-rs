@@ -1,15 +1,23 @@
 use anyhow::{bail, Result};
+use digest::{Digest, DynDigest};
+use sha2::Sha256;
 
 use crate::{
     cipher::Stream,
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling},
-    group::HashFactory,
-    util::random::Randstream,
+    group::{
+        edwards25519::Point as EdPoint, edwards25519::Scalar as EdScalar, HashFactory,
+        ScalarCanCheckCanonical,
+    },
+    util::{
+        key::{self, Generator, Suite as KeySuite},
+        random::Randstream,
+    },
     Group, Point, Random, Scalar, XOFFactory, XOF,
 };
 
 /// Suite represents the functionalities that this package can test
-pub trait Suite: Group + HashFactory + XOFFactory + Random + Clone {}
+pub trait Suite: KeySuite + HashFactory + XOFFactory + Clone {}
 
 struct SuiteStable<SUITE: Suite> {
     suite: SUITE,
@@ -591,46 +599,50 @@ pub fn compare_groups<G1: Group, G2: Group>(
 }
 
 /// SuiteTest tests a standard set of validation tests to a ciphersuite.
-pub fn suite_test<SUITE: Suite>(suite: SUITE) {
+pub fn suite_test<SUITE: Suite + Generator<SCALAR = <SUITE::POINT as Point>::SCALAR>>(
+    suite: SUITE,
+) -> Result<()> {
     // Try hashing something
     let mut h = suite.hash();
-    //let l = h.output_size();
-    // //println("HashLen: ", l)
+    let l = h.output_size();
+    //println("HashLen: ", l)
 
-    // h.update("abc");
-    // hb := h.Sum(nil)
-    //println("Hash:")
-    //println(hex.Dump(hb))
-    // if h.Size() != l || len(hb) != l {
-    // 	t.Errorf("inconsistent hash output length: %v vs %v vs %v", l, h.Size(), len(hb))
-    // }
+    Digest::update(&mut h, "abc".as_bytes());
+    let hb = h.clone().finalize().to_vec();
+    print!("\nHash: {:?}", hb);
+    if h.output_size() != l || hb.len() != l {
+        bail!(
+            "inconsistent hash output length: {} vs {} vs {}",
+            l,
+            h.output_size(),
+            hb.len()
+        )
+    }
 
-    // // Generate some pseudorandom bits
-    // x := suite.XOF(hb)
-    // sb := make([]byte, 128)
-    // x.Read(sb)
-    // //fmt.Println("Stream:")
-    // //fmt.Println(hex.Dump(sb))
+    // Generate some pseudorandom bits
+    let mut x = suite.xof(Some(&hb));
+    let mut sb = [0u8; 128];
+    x.read(&mut sb).unwrap();
+    print!("\nStream: {:?}", sb);
 
-    // // Test if it generates two fresh keys
-    // p1 := key.NewKeyPair(suite)
-    // p2 := key.NewKeyPair(suite)
-    // if p1.Private.Equal(p2.Private) {
-    // 	t.Errorf("NewKeyPair returns the same secret key twice: %v", p1)
-    // }
+    // Test if it generates two fresh keys
+    let mut p1 = key::new_key_pair(&suite).unwrap();
+    let mut p2 = key::new_key_pair(&suite).unwrap();
+    if p1.private == p2.private {
+        bail!("NewKeyPair returns the same secret key twice: {:?}", p1)
+    }
 
-    // // Test if it creates the same key with the same seed
-    // p1 = new(key.Pair)
-    // p2 = new(key.Pair)
+    // Test if it creates the same key with the same seed
+    p1 = key::Pair::default();
+    p2 = key::Pair::default();
 
-    // p1.Gen(newSuiteStable(suite))
-    // p2.Gen(newSuiteStable(suite))
+    // TODO!!
+    //p1.gen(&new_suite_stable(suite));
+    //p2.gen(&new_suite_stable(suite));
     // if !p1.Private.Equal(p2.Private) {
     // 	t.Errorf("NewKeyPair returns different keys for same seed: %v != %v", p1, p2)
     // }
 
-    // // Test the public-key group arithmetic
-    // GroupTest(t, suite)
-
-    todo!()
+    // Test the public-key group arithmetic
+    group_test(suite)
 }

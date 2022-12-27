@@ -1,12 +1,4 @@
-// package edwards25519
-
-// var tSuite = NewBlakeSHA256Ed25519()
-// var groupBench = test.NewGroupBench(tSuite)
-
-use crate::{
-    util::test::{self, new_group_bench, GroupBench},
-    Random,
-};
+use crate::util::test::{self, new_group_bench, GroupBench};
 
 use super::{Curve, SuiteEd25519};
 
@@ -19,8 +11,7 @@ impl test::Suite for SuiteEd25519 {}
 
 #[test]
 fn test_suite() {
-    test::group_test(Curve::new()).unwrap()
-    //test::suite_test(SuiteEd25519::new_blake_sha256ed25519())
+    test::suite_test(SuiteEd25519::new_blake_sha256ed25519()).unwrap()
 }
 
 // func BenchmarkScalarAdd(b *testing.B)    { groupBench.ScalarAdd(b.N) }

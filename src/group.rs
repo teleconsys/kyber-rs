@@ -3,7 +3,7 @@ pub mod integer_field;
 mod internal;
 
 use anyhow::Result;
-use digest::Digest;
+use digest::{Digest, FixedOutputReset, Reset, Update};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -192,7 +192,7 @@ pub trait Group: Dh + Clone + Default {
 
 /// A HashFactory is an interface that can be mixed in to local suite definitions.
 pub trait HashFactory {
-    type T: Hasher + HmacCompatible + Default;
+    type T: Hasher + HmacCompatible + Default + Update + Reset + FixedOutputReset + Clone + 'static;
     fn hash(&self) -> Self::T {
         Default::default()
     }

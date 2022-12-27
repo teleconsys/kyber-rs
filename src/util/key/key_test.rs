@@ -92,8 +92,8 @@ impl KeySuite for FixedPrivSuiteEd25519 {}
 
 impl Generator for FixedPrivSuiteEd25519 {
     type SCALAR = EdScalar;
-    fn new_key<S: crate::cipher::Stream>(&self, _: &mut S) -> anyhow::Result<EdScalar> {
-        Ok(self.scalar().set_int64(33))
+    fn new_key<S: crate::cipher::Stream>(&self, _: &mut S) -> anyhow::Result<Option<EdScalar>> {
+        Ok(Some(self.scalar().set_int64(33)))
     }
 }
 

@@ -11,7 +11,7 @@ fn test_curve_new_key() {
     let mut stream = t_suite.random_stream();
 
     for _ in 0..10u32.pow(6u32) {
-        let s = group.new_key(&mut stream).unwrap();
+        let s = group.new_key(&mut stream).unwrap().unwrap();
 
         // little-endian check of a multiple of 8
         assert_eq!(0u8, s.v[0] & 7)
