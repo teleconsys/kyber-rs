@@ -94,8 +94,7 @@ impl Curve {
     }
 }
 
-impl Generator for Curve {
-    type SCALAR = Scalar;
+impl Generator<Scalar> for Curve {
 
     /// NewKey returns a formatted Ed25519 key (avoiding subgroup attack by requiring
     /// it to be a multiple of 8). NewKey implements the kyber/util/key.Generator interface.

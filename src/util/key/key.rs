@@ -13,9 +13,8 @@ use anyhow::Result;
 /// to correctly choose a key. It should always be implemented for a suite
 /// if you want to use the 'key' utils, but if no generator should be provided
 /// the 'new_key' function shall return 'None'
-pub trait Generator {
-    type SCALAR: Scalar;
-    fn new_key<S: crate::cipher::Stream>(&self, stream: &mut S) -> Result<Option<Self::SCALAR>>;
+pub trait Generator<SCALAR: Scalar> {
+    fn new_key<S: crate::cipher::Stream>(&self, stream: &mut S) -> Result<Option<SCALAR>>;
 }
 
 /// Suite defines the capabilities required by this package.
@@ -30,7 +29,7 @@ pub struct Pair<POINT: Point> {
 }
 
 /// NewKeyPair directly creates a secret/public key pair
-pub fn new_key_pair<SUITE: Suite + Generator<SCALAR = <SUITE::POINT as Point>::SCALAR>>(
+pub fn new_key_pair<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>>(
     suite: &SUITE,
 ) -> Result<Pair<SUITE::POINT>> {
     let mut kp = Pair::default();
@@ -45,7 +44,7 @@ impl<POINT: Point> Pair<POINT> {
     /// to generate the private key, otherwise the normal technique
     /// of choosing a random scalar from the group is used.
     pub(crate) fn gen<
-        SUITE: Suite<POINT = POINT> + Generator<SCALAR = <POINT as Point>::SCALAR>,
+        SUITE: Suite<POINT = POINT> + Generator<POINT::SCALAR>,
     >(
         &mut self,
         suite: &SUITE,

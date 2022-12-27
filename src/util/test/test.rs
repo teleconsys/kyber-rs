@@ -1,41 +1,90 @@
 use anyhow::{bail, Result};
 use digest::{Digest, DynDigest};
-use sha2::Sha256;
 
 use crate::{
     cipher::Stream,
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling},
     group::{
-        edwards25519::Point as EdPoint, edwards25519::Scalar as EdScalar, HashFactory,
-        ScalarCanCheckCanonical,
+        HashFactory,
+        
     },
     util::{
         key::{self, Generator, Suite as KeySuite},
         random::Randstream,
     },
-    Group, Point, Random, Scalar, XOFFactory, XOF,
+    Group, Point, Scalar, XOFFactory, XOF, Random,
 };
 
 /// Suite represents the functionalities that this package can test
-pub trait Suite: KeySuite + HashFactory + XOFFactory + Clone {}
+pub trait Suite: Group + Random + HashFactory + XOFFactory + Clone + KeySuite {}
 
+#[derive(Default, Clone)]
 struct SuiteStable<SUITE: Suite> {
     suite: SUITE,
-    xof: Box<dyn XOF>,
 }
 
-fn new_suite_stable<SUITE: Suite>(s: SUITE) -> SuiteStable<SUITE> {
+fn new_suite_stable<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>>(s: &SUITE) -> SuiteStable<SUITE> {
     return SuiteStable {
         suite: s.clone(),
-        xof: s.xof(None),
     };
 }
 
-impl<SUITE: Suite> SuiteStable<SUITE> {
-    fn random_stream(&self) -> Box<dyn XOF> {
-        return self.xof.clone();
+impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> HashFactory for SuiteStable<SUITE> {
+    type T = SUITE::T;
+}
+
+impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> XOFFactory for SuiteStable<SUITE> {
+    fn xof(&self, _seed: Option<&[u8]>) -> Box<dyn XOF> {
+        self.suite.xof(None)
+    }
+} 
+
+impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> Random for SuiteStable<SUITE> {
+    fn random_stream(&self) -> Box<dyn Stream> {
+        Box::new(self.xof(None)) as Box<dyn Stream>
     }
 }
+
+impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> Generator<<SUITE::POINT as Point>::SCALAR> for SuiteStable<SUITE> {
+
+    fn new_key<S: Stream>(&self, _stream: &mut S) -> Result<Option<<SUITE::POINT as Point>::SCALAR>> {
+        self.suite.new_key(&mut self.random_stream())
+    }
+
+}
+
+impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> Group for SuiteStable<SUITE> {
+    type POINT = SUITE::POINT;
+
+    fn string(&self) -> String {
+        self.suite.string()
+    }
+
+    fn scalar_len(&self) -> usize {
+        self.suite.scalar_len()
+    }
+
+    fn scalar(&self) -> <Self::POINT as Point>::SCALAR {
+        self.suite.scalar()
+    }
+
+    fn point_len(&self) -> usize {
+        self.suite.point_len()
+    }
+
+    fn point(&self) -> Self::POINT {
+        self.suite.point()
+    }
+
+    fn is_prime_order(&self) -> Option<bool> {
+        self.suite.is_prime_order()
+    }
+}
+
+impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> KeySuite for SuiteStable<SUITE> {}
+impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> Suite for SuiteStable<SUITE> {}
+
+
 
 fn test_embed<GROUP: Group, S: Stream>(
     g: &GROUP,
@@ -599,7 +648,7 @@ pub fn compare_groups<G1: Group, G2: Group>(
 }
 
 /// SuiteTest tests a standard set of validation tests to a ciphersuite.
-pub fn suite_test<SUITE: Suite + Generator<SCALAR = <SUITE::POINT as Point>::SCALAR>>(
+pub fn suite_test<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>>(
     suite: SUITE,
 ) -> Result<()> {
     // Try hashing something
@@ -636,12 +685,11 @@ pub fn suite_test<SUITE: Suite + Generator<SCALAR = <SUITE::POINT as Point>::SCA
     p1 = key::Pair::default();
     p2 = key::Pair::default();
 
-    // TODO!!
-    //p1.gen(&new_suite_stable(suite));
-    //p2.gen(&new_suite_stable(suite));
-    // if !p1.Private.Equal(p2.Private) {
-    // 	t.Errorf("NewKeyPair returns different keys for same seed: %v != %v", p1, p2)
-    // }
+    p1.gen(&new_suite_stable(&suite))?;
+    p2.gen(&new_suite_stable(&suite))?;
+    if p1.private != p2.private {
+    	bail!("NewKeyPair returns different keys for same seed: {} != {}", p1.private.to_string(), p2.private.to_string())
+    }
 
     // Test the public-key group arithmetic
     group_test(suite)

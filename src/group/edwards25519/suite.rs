@@ -78,8 +78,7 @@ impl DerefMut for SuiteEd25519 {
     }
 }
 
-impl Generator for SuiteEd25519 {
-    type SCALAR = Scalar;
+impl Generator<Scalar> for SuiteEd25519 {
     fn new_key<S: crate::cipher::Stream>(&self, stream: &mut S) -> anyhow::Result<Option<Scalar>> {
         self.curve.new_key(stream)
     }
