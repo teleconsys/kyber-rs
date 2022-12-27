@@ -189,7 +189,7 @@ pub struct AEAD<T: Dh> {
 }
 
 impl<DH: Dh> AEAD<DH> {
-    pub fn new<POINT: Point>(pre: POINT, hkfd_context: &Vec<u8>) -> Result<Self> {
+    pub fn new<POINT: Point>(pre: POINT, hkfd_context: &[u8]) -> Result<Self> {
         let pre_buff = pre.marshal_binary()?;
         let key = DH::hkdf(&pre_buff, &hkfd_context, None)?;
         if key.len() != 32 {
