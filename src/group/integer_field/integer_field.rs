@@ -4,7 +4,7 @@ use std::ops::{Add, Mul};
 use anyhow::{bail, Result};
 use num_bigint::BigInt;
 use num_bigint::Sign::Plus;
-use num_traits::Num;
+use num_traits::{Num, Signed};
 
 use crate::cipher::cipher::Stream;
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
@@ -89,10 +89,10 @@ impl Int {
         self.m = m.clone();
         self.bo = BigEndian;
         self.v = BigInt::from(v);
+        // specify euclidean modulus for negative number
         match self.v.sign() {
-            num_bigint::Sign::Minus => self.v = (self.v % m.clone()) + m,
-            num_bigint::Sign::Plus => self.v = self.v % m,
-            num_bigint::Sign::NoSign => (),
+            num_bigint::Sign::Minus => self.v = (self.v % m.clone()) + m.abs(),
+            _ => self.v = self.v % m,
         }
         self
     }

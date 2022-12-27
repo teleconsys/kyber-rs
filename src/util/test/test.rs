@@ -241,7 +241,7 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
     }
     p1 = p1.clone().add(&p1, &p1);
     p2 = p2.mul(&stmp.clone().set_int64(4), None);
-    if p1 != p2 {
+    if !p1.equal(&p2) {
         return Err(anyhow::Error::msg(format!(
             "multiply by four doesn't work: {} (+) {} != {} (x) 4 == {}",
             g.point().add(&gen, &gen).to_string(),
@@ -265,14 +265,14 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
     ptmp = ptmp.clone().mul(&stmp.clone().set_int64(-1), None);
     ptmp = ptmp.clone().add(&ptmp, &gen);
 
-    if ptmp != pzero {
+    if !ptmp.equal(&pzero) {
         return Err(anyhow::Error::msg(format!("generator additive identity doesn't work: {} (x) -1 (+) {} != {} the group point identity", ptmp.mul(&stmp.set_int64(-1), None).to_string(), gen.to_string(), pzero.to_string())));
     }
     //secret.Inv works only in prime-order groups
     if prime_order {
         ptmp = ptmp.clone().mul(&stmp.clone().set_int64(2), None);
         ptmp = ptmp.clone().mul(&stmp.clone().inv(&stmp), Some(&ptmp));
-        if ptmp != gen {
+        if ptmp.equal(&gen) {
             return Err(anyhow::Error::msg(format!(
                 "generator multiplicative identity doesn't work:\n{} (x) {} = {}\n%{} (x) {} = {}",
                 ptmp.clone().base().to_string(),
@@ -292,7 +292,7 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
 
     p1 = p1.mul(&s1, Some(&gen));
     p2 = p2.mul(&s2, Some(&gen));
-    if p1 == p2 {
+    if p1.equal(&p2) {
         return Err(anyhow::Error::msg(format!(
             "encryption isn't producing unique points: {} (x) {} == {} (x) {} == {}",
             s1.to_string(),
@@ -306,7 +306,7 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
 
     let dh1 = g.point().mul(&s2, Some(&p1));
     let dh2 = g.point().mul(&s1, Some(&p2));
-    if dh1 != dh2 {
+    if !dh1.equal(&dh2) {
         return Err(anyhow::Error::msg(format!(
             "Diffie-Hellman didn't work: {} == {} (x) {} != {} (x) {} == {}",
             dh1.to_string(),
@@ -323,7 +323,7 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
     // Test secret inverse to get from dh1 back to p1
     if prime_order {
         ptmp = ptmp.mul(&g.scalar().inv(&s2), Some(&dh1));
-        if ptmp != p1 {
+        if !ptmp.equal(&p1) {
             return Err(anyhow::Error::msg(format!(
                 "Scalar inverse didn't work: {} != (-){} (x) {} == {}",
                 p1.to_string(),
@@ -336,7 +336,7 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
 
     // Zero and One identity secrets
     //println("dh1^0 = ",ptmp.Mul(dh1, szero).String())
-    if ptmp.clone().mul(&szero, Some(&dh1)) != pzero {
+    if !ptmp.clone().mul(&szero, Some(&dh1)).equal(&pzero) {
         return Err(anyhow::Error::msg(format!(
             "Encryption with secret=0 didn't work: {} (x) {} == {} != {}",
             szero.to_string(),
@@ -345,7 +345,7 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
             pzero.to_string(),
         )));
     }
-    if ptmp.clone().mul(&sone, Some(&dh1)) != dh1 {
+    if !ptmp.clone().mul(&sone, Some(&dh1)).equal(&dh1) {
         return Err(anyhow::Error::msg(format!(
             "Encryption with secret=1 didn't work: {} (x) {} == {} != {}",
             sone.to_string(),
@@ -359,7 +359,7 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
     ptmp = ptmp.add(&p1, &p2);
     stmp = s1.clone() + s2.clone();
     let mut pt2 = g.point().mul(&stmp, Some(&gen));
-    if pt2 != ptmp {
+    if !pt2.equal(&ptmp) {
         return Err(anyhow::Error::msg(format!(
             "Additive homomorphism doesn't work: {} + {} == {}, {} (x) {} == {} != {} == {} (+) {}",
             s1.to_string(),
@@ -376,7 +376,7 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
     ptmp = ptmp.sub(&p1, &p2);
     stmp = stmp.sub(&s1, &s2);
     pt2 = pt2.mul(&stmp, Some(&gen));
-    if pt2 != ptmp {
+    if !pt2.equal(&ptmp) {
         return Err(anyhow::Error::msg(format!(
             "Additive homomorphism doesn't work: {} + {} == {}, {} (x) {} == {} != {} == {} (+) {}",
             s1.to_string(),
@@ -405,7 +405,7 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
     }
     pt2 = pt2.neg(&p2).clone();
     pt2 = pt2.clone().add(&pt2, &p1);
-    if pt2 != ptmp {
+    if !pt2.equal(&ptmp) {
         return Err(anyhow::Error::msg(format!(
             "Point.Neg doesn't work: (-){} == {}, {} (+) {} == {} != {}",
             p2.to_string(),
@@ -419,7 +419,7 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
 
     // Multiplicative homomorphic identities
     stmp = s1.clone() * s2.clone();
-    if ptmp.clone().mul(&stmp, Some(&gen)) == dh1 {
+    if !ptmp.clone().mul(&stmp, Some(&gen)).equal(&dh1) {
         return Err(anyhow::Error::msg(format!(
             "Multiplicative homomorphism doesn't work: {} * {} == {}, {} (x) {} == {} != {}",
             s1.to_string(),
@@ -461,7 +461,7 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
     let mut last = gen;
     for _ in 0..5 {
         let rgen = g.point().pick(rand);
-        if rgen == last {
+        if rgen.equal(&last) {
             return Err(anyhow::Error::msg(format!(
                 "Pick() not producing unique points: got {} twice",
                 rgen.to_string()
@@ -469,11 +469,9 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
         }
         last = rgen.clone();
 
-        ptmp = ptmp
-            .clone()
-            .mul(&stmp.clone().set_int64(-1), Some(&rgen))
-            .add(&ptmp, &rgen);
-        if ptmp != pzero {
+        ptmp = ptmp.clone().mul(&stmp.clone().set_int64(-1), Some(&rgen));
+        ptmp = ptmp.clone().add(&ptmp, &rgen);
+        if !ptmp.equal(&pzero) {
             return Err(anyhow::Error::msg(format!(
                 "random generator fails additive identity: {} (x) {} == {}, {} (+) {} == {} != {}",
                 g.scalar().set_int64(-1).to_string(),
@@ -492,11 +490,10 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
             )));
         }
         if prime_order {
-            ptmp = ptmp
-                .clone()
-                .mul(&stmp.clone().set_int64(2), Some(&rgen))
-                .mul(&stmp.clone().inv(&stmp), Some(&ptmp));
-            if ptmp != rgen {
+            stmp = stmp.set_int64(2);
+            ptmp = ptmp.clone().mul(&stmp, Some(&rgen));
+            ptmp = ptmp.clone().mul(&stmp.clone().inv(&stmp), Some(&ptmp));
+            if !ptmp.equal(&rgen) {
                 return Err(anyhow::Error::msg(format!(
                     "random generator fails multiplicative identity: {} (x) (2 (x) {}) == {} != {}",
                     stmp.to_string(),
