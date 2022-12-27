@@ -80,7 +80,7 @@ pub trait PointCanCheckCanonicalAndSmallOrder {
 /// or an (x, y) point on an elliptic curve.
 /// A Point can contain a Diffie-Hellman public key, an ElGamal ciphertext, etc.
 pub trait Point:
-    Marshaling + Clone + PartialEq + Default + ToString + Serialize + DeserializeOwned
+    Marshaling + Clone + PartialEq + Default + ToString + Serialize + DeserializeOwned + Debug
 {
     type SCALAR: Scalar;
 

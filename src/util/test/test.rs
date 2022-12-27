@@ -1,9 +1,7 @@
-use std::fmt::format;
-
-use anyhow::Result;
-use digest::DynDigest;
+use anyhow::{bail, Result};
 
 use crate::{
+    cipher::Stream,
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling},
     group::HashFactory,
     util::random::Randstream,
@@ -31,9 +29,9 @@ impl<SUITE: Suite> SuiteStable<SUITE> {
     }
 }
 
-fn test_embed<GROUP: Group>(
+fn test_embed<GROUP: Group, S: Stream>(
     g: &GROUP,
-    rand: &mut Randstream,
+    rand: &mut S,
     points: &mut Vec<GROUP::POINT>,
     s: String,
 ) -> Result<()> {
@@ -44,11 +42,7 @@ fn test_embed<GROUP: Group>(
     let x = match p.data() {
         Ok(x) => x,
         Err(e) => {
-            return Err(anyhow::Error::msg(format!(
-                "Point extraction failed for {}: {}",
-                p.to_string(),
-                e
-            )))
+            bail!("Point extraction failed for {}: {}", p.to_string(), e)
         }
     };
 
@@ -63,68 +57,68 @@ fn test_embed<GROUP: Group>(
         x_cmp.push(byte);
     }
     if b.to_vec() != x_cmp {
-        return Err(anyhow::Error::msg("Point embedding corrupted the data"));
+        bail!("Point embedding corrupted the data")
     }
     points.push(p);
     Ok(())
 }
 
-fn test_point_set<GROUP: Group>(g: &GROUP, rand: &mut Randstream) -> Result<()> {
+fn test_point_set<GROUP: Group, S: Stream>(g: &GROUP, rand: &mut S) -> Result<()> {
     let n = 1000;
     let null = g.point().null();
     for _ in 0..n {
         let mut p1 = g.point().pick(rand);
         let mut p2 = g.point();
         p2.set(p1.clone());
-        if p1 != p2 {
-            return Err(anyhow::Error::msg(format!(
+        if !p1.equal(&p2) {
+            bail!(
                 "Set() set to a different point: {} != {}",
                 p1.to_string(),
                 p2.to_string()
-            )));
+            )
         }
-        if p1 != null {
+        if !p1.equal(&null) {
             p1 = p1.clone().add(&p1, &p1);
-            if p1 == p2 {
-                return Err(anyhow::Error::msg(format!(
+            if p1.equal(&p2) {
+                bail!(
                     "Modifying P1 shouldn't modify P2: {} == {}",
                     p1.to_string(),
                     p2.to_string()
-                )));
+                )
             }
         }
     }
     Ok(())
 }
 
-fn test_point_clone<GROUP: Group>(g: &GROUP, rand: &mut Randstream) -> Result<()> {
+fn test_point_clone<GROUP: Group, S: Stream>(g: &GROUP, rand: &mut S) -> Result<()> {
     let n = 1000;
     let null = g.point().null();
     for _ in 0..n {
         let mut p1 = g.point().pick(rand);
         let p2 = p1.clone();
         if p1 != p2 {
-            return Err(anyhow::Error::msg(format!(
+            bail!(
                 "Clone didn't work for point: {} != {}",
                 p1.to_string(),
                 p2.to_string()
-            )));
+            )
         }
         if p1 != null {
             p1 = p1.clone().add(&p1, &p1);
             if p1 == p2 {
-                return Err(anyhow::Error::msg(format!(
+                bail!(
                     "Modifying P1 shouldn't modify P2: {} == {}",
                     p1.to_string(),
                     p2.to_string()
-                )));
+                )
             }
         }
     }
     Ok(())
 }
 
-fn test_scalar_set<GROUP: Group>(g: &GROUP, rand: &mut Randstream) -> Result<()> {
+fn test_scalar_set<GROUP: Group, S: Stream>(g: &GROUP, rand: &mut S) -> Result<()> {
     let n = 1000;
     let zero = g.scalar().zero();
     let one = g.scalar().one();
@@ -132,27 +126,27 @@ fn test_scalar_set<GROUP: Group>(g: &GROUP, rand: &mut Randstream) -> Result<()>
         let mut s1 = g.scalar().pick(rand);
         let s2 = g.scalar().set(&s1);
         if s1 != s2 {
-            return Err(anyhow::Error::msg(format!(
+            bail!(
                 "Set() set to a different scalar: {} != {}",
                 s1.to_string(),
                 s2.to_string()
-            )));
+            )
         }
         if s1 != zero && s1 != one {
             s1 = s1.clone() * s1;
             if s1 == s2 {
-                return Err(anyhow::Error::msg(format!(
+                bail!(
                     "Modifying s1 shouldn't modify s2: {} == {}",
                     s1.to_string(),
                     s2.to_string()
-                )));
+                )
             }
         }
     }
     Ok(())
 }
 
-fn test_scalar_clone<GROUP: Group>(g: &GROUP, rand: &mut Randstream) -> Result<()> {
+fn test_scalar_clone<GROUP: Group, S: Stream>(g: &GROUP, rand: &mut S) -> Result<()> {
     let n = 1000;
     let zero = g.scalar().zero();
     let one = g.scalar().one();
@@ -160,20 +154,20 @@ fn test_scalar_clone<GROUP: Group>(g: &GROUP, rand: &mut Randstream) -> Result<(
         let mut s1 = g.scalar().pick(rand);
         let s2 = s1.clone();
         if s1 != s2 {
-            return Err(anyhow::Error::msg(format!(
+            bail!(
                 "Clone didn't work for scalar: {} != {}",
                 s1.to_string(),
                 s2.to_string()
-            )));
+            )
         }
         if s1 != zero && s1 != one {
             s1 = s1.clone() * s1;
             if s1 == s2 {
-                return Err(anyhow::Error::msg(format!(
+                bail!(
                     "Modifying s1 shouldn't modify s2: {} == {}",
                     s1.to_string(),
                     s2.to_string()
-                )));
+                )
             }
         }
     }
@@ -186,7 +180,7 @@ fn test_scalar_clone<GROUP: Group>(g: &GROUP, rand: &mut Randstream) -> Result<(
 /// Returns a log of the pseudorandom Points produced in the test,
 /// for comparison across alternative implementations
 /// that are supposed to be equivalent.
-fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP::POINT>> {
+fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GROUP::POINT>> {
     print!(
         "\nTesting group '{}': {}-byte Point, {}-byte Scalar\n",
         g.string(),
@@ -205,22 +199,16 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
     let s1 = g.scalar().pick(rand);
     let s2 = g.scalar().pick(rand);
     if s1 == szero {
-        return Err(anyhow::Error::msg(format!(
-            "first secret is scalar zero {}",
-            s1.to_string()
-        )));
+        bail!("first secret is scalar zero {}", s1.to_string())
     }
     if s2 == szero {
-        return Err(anyhow::Error::msg(format!(
-            "second secret is scalar zero {}",
-            s2.to_string()
-        )));
+        bail!("second secret is scalar zero {}", s2.to_string())
     }
     if s1 == s2 {
-        return Err(anyhow::Error::msg(format!(
+        bail!(
             "not getting unique secrets: picked {} twice",
             s1.to_string()
-        )));
+        )
     }
 
     let gen = g.point().base();
@@ -230,25 +218,25 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
     let mut p1 = g.point().add(&gen, &gen);
     let mut p2 = g.point().mul(&stmp.clone().set_int64(2), None);
     if p1 != p2 {
-        return Err(anyhow::Error::msg(format!(
+        bail!(
             "multiply by two doesn't work: {} == {} (+) {} != {} (x) 2 == {}",
             p1.to_string(),
             gen.to_string(),
             gen.to_string(),
             gen.to_string(),
             p2.to_string()
-        )));
+        )
     }
     p1 = p1.clone().add(&p1, &p1);
     p2 = p2.mul(&stmp.clone().set_int64(4), None);
     if !p1.equal(&p2) {
-        return Err(anyhow::Error::msg(format!(
+        bail!(
             "multiply by four doesn't work: {} (+) {} != {} (x) 4 == {}",
             g.point().add(&gen, &gen).to_string(),
             g.point().add(&gen, &gen).to_string(),
             gen.to_string(),
             p2.to_string()
-        )));
+        )
     }
     points.push(p1.clone());
 
@@ -266,14 +254,14 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
     ptmp = ptmp.clone().add(&ptmp, &gen);
 
     if !ptmp.equal(&pzero) {
-        return Err(anyhow::Error::msg(format!("generator additive identity doesn't work: {} (x) -1 (+) {} != {} the group point identity", ptmp.mul(&stmp.set_int64(-1), None).to_string(), gen.to_string(), pzero.to_string())));
+        bail!("generator additive identity doesn't work: {} (x) -1 (+) {} != {} the group point identity", ptmp.mul(&stmp.set_int64(-1), None).to_string(), gen.to_string(), pzero.to_string())
     }
     //secret.Inv works only in prime-order groups
     if prime_order {
         ptmp = ptmp.clone().mul(&stmp.clone().set_int64(2), None);
         ptmp = ptmp.clone().mul(&stmp.clone().inv(&stmp), Some(&ptmp));
         if ptmp.equal(&gen) {
-            return Err(anyhow::Error::msg(format!(
+            bail!(
                 "generator multiplicative identity doesn't work:\n{} (x) {} = {}\n%{} (x) {} = {}",
                 ptmp.clone().base().to_string(),
                 stmp.clone().set_int64(2).to_string(),
@@ -286,28 +274,28 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
                     .mul(&stmp.clone().set_int64(2), None)
                     .mul(&stmp.clone().inv(&stmp), Some(&ptmp))
                     .to_string()
-            )));
+            )
         }
     }
 
     p1 = p1.mul(&s1, Some(&gen));
     p2 = p2.mul(&s2, Some(&gen));
     if p1.equal(&p2) {
-        return Err(anyhow::Error::msg(format!(
+        bail!(
             "encryption isn't producing unique points: {} (x) {} == {} (x) {} == {}",
             s1.to_string(),
             gen.to_string(),
             s2.to_string(),
             gen.to_string(),
             p1.to_string()
-        )));
+        )
     }
     points.push(p1.clone());
 
     let dh1 = g.point().mul(&s2, Some(&p1));
     let dh2 = g.point().mul(&s1, Some(&p2));
     if !dh1.equal(&dh2) {
-        return Err(anyhow::Error::msg(format!(
+        bail!(
             "Diffie-Hellman didn't work: {} == {} (x) {} != {} (x) {} == {}",
             dh1.to_string(),
             s2.to_string(),
@@ -315,7 +303,7 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
             s1.to_string(),
             p2.to_string(),
             dh2.to_string()
-        )));
+        )
     }
     points.push(dh1.clone());
     print!("shared secret = {}", dh1.to_string());
@@ -324,35 +312,35 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
     if prime_order {
         ptmp = ptmp.mul(&g.scalar().inv(&s2), Some(&dh1));
         if !ptmp.equal(&p1) {
-            return Err(anyhow::Error::msg(format!(
+            bail!(
                 "Scalar inverse didn't work: {} != (-){} (x) {} == {}",
                 p1.to_string(),
                 s2.to_string(),
                 dh1.to_string(),
                 ptmp.to_string(),
-            )));
+            )
         }
     }
 
     // Zero and One identity secrets
     //println("dh1^0 = ",ptmp.Mul(dh1, szero).String())
     if !ptmp.clone().mul(&szero, Some(&dh1)).equal(&pzero) {
-        return Err(anyhow::Error::msg(format!(
+        bail!(
             "Encryption with secret=0 didn't work: {} (x) {} == {} != {}",
             szero.to_string(),
             dh1.to_string(),
             ptmp.to_string(),
             pzero.to_string(),
-        )));
+        )
     }
     if !ptmp.clone().mul(&sone, Some(&dh1)).equal(&dh1) {
-        return Err(anyhow::Error::msg(format!(
+        bail!(
             "Encryption with secret=1 didn't work: {} (x) {} == {} != {}",
             sone.to_string(),
             dh1.to_string(),
             ptmp.to_string(),
             dh1.to_string(),
-        )));
+        )
     }
 
     // Additive homomorphic identities
@@ -360,7 +348,7 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
     stmp = s1.clone() + s2.clone();
     let mut pt2 = g.point().mul(&stmp, Some(&gen));
     if !pt2.equal(&ptmp) {
-        return Err(anyhow::Error::msg(format!(
+        bail!(
             "Additive homomorphism doesn't work: {} + {} == {}, {} (x) {} == {} != {} == {} (+) {}",
             s1.to_string(),
             s2.to_string(),
@@ -371,13 +359,13 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
             ptmp.to_string(),
             p1.to_string(),
             p2.to_string(),
-        )));
+        )
     }
     ptmp = ptmp.sub(&p1, &p2);
     stmp = stmp.sub(&s1, &s2);
     pt2 = pt2.mul(&stmp, Some(&gen));
     if !pt2.equal(&ptmp) {
-        return Err(anyhow::Error::msg(format!(
+        bail!(
             "Additive homomorphism doesn't work: {} + {} == {}, {} (x) {} == {} != {} == {} (+) {}",
             s1.to_string(),
             s2.to_string(),
@@ -388,12 +376,12 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
             ptmp.to_string(),
             p1.to_string(),
             p2.to_string(),
-        )));
+        )
     }
     let mut st2 = g.scalar().neg(&s2);
     st2 = s1.clone() + st2;
     if stmp != st2 {
-        return Err(anyhow::Error::msg(format!(
+        bail!(
             "Scalar.Neg doesn't work: -{} == {}, {} + {} == {} != {}",
             s2.to_string(),
             g.scalar().neg(&s2).to_string(),
@@ -401,12 +389,12 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
             s1.to_string(),
             st2.to_string(),
             stmp.to_string(),
-        )));
+        )
     }
     pt2 = pt2.neg(&p2).clone();
     pt2 = pt2.clone().add(&pt2, &p1);
     if !pt2.equal(&ptmp) {
-        return Err(anyhow::Error::msg(format!(
+        bail!(
             "Point.Neg doesn't work: (-){} == {}, {} (+) {} == {} != {}",
             p2.to_string(),
             g.point().neg(&p2).to_string(),
@@ -414,13 +402,13 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
             p1.to_string(),
             pt2.to_string(),
             ptmp.to_string(),
-        )));
+        )
     }
 
     // Multiplicative homomorphic identities
     stmp = s1.clone() * s2.clone();
     if !ptmp.clone().mul(&stmp, Some(&gen)).equal(&dh1) {
-        return Err(anyhow::Error::msg(format!(
+        bail!(
             "Multiplicative homomorphism doesn't work: {} * {} == {}, {} (x) {} == {} != {}",
             s1.to_string(),
             s2.to_string(),
@@ -429,13 +417,13 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
             gen.to_string(),
             ptmp.to_string(),
             dh1.to_string(),
-        )));
+        )
     }
     if prime_order {
         st2 = st2.inv(&s2);
         st2 = st2 * stmp.clone();
         if st2 != s1 {
-            return Err(anyhow::Error::msg(format!(
+            bail!(
                 "Scalar division doesn't work: {}^-1 * {} == {} * {} == {} != {}",
                 s2.to_string(),
                 stmp.to_string(),
@@ -443,17 +431,17 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
                 stmp.to_string(),
                 st2.to_string(),
                 s1.to_string(),
-            )));
+            )
         }
         st2 = st2.div(&stmp, &s2);
         if st2 != s1 {
-            return Err(anyhow::Error::msg(format!(
+            bail!(
                 "Scalar division doesn't work: {} / {} == {} != {}",
                 stmp.to_string(),
                 s2.to_string(),
                 st2.to_string(),
                 s1.to_string(),
-            )));
+            )
         }
     }
 
@@ -462,17 +450,17 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
     for _ in 0..5 {
         let rgen = g.point().pick(rand);
         if rgen.equal(&last) {
-            return Err(anyhow::Error::msg(format!(
+            bail!(
                 "Pick() not producing unique points: got {} twice",
                 rgen.to_string()
-            )));
+            )
         }
         last = rgen.clone();
 
         ptmp = ptmp.clone().mul(&stmp.clone().set_int64(-1), Some(&rgen));
         ptmp = ptmp.clone().add(&ptmp, &rgen);
         if !ptmp.equal(&pzero) {
-            return Err(anyhow::Error::msg(format!(
+            bail!(
                 "random generator fails additive identity: {} (x) {} == {}, {} (+) {} == {} != {}",
                 g.scalar().set_int64(-1).to_string(),
                 rgen.to_string(),
@@ -487,20 +475,20 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
                     .mul(&g.scalar().set_int64(-1), Some(&rgen))
                     .to_string(),
                 pzero.to_string(),
-            )));
+            )
         }
         if prime_order {
             stmp = stmp.set_int64(2);
             ptmp = ptmp.clone().mul(&stmp, Some(&rgen));
             ptmp = ptmp.clone().mul(&stmp.clone().inv(&stmp), Some(&ptmp));
             if !ptmp.equal(&rgen) {
-                return Err(anyhow::Error::msg(format!(
+                bail!(
                     "random generator fails multiplicative identity: {} (x) (2 (x) {}) == {} != {}",
                     stmp.to_string(),
                     rgen.to_string(),
                     ptmp.to_string(),
                     rgen.to_string(),
-                )));
+                )
             }
         }
         points.push(rgen);
@@ -524,25 +512,17 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
         match s.marshal_to(&mut buf) {
             Ok(_) => (),
             Err(e) => {
-                return Err(anyhow::Error::msg(format!(
-                    "encoding of secret fails: {}",
-                    e.to_string()
-                )))
+                bail!("encoding of secret fails: {}", e.to_string())
             }
         }
         match stmp.unmarshal_binary(&mut buf) {
             Ok(_) => (),
             Err(e) => {
-                return Err(anyhow::Error::msg(format!(
-                    "decoding of secret fails: {}",
-                    e.to_string()
-                )))
+                bail!("decoding of secret fails: {}", e.to_string())
             }
         }
         if stmp != s {
-            return Err(anyhow::Error::msg(
-                "decoding produces different secret than encoded",
-            ));
+            bail!("decoding produces different secret than encoded",)
         }
 
         let mut buf = Vec::new();
@@ -550,25 +530,17 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
         match p.marshal_to(&mut buf) {
             Ok(_) => (),
             Err(e) => {
-                return Err(anyhow::Error::msg(format!(
-                    "encoding of point fails: {}",
-                    e.to_string()
-                )))
+                bail!("encoding of point fails: {}", e.to_string())
             }
         }
         match ptmp.unmarshal_binary(&mut buf) {
             Ok(_) => (),
             Err(e) => {
-                return Err(anyhow::Error::msg(format!(
-                    "decoding of point fails: {}",
-                    e.to_string()
-                )))
+                bail!("decoding of point fails: {}", e.to_string())
             }
         }
         if ptmp != p {
-            return Err(anyhow::Error::msg(
-                "decoding produces different point than encoded",
-            ));
+            bail!("decoding produces different point than encoded",);
         }
     }
 
@@ -578,11 +550,7 @@ fn test_group<GROUP: Group>(g: GROUP, rand: &mut Randstream) -> Result<Vec<GROUP
     match g.point().unmarshal_binary(&b) {
         Ok(_) => (),
         Err(e) => {
-            return Err(anyhow::Error::msg(format!(
-                "Could not unmarshall binary {:?}: {}",
-                b,
-                e.to_string()
-            )))
+            bail!("Could not unmarshall binary {:?}: {}", b, e.to_string())
         }
     };
 
@@ -602,21 +570,24 @@ pub fn group_test<GROUP: Group>(g: GROUP) -> Result<()> {
 
 /// CompareGroups tests two group implementations that are supposed to be equivalent,
 /// and compare their results.
-fn compare_groups<G1: Group, G2: Group>(func: fn(&[u8]), xof: Box<dyn XOF>, g1: G1, g2: G2) {
-    // // Produce test results from the same pseudorandom seed
-    // r1 := testGroup(t, g1, fn(nil))
-    // r2 := testGroup(t, g2, fn(nil))
+pub fn compare_groups<G1: Group, G2: Group>(
+    func: fn(Option<&[u8]>) -> Box<dyn XOF>,
+    g1: G1,
+    g2: G2,
+) -> Result<()> {
+    // Produce test results from the same pseudorandom seed
+    let r1 = test_group(g1, &mut func(None)).unwrap();
+    let r2 = test_group(g2, &mut func(None)).unwrap();
 
-    // // Compare resulting Points
-    // for i := range r1 {
-    // 	b1, _ := r1[i].MarshalBinary()
-    // 	b2, _ := r2[i].MarshalBinary()
-    // 	if !bytes.Equal(b1, b2) {
-    // 		t.Errorf("unequal result-pair %v\n1: %v\n2: %v",
-    // 			i, r1[i], r2[i])
-    // 	}
-    // }
-    todo!()
+    // Compare resulting Points
+    for (i, _) in r1.iter().enumerate() {
+        let b1 = r1[i].marshal_binary().unwrap();
+        let b2 = r2[i].marshal_binary().unwrap();
+        if b1 != b2 {
+            bail!("unequal result-pair {}\n1: {:?}\n2: {:?}", i, r1[i], r2[i])
+        }
+    }
+    Ok(())
 }
 
 /// SuiteTest tests a standard set of validation tests to a ciphersuite.
