@@ -4,15 +4,12 @@ use digest::{Digest, DynDigest};
 use crate::{
     cipher::Stream,
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling},
-    group::{
-        HashFactory,
-        
-    },
+    group::HashFactory,
     util::{
         key::{self, Generator, Suite as KeySuite},
         random::Randstream,
     },
-    Group, Point, Scalar, XOFFactory, XOF, Random,
+    Group, Point, Random, Scalar, XOFFactory, XOF,
 };
 
 /// Suite represents the functionalities that this package can test
@@ -23,10 +20,10 @@ struct SuiteStable<SUITE: Suite> {
     suite: SUITE,
 }
 
-fn new_suite_stable<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>>(s: &SUITE) -> SuiteStable<SUITE> {
-    return SuiteStable {
-        suite: s.clone(),
-    };
+fn new_suite_stable<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>>(
+    s: &SUITE,
+) -> SuiteStable<SUITE> {
+    return SuiteStable { suite: s.clone() };
 }
 
 impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> HashFactory for SuiteStable<SUITE> {
@@ -37,7 +34,7 @@ impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> XOFFactory for S
     fn xof(&self, _seed: Option<&[u8]>) -> Box<dyn XOF> {
         self.suite.xof(None)
     }
-} 
+}
 
 impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> Random for SuiteStable<SUITE> {
     fn random_stream(&self) -> Box<dyn Stream> {
@@ -45,12 +42,15 @@ impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> Random for Suite
     }
 }
 
-impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> Generator<<SUITE::POINT as Point>::SCALAR> for SuiteStable<SUITE> {
-
-    fn new_key<S: Stream>(&self, _stream: &mut S) -> Result<Option<<SUITE::POINT as Point>::SCALAR>> {
+impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>>
+    Generator<<SUITE::POINT as Point>::SCALAR> for SuiteStable<SUITE>
+{
+    fn new_key<S: Stream>(
+        &self,
+        _stream: &mut S,
+    ) -> Result<Option<<SUITE::POINT as Point>::SCALAR>> {
         self.suite.new_key(&mut self.random_stream())
     }
-
 }
 
 impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> Group for SuiteStable<SUITE> {
@@ -83,8 +83,6 @@ impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> Group for SuiteS
 
 impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> KeySuite for SuiteStable<SUITE> {}
 impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> Suite for SuiteStable<SUITE> {}
-
-
 
 fn test_embed<GROUP: Group, S: Stream>(
     g: &GROUP,
@@ -688,7 +686,11 @@ pub fn suite_test<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>>(
     p1.gen(&new_suite_stable(&suite))?;
     p2.gen(&new_suite_stable(&suite))?;
     if p1.private != p2.private {
-    	bail!("NewKeyPair returns different keys for same seed: {} != {}", p1.private.to_string(), p2.private.to_string())
+        bail!(
+            "NewKeyPair returns different keys for same seed: {} != {}",
+            p1.private.to_string(),
+            p2.private.to_string()
+        )
     }
 
     // Test the public-key group arithmetic

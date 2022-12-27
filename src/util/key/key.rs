@@ -43,9 +43,7 @@ impl<POINT: Point> Pair<POINT> {
     /// suite implements key.Generator, then suite.NewKey is called
     /// to generate the private key, otherwise the normal technique
     /// of choosing a random scalar from the group is used.
-    pub(crate) fn gen<
-        SUITE: Suite<POINT = POINT> + Generator<POINT::SCALAR>,
-    >(
+    pub(crate) fn gen<SUITE: Suite<POINT = POINT> + Generator<POINT::SCALAR>>(
         &mut self,
         suite: &SUITE,
     ) -> Result<()> {
