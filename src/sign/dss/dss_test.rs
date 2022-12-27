@@ -184,8 +184,8 @@ where
     let mut dkgs = Vec::with_capacity(NB_PARTICIPANTS);
     for i in 0..NB_PARTICIPANTS {
         let dkg = dkg::rabin::new_dist_key_generator::<SUITE>(
-            suite,
-            part_sec[i].clone(),
+            &suite,
+            &part_sec[i],
             part_pubs,
             NB_PARTICIPANTS / 2 + 1,
         )

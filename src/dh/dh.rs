@@ -15,7 +15,7 @@ use digest::{
 };
 use hkdf::Hkdf;
 
-use crate::{group::HashFactory, Point, Suite};
+use crate::{group::HashFactory, share::vss::suite::Suite, Point};
 
 pub(crate) const NONCE_SIZE: usize = 12;
 

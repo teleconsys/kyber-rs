@@ -3,7 +3,7 @@ pub mod integer_field;
 mod internal;
 
 use anyhow::Result;
-use digest::Digest;
+use digest::{Digest, FixedOutputReset, Reset, Update};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -80,7 +80,7 @@ pub trait PointCanCheckCanonicalAndSmallOrder {
 /// or an (x, y) point on an elliptic curve.
 /// A Point can contain a Diffie-Hellman public key, an ElGamal ciphertext, etc.
 pub trait Point:
-    Marshaling + Clone + PartialEq + Default + ToString + Serialize + DeserializeOwned
+    Marshaling + Clone + PartialEq + Default + ToString + Serialize + DeserializeOwned + Debug
 {
     type SCALAR: Scalar;
 
@@ -97,7 +97,7 @@ pub trait Point:
     fn pick<S: Stream>(self, rand: &mut S) -> Self;
 
     /// Set sets the receiver equal to another Point p.
-    fn set(&mut self, p: Self) -> &mut Self;
+    fn set(&mut self, p: Self) -> Self;
 
     /// Maximum number of bytes that can be embedded in a single
     /// group element via Pick().
@@ -120,7 +120,7 @@ pub trait Point:
     fn sub(self, a: &Self, b: &Self) -> Self;
 
     /// Set to the negation of point a.
-    fn neg(&self, a: &Self) -> &mut Self;
+    fn neg(&mut self, a: &Self) -> Self;
 
     /// Multiply point p by the scalar s.
     /// If p == nil, multiply with the standard base point Base().
@@ -185,11 +185,14 @@ pub trait Group: Dh + Clone + Default {
 
     /// Create new point
     fn point(&self) -> Self::POINT;
+
+    /// If 'None' is returned is assumes that the group has a prime order
+    fn is_prime_order(&self) -> Option<bool>;
 }
 
 /// A HashFactory is an interface that can be mixed in to local suite definitions.
 pub trait HashFactory {
-    type T: Hasher + HmacCompatible + Default;
+    type T: Hasher + HmacCompatible + Default + Update + Reset + FixedOutputReset + Clone + 'static;
     fn hash(&self) -> Self::T {
         Default::default()
     }

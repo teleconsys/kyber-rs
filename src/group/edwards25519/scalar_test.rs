@@ -21,6 +21,32 @@ fn test_string() {
 }
 
 #[test]
+fn test_negative_big_int() {
+    // Create a scalar that would trigger #262.
+    let mut s = EdScalar::default();
+    s = s.set_int64(-1);
+    assert_eq!(
+        s.string(),
+        "ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010",
+        "unexpected result: {}",
+        s.string()
+    );
+}
+
+#[test]
+fn test_positive_big_int() {
+    // Create a scalar that would trigger #262.
+    let mut s = EdScalar::default();
+    s = s.set_int64(1);
+    assert_eq!(
+        s.string(),
+        "0100000000000000000000000000000000000000000000000000000000000000",
+        "unexpected result: {}",
+        s.string()
+    );
+}
+
+#[test]
 fn test_scalar_marshal() {
     let s = EdScalar::default();
 

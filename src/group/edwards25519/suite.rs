@@ -1,19 +1,19 @@
 use std::ops::DerefMut;
 
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use std::ops::Deref;
 
 use crate::cipher::Stream;
-use crate::dh::Dh;
 use crate::group::edwards25519::curve::Curve;
 use crate::group::edwards25519::scalar::Scalar;
 use crate::group::Group;
 use crate::group::HashFactory;
+use crate::share::vss::suite::Suite;
 use crate::sign::dss;
 use crate::util::key::Generator;
 use crate::util::key::Suite as KeySuite;
 use crate::util::random;
-use crate::{xof, Random, Suite, XOFFactory};
+use crate::{xof, Random, XOFFactory};
 
 use super::Point;
 
@@ -78,9 +78,8 @@ impl DerefMut for SuiteEd25519 {
     }
 }
 
-impl Generator for SuiteEd25519 {
-    type SCALAR = Scalar;
-    fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> anyhow::Result<Scalar> {
+impl Generator<Scalar> for SuiteEd25519 {
+    fn new_key<S: crate::cipher::Stream>(&self, stream: &mut S) -> anyhow::Result<Option<Scalar>> {
         self.curve.new_key(stream)
     }
 }
@@ -106,6 +105,10 @@ impl Group for SuiteEd25519 {
 
     fn point_len(&self) -> usize {
         self.curve.point_len()
+    }
+
+    fn is_prime_order(&self) -> Option<bool> {
+        self.curve.is_prime_order()
     }
 }
 

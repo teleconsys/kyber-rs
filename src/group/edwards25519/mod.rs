@@ -1,5 +1,6 @@
 pub(crate) mod constants;
 mod curve;
+#[cfg(test)]
 mod curve_test;
 mod fe;
 mod ge;

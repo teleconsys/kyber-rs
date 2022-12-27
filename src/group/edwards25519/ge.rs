@@ -87,12 +87,12 @@ pub struct ExtendedGroupElement {
 }
 
 impl ExtendedGroupElement {
-    // func (p *extendedGroupElement) Neg(s *extendedGroupElement) {
-    // 	feNeg(&p.X, &s.X)
-    // 	feCopy(&p.Y, &s.Y)
-    // 	feCopy(&p.Z, &s.Z)
-    // 	feNeg(&p.T, &s.T)
-    // }
+    pub fn neg(&mut self, s: &Self) {
+        fe_neg(&mut self.x, &s.x);
+        fe_copy(&mut self.y, &s.y);
+        fe_copy(&mut self.z, &s.z);
+        fe_neg(&mut self.t, &s.t);
+    }
 
     fn double(&mut self, r: &mut CompletedGroupElement) {
         let mut q = ProjectiveGroupElement::default();
@@ -447,7 +447,7 @@ impl Default for CachedGroupElement {
 /// equal returns 1 if b == c and 0 otherwise.
 fn equal(b: i32, c: i32) -> i32 {
     let mut x = (b ^ c) as u32;
-    x -= 1;
+    x = x.wrapping_sub(1);
     return (x >> 31) as i32;
 }
 
