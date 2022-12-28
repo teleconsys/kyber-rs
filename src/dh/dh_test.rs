@@ -153,18 +153,9 @@ fn test_aead_random() {
         let keypair1 = key::new_key_pair(&suite).unwrap();
         let keypair2 = key::new_key_pair(&suite).unwrap();
         let priv1 = keypair1.private;
-        //println!("priv 1 {}", priv1.to_string());
         let priv2 = keypair2.private;
-        //println!("priv 2 {}", priv2.to_string());
         let pub1 = keypair1.public;
-        //println!("pub 1 {}", pub1.to_string());
         let pub2 = keypair2.public;
-        //println!("pub 2 {}", pub2.to_string());
-
-        // let priv1 = suite.scalar().pick(&mut suite.random_stream());
-        // let pub1 = suite.point().mul(&priv1, None);
-        // let priv2 = suite.scalar().pick(&mut suite.random_stream());
-        // let pub2= suite.point().mul(&priv2, None);
 
         let mut message = [0u8; 64];
         random::bytes(&mut message, &mut suite.random_stream()).unwrap();
