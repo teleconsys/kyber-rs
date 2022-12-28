@@ -253,6 +253,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
     // Do a simple Diffie-Hellman test
     let s1 = g.scalar().pick(rand);
     let s2 = g.scalar().pick(rand);
+
     if s1 == szero {
         bail!("first secret is scalar zero {}", s1.to_string())
     }
@@ -475,7 +476,9 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
         )
     }
     if prime_order {
+        print!("\ns2 val {:?}", s2.marshal_binary().unwrap());
         st2 = st2.inv(&s2);
+        print!("\nst2 val {:?}", st2.marshal_binary().unwrap());
         st2 = st2 * stmp.clone();
         if st2 != s1 {
             bail!(
@@ -618,7 +621,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
 }
 
 /// GroupTest applies a generic set of validation tests to a cryptographic Group.
-pub fn group_test<GROUP: Group>(g: GROUP) -> Result<()> {
+pub fn group_test<GROUP: Group + Generator<<GROUP::POINT as Point>::SCALAR>>(g: GROUP) -> Result<()> {
     _ = test_group(g, &mut Randstream::default())?;
     Ok(())
 }

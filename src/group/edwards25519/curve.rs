@@ -76,7 +76,7 @@ impl Curve {
         let mut secret = self.scalar();
         secret.v.copy_from_slice(&digest[0..32]);
 
-        return (secret, buffer, digest.to_vec()[32..].to_vec());
+        return (secret, buffer, digest[32..].to_vec());
     }
 
     /// NewKeyAndSeed returns a formatted Ed25519 key (avoid subgroup attack by requiring

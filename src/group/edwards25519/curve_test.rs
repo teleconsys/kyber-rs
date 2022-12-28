@@ -1,6 +1,6 @@
 use crate::util::test::{self, new_group_bench, GroupBench};
 
-use super::{Curve, SuiteEd25519};
+use super::SuiteEd25519;
 
 fn test_group() -> GroupBench<SuiteEd25519> {
     let t_suite = SuiteEd25519::new_blake_sha256ed25519();

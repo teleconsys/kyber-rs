@@ -76,8 +76,11 @@ pub trait Dh {
         own_private: <SUITE::POINT as Point>::SCALAR,
         remote_public: SUITE::POINT,
     ) -> SUITE::POINT {
-        let sk = suite.point();
-        sk.mul(&own_private, Some(&remote_public))
+        //println!("priv dh {}", own_private.to_string());
+        //println!("pub dh {}", remote_public.to_string());
+        let p = suite.point().mul(&own_private, Some(&remote_public));
+        //println!("res {:?}", p.to_string());
+        return p
     }
 
     fn hkdf(ikm: &[u8], info: &[u8], output_size: Option<usize>) -> Result<Vec<u8>> {
@@ -110,7 +113,7 @@ pub trait Dh {
         let nonce = GenericArray::from_slice(nonce);
 
         let payload: Payload = match additional_data {
-            None => data.into(),
+            None => Payload::from(data),
             Some(add_data) => Payload {
                 aad: add_data,
                 msg: data,
@@ -138,7 +141,7 @@ pub trait Dh {
         let nonce = GenericArray::from_slice(nonce);
 
         let payload: Payload = match additional_data {
-            None => ciphertext.into(),
+            None => Payload::from(ciphertext),
             Some(add_data) => Payload {
                 aad: add_data,
                 msg: ciphertext,
@@ -189,7 +192,7 @@ pub struct AEAD<T: Dh> {
 }
 
 impl<DH: Dh> AEAD<DH> {
-    pub fn new<POINT: Point>(pre: POINT, hkfd_context: &Vec<u8>) -> Result<Self> {
+    pub fn new<POINT: Point>(pre: POINT, hkfd_context: &[u8]) -> Result<Self> {
         let pre_buff = pre.marshal_binary()?;
         let key = DH::hkdf(&pre_buff, &hkfd_context, None)?;
         if key.len() != 32 {
@@ -215,6 +218,7 @@ impl<DH: Dh> AEAD<DH> {
         plaintext: &[u8],
         additional_data: Option<&[u8]>,
     ) -> Result<Vec<u8>> {
+        println!("{:?}", self.key);
         let encrypted = DH::aes_encrypt(&self.key, nonce, plaintext, additional_data)?;
         if dst.is_some() {
             dst.unwrap().copy_from_slice(&encrypted);
@@ -240,6 +244,7 @@ impl<DH: Dh> AEAD<DH> {
         ciphertext: &[u8],
         additional_data: Option<&[u8]>,
     ) -> Result<Vec<u8>> {
+        println!("{:?}",self.key);
         let decrypted = DH::aes_decrypt(&self.key, nonce, ciphertext, additional_data)?;
         if dst.is_some() {
             dst.unwrap().copy_from_slice(&decrypted);

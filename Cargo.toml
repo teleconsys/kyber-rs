@@ -33,6 +33,7 @@ flate2 = "1.0.24"
 scanner-rust = "2.0.16"
 
 
+
 [[bench]]
 name = "ed25519"
 harness = false
