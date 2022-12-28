@@ -3,9 +3,8 @@ use sha2::Sha256;
 use crate::dh::{AEAD, NONCE_SIZE};
 use crate::encoding::BinaryUnmarshaler;
 use crate::group::edwards25519::{Point, SuiteEd25519};
-use crate::util::key::Generator;
 use crate::util::{key, random};
-use crate::{Group, Point as PointTrait, Random, Scalar};
+use crate::{Random, Group, Scalar, Point as PointTrait};
 
 use super::Dh;
 
@@ -148,15 +147,19 @@ fn test_aead_whole() {
 
 #[test]
 fn test_aead_random() {
-    for i in 0..10 ^ 6 {
+    for i in 0..1000 {
         let suite = SuiteEd25519::new_blake_sha256ed25519();
 
         let keypair1 = key::new_key_pair(&suite).unwrap();
         let keypair2 = key::new_key_pair(&suite).unwrap();
         let priv1 = keypair1.private;
+        //println!("priv 1 {}", priv1.to_string());
         let priv2 = keypair2.private;
+        //println!("priv 2 {}", priv2.to_string());
         let pub1 = keypair1.public;
+        //println!("pub 1 {}", pub1.to_string());
         let pub2 = keypair2.public;
+        //println!("pub 2 {}", pub2.to_string());
 
         // let priv1 = suite.scalar().pick(&mut suite.random_stream());
         // let pub1 = suite.point().mul(&priv1, None);
@@ -171,12 +174,12 @@ fn test_aead_random() {
         let pre = SuiteEd25519::dh_exchange(suite, priv1, pub2);
         let gcm = AEAD::<SuiteEd25519>::new(pre, &vec![]).unwrap();
 
-        let ciphertext = gcm.seal(None, &nonce, &message, Some(&vec![])).unwrap();
+        let ciphertext = gcm.seal(None, &nonce, &message, None).unwrap();
 
         let pre2 = SuiteEd25519::dh_exchange(suite, priv2, pub1);
         let gcm2 = AEAD::<SuiteEd25519>::new(pre2, &vec![]).unwrap();
 
-        let decrypted = gcm2.open(None, &nonce, &ciphertext, Some(&vec![])).expect(&format!("decryption failed at iteration {}", i));
+        let decrypted = gcm2.open(None, &nonce, &ciphertext, None).expect(&format!("decryption failed at iteration {}", i));
 
         assert_eq!(decrypted, message, "assertion failed at iteration {}", i);
     }

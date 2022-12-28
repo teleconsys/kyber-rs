@@ -52,7 +52,7 @@ impl<POINT: Point> Pair<POINT> {
             Some(key) => key,
             None => suite.scalar().pick(&mut random),
         };
-        self.public = suite.point().mul(&self.private, None);
+        self.public = suite.point().mul(&self.private, Some(&suite.point().base()));
         Ok(())
     }
 }
