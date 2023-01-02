@@ -36,7 +36,7 @@ fn test_schnorr_signature() {
 
     // wrong public key
     let wr_pk = key::new_key_pair(&suite).unwrap();
-    verify(suite, &&wr_pk.public, msg, &s).unwrap_err();
+    verify(suite, &wr_pk.public, msg, &s).unwrap_err();
 }
 
 #[test]

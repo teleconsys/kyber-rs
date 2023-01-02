@@ -23,7 +23,7 @@ struct SuiteStable<SUITE: Suite> {
 fn new_suite_stable<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>>(
     s: &SUITE,
 ) -> SuiteStable<SUITE> {
-    return SuiteStable { suite: s.clone() };
+    SuiteStable { suite: s.clone() }
 }
 
 impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> HashFactory for SuiteStable<SUITE> {
@@ -107,8 +107,8 @@ fn test_embed<GROUP: Group, S: Stream>(
     if max > b.len() {
         max = b.len()
     }
-    let mut x_cmp = x.clone();
-    for byte in b[max..].to_vec() {
+    let mut x_cmp = x;
+    for byte in b[max..].iter().copied() {
         x_cmp.push(byte);
     }
     if b.to_vec() != x_cmp {
@@ -300,9 +300,8 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
     // if curve's is_prime_order return None,
     // then assume that it is.
     let mut prime_order = true;
-    match g.is_prime_order() {
-        Some(b) => prime_order = b,
-        None => (),
+    if let Some(b) = g.is_prime_order() {
+        prime_order = b
     }
 
     // Verify additive and multiplicative identities of the generator.
@@ -447,7 +446,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
             stmp.to_string(),
         )
     }
-    pt2 = pt2.neg(&p2).clone();
+    pt2 = pt2.neg(&p2);
     pt2 = pt2.clone().add(&pt2, &p1);
     if !pt2.equal(&ptmp) {
         bail!(
@@ -567,17 +566,11 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
     for _ in 0..5 {
         let mut buf = Vec::new();
         let s = g.scalar().pick(rand);
-        match s.marshal_to(&mut buf) {
-            Ok(_) => (),
-            Err(e) => {
-                bail!("encoding of secret fails: {}", e.to_string())
-            }
+        if let Err(e) = s.marshal_to(&mut buf) {
+            bail!("encoding of secret fails: {}", e.to_string())
         }
-        match stmp.unmarshal_binary(&mut buf) {
-            Ok(_) => (),
-            Err(e) => {
-                bail!("decoding of secret fails: {}", e.to_string())
-            }
+        if let Err(e) = stmp.unmarshal_binary(&buf) {
+            bail!("decoding of secret fails: {}", e.to_string())
         }
         if stmp != s {
             bail!("decoding produces different secret than encoded",)
@@ -585,17 +578,11 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
 
         let mut buf = Vec::new();
         let p = g.point().pick(rand);
-        match p.marshal_to(&mut buf) {
-            Ok(_) => (),
-            Err(e) => {
-                bail!("encoding of point fails: {}", e.to_string())
-            }
+        if let Err(e) = p.marshal_to(&mut buf) {
+            bail!("encoding of point fails: {}", e.to_string())
         }
-        match ptmp.unmarshal_binary(&mut buf) {
-            Ok(_) => (),
-            Err(e) => {
-                bail!("decoding of point fails: {}", e.to_string())
-            }
+        if let Err(e) = ptmp.unmarshal_binary(&buf) {
+            bail!("decoding of point fails: {}", e.to_string())
         }
         if ptmp != p {
             bail!("decoding produces different point than encoded",);
@@ -605,11 +592,8 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
     // Test that we can marshal/ unmarshal null point
     pzero = g.point().null();
     let b = pzero.marshal_binary().unwrap();
-    match g.point().unmarshal_binary(&b) {
-        Ok(_) => (),
-        Err(e) => {
-            bail!("Could not unmarshall binary {:?}: {}", b, e.to_string())
-        }
+    if let Err(e) = g.point().unmarshal_binary(&b) {
+        bail!("Could not unmarshall binary {:?}: {}", b, e.to_string())
     };
 
     test_point_set(&g, rand)?;
@@ -621,7 +605,9 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
 }
 
 /// GroupTest applies a generic set of validation tests to a cryptographic Group.
-pub fn group_test<GROUP: Group + Generator<<GROUP::POINT as Point>::SCALAR>>(g: GROUP) -> Result<()> {
+pub fn group_test<GROUP: Group + Generator<<GROUP::POINT as Point>::SCALAR>>(
+    g: GROUP,
+) -> Result<()> {
     _ = test_group(g, &mut Randstream::default())?;
     Ok(())
 }
@@ -672,7 +658,7 @@ pub fn suite_test<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>>(
     // Generate some pseudorandom bits
     let mut x = suite.xof(Some(&hb));
     let mut sb = [0u8; 128];
-    x.read(&mut sb).unwrap();
+    x.read_exact(&mut sb).unwrap();
     print!("\nStream: {:?}", sb);
 
     // Test if it generates two fresh keys

@@ -8,8 +8,7 @@ use crate::{
     },
     share::vss::suite::Suite,
     sign::dss,
-    util::random::Randstream,
-    xof, Group, Point, Random, Scalar, XOFFactory,
+    util, xof, Group, Point, Random, Scalar, XOFFactory,
 };
 
 use super::{new_key_pair, Generator, Suite as KeySuite};
@@ -23,7 +22,7 @@ fn test_new_key_pair() {
     assert_eq!(public, keypair.public);
 }
 
-#[derive(Clone, Debug, Copy)]
+#[derive(Clone, Debug, Copy, Default)]
 /// A type to test interface Generator by intentionally creating a fixed private key.
 struct FixedPrivSuiteEd25519 {
     pub(crate) curve: Curve,
@@ -62,23 +61,15 @@ impl Group for FixedPrivSuiteEd25519 {
     }
 }
 
-impl Default for FixedPrivSuiteEd25519 {
-    fn default() -> Self {
-        FixedPrivSuiteEd25519 {
-            curve: Curve::default(),
-        }
-    }
-}
-
 impl Random for FixedPrivSuiteEd25519 {
     fn random_stream(&self) -> Box<dyn Stream> {
-        Box::new(Randstream::default())
+        Box::<util::random::random::Randstream>::default()
     }
 }
 
 impl XOFFactory for FixedPrivSuiteEd25519 {
     fn xof(&self, key: Option<&[u8]>) -> Box<dyn crate::XOF> {
-        Box::new(xof::blake::XOF::new(key))
+        Box::new(xof::blake::Xof::new(key))
     }
 }
 

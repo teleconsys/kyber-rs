@@ -27,9 +27,9 @@ pub enum ByteOrder {
     BigEndian,
 }
 
-impl Into<bool> for ByteOrder {
-    fn into(self) -> bool {
-        match self {
+impl From<ByteOrder> for bool {
+    fn from(val: ByteOrder) -> Self {
+        match val {
             LittleEndian => true,
             BigEndian => false,
         }
@@ -92,7 +92,7 @@ impl Int {
         // specify euclidean modulus for negative number
         match self.v.sign() {
             num_bigint::Sign::Minus => self.v = (self.v % m.clone()) + m.abs(),
-            _ => self.v = self.v % m,
+            _ => self.v %= m,
         }
         self
     }
@@ -126,7 +126,7 @@ impl Int {
 
         let buf = vec![0; pad as usize];
         let buf2 = &buf[0..act as usize];
-        reverse(&buf2.to_vec(), &v_bytes)
+        reverse(buf2, &v_bytes)
     }
 
     /// marshal_size returns the length in bytes of encoded integers with modulus m.
@@ -139,7 +139,7 @@ impl Int {
 
     /// new_int creates a new Int with a given big.Int and a big.Int modulus.
     pub fn new_int(v: BigInt, m: BigInt) -> Int {
-        return Int::default().init(v, m);
+        Int::default().init(v, m)
     }
 
     /// new_int64 creates a new Int with a given int64 value and big.Int modulus.
@@ -150,13 +150,13 @@ impl Int {
     /// new_int_bytes creates a new Int with a given slice of bytes and a big.Int
     /// modulus.
     pub fn new_int_bytes(a: &[u8], m: &BigInt, byte_order: ByteOrder) -> Int {
-        return Int::default().init_bytes(a, m, byte_order);
+        Int::default().init_bytes(a, m, byte_order)
     }
 
     /// new_int_string creates a new Int with a given string and a big.Int modulus.
     /// The value is set to a rational fraction n/d in a given base.
     pub fn new_int_string(n: String, d: String, base: i32, m: &BigInt) -> Int {
-        return Int::default().init_string(n, d, base, m);
+        Int::default().init_string(n, d, base, m)
     }
 
     // Equal returns true if the TWO Ints are equal
@@ -194,9 +194,11 @@ impl Int {
     /// (nil,false) if either string fails to parse.
     pub fn set_string(mut self, n: String, d: String, base: i32) -> Result<Self> {
         self.v = BigInt::from_str_radix(n.as_str(), base as u32)?;
-        if d != "" {
-            let mut di = Int::default();
-            di.m = self.m.clone();
+        if !d.is_empty() {
+            let mut di = Int {
+                m: self.m.clone(),
+                ..Default::default()
+            };
             di = di.set_string(d, "".to_string(), base)?;
             return Ok(self.clone().div(&self, &di));
         }
@@ -216,7 +218,7 @@ impl Int {
     pub fn mul(mut self, a: &Self, b: &Self) -> Self {
         self.m = a.m.clone();
         self.v = a.v.clone() * b.v.clone();
-        self.v = self.v % self.m.clone();
+        self.v %= self.m.clone();
         self
     }
 
@@ -266,13 +268,13 @@ impl BinaryUnmarshaler for Int {
     /// Returns an error if the buffer is not exactly Len() bytes long
     /// or if the contents of the buffer represents an out-of-range integer.
     fn unmarshal_binary(&mut self, data: &[u8]) -> Result<()> {
-        let mut buf: Vec<u8> = data.clone().to_vec();
+        let mut buf: Vec<u8> = data.to_vec();
         if buf.len() != self.marshal_size() as usize {
             bail!("unmarshal_binary: wrong size buffer");
         }
         // Still needed here because of the comparison with the modulo
         if self.bo == LittleEndian {
-            buf = reverse(&mut vec![0 as u8; buf.len()], &buf.to_vec()).to_owned();
+            buf = reverse(&vec![0_u8; buf.len()], &buf.to_vec());
         }
         self.v = BigInt::from_bytes_be(Plus, buf.as_slice());
         if matches!(self.v.cmp(&self.m), Greater | Equal) {
@@ -349,9 +351,9 @@ impl Scalar for Int {
     /// by a byte string.
     /// Endianness depends on the endianess set in i.
     fn set_bytes(self, a: &[u8]) -> Self {
-        let mut buff = a.clone().to_vec();
+        let mut buff = a.to_vec();
         if self.bo == LittleEndian {
-            buff = reverse(vec![0; buff.len()].as_ref(), &a.to_vec());
+            buff = reverse(vec![0; buff.len()].as_ref(), a);
         }
         Int {
             m: self.m.clone(),
@@ -364,15 +366,15 @@ impl Scalar for Int {
         todo!()
     }
 
-    fn div(self, a: &Self, b: &Self) -> Self {
+    fn div(self, _a: &Self, _bb: &Self) -> Self {
         todo!()
     }
 
-    fn inv(self, a: &Self) -> Self {
+    fn inv(self, _a: &Self) -> Self {
         todo!()
     }
 
-    fn neg(self, a: &Self) -> Self {
+    fn neg(self, _a: &Self) -> Self {
         todo!()
     }
 }
@@ -557,13 +559,12 @@ impl Scalar for Int {
 /// reverse copies src into dst in byte-reversed order and returns dst,
 /// such that src[0] goes into dst[len-1] and vice versa.
 /// dst and src may be the same slice but otherwise must not overlap.
-fn reverse(dst: &Vec<u8>, src: &Vec<u8>) -> Vec<u8> {
-    let mut dst = dst.clone();
-    let src = src.clone();
+fn reverse(dst: &[u8], src: &[u8]) -> Vec<u8> {
+    let mut dst = dst.to_vec();
     let l = dst.len();
     for i in 0..(l + 1) / 2 {
         let j = l - 1 - i;
         (dst[i], dst[j]) = (src[j], src[i]);
     }
-    dst.clone()
+    dst.to_vec()
 }

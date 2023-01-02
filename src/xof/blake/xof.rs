@@ -9,10 +9,10 @@ use crate::xof::xof;
 #[derive(Clone)]
 enum HashState {
     Readable { reader: blake3::OutputReader },
-    Writeable { writer: blake3::Hasher },
+    Writeable { writer: Box<blake3::Hasher> },
 }
 
-pub struct XOF {
+pub struct Xof {
     implementation: HashState,
 
     // key is here to not make excess garbage during repeated calls
@@ -20,7 +20,7 @@ pub struct XOF {
     key: Vec<u8>,
 }
 
-impl Stream for XOF {
+impl Stream for Xof {
     fn xor_key_stream(&mut self, dst: &mut [u8], src: &[u8]) -> Result<(), Error> {
         if dst.len() < src.len() {
             return Err(Error::msg("dst too short"));
@@ -46,7 +46,7 @@ impl Stream for XOF {
     }
 }
 
-impl std::io::Write for XOF {
+impl std::io::Write for Xof {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         match &mut self.implementation {
             HashState::Readable { reader: _ } => Err(std::io::Error::new(
@@ -68,7 +68,7 @@ impl std::io::Write for XOF {
         // self.implementation.flush()
     }
 }
-impl std::io::Read for XOF {
+impl std::io::Read for Xof {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         match &mut self.implementation {
             HashState::Readable { reader } => reader.read(buf),
@@ -82,9 +82,9 @@ impl std::io::Read for XOF {
     }
 }
 
-impl xof::XOF for XOF {
+impl xof::XOF for Xof {
     fn clone(&self) -> Box<dyn xof::XOF> {
-        Box::new(XOF {
+        Box::new(Xof {
             implementation: self.implementation.clone(),
             key: self.key.clone(),
         })
@@ -93,28 +93,30 @@ impl xof::XOF for XOF {
     fn reseed(&mut self) {
         // Use New to create a new one seeded with output from the old one.
         if self.key.len() < 128 {
-            self.key = vec![0 as u8; 128];
+            self.key = vec![0_u8; 128];
         } else {
             self.key = self.key[0..128].to_vec();
         }
         let mut k = self.key.clone();
         _ = self.read(&mut k);
         self.key = k;
-        let y = XOF::new(Some(&self.key));
+        let y = Xof::new(Some(&self.key));
         // Steal the XOF implementation, and put it inside of x.
         self.implementation = y.implementation;
     }
 }
 
-impl XOF {
+impl Xof {
     /// New creates a new XOF using the Blake2b hash.
     pub fn new(seed: Option<&[u8]>) -> Self {
         let mut b = blake3::Hasher::new();
         if let Some(s) = seed {
-            b.write(s).unwrap();
+            b.write_all(s).unwrap();
         }
-        XOF {
-            implementation: HashState::Writeable { writer: b },
+        Xof {
+            implementation: HashState::Writeable {
+                writer: Box::new(b),
+            },
             key: vec![0; 0],
         }
     }

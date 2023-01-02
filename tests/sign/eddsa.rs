@@ -47,15 +47,10 @@ fn test_golden() {
     const PUBLIC_KEY_SIZE: usize = 32;
     const PRIVATE_KEY_SIZE: usize = 32;
 
-    loop {
-        let line = match scanner.next().unwrap() {
-            Some(text) => text,
-            None => break,
-        };
-
+    while let Some(line) = scanner.next().unwrap() {
         line_no += 1;
 
-        let parts: Vec<&str> = line.split(":").collect();
+        let parts: Vec<&str> = line.split(':').collect();
         if parts.len() != 5 {
             panic!("bad number of parts on line {}", line_no)
         }
@@ -110,14 +105,15 @@ pub struct ConstantStream {
 
 impl cipher::Stream for ConstantStream {
     fn xor_key_stream(&mut self, dst: &mut [u8], _: &[u8]) -> Result<()> {
-        Ok(dst.copy_from_slice(&self.seed))
+        dst.copy_from_slice(&self.seed);
+        Ok(())
     }
 }
 
 // ConstantStream is a cipher.Stream which always returns
 // the same value.
 pub fn constant_stream(buff: Vec<u8>) -> Box<dyn cipher::Stream> {
-    return Box::new(ConstantStream {
+    Box::new(ConstantStream {
         seed: buff[..32].to_vec(),
-    });
+    })
 }

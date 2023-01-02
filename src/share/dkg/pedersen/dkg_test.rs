@@ -33,14 +33,13 @@ lazy_static! {
     static ref DEFAULT_T: usize = vss::pedersen::vss::minimum_t(DEFAULT_N);
 }
 
-fn generate(
-    n: usize,
-    t: usize,
-) -> (
-    Vec<EdPoint>,
-    Vec<EdScalar>,
-    Vec<DistKeyGenerator<SuiteEd25519, &'static [u8]>>,
-) {
+struct TestData<SUITE: Suite> {
+    part_pubs: Vec<SUITE::POINT>,
+    part_sec: Vec<<SUITE::POINT as Point>::SCALAR>,
+    dkgs: Vec<DistKeyGenerator<SUITE, &'static [u8]>>,
+}
+
+fn generate(n: usize, t: usize) -> TestData<SuiteEd25519> {
     let mut part_pubs = Vec::with_capacity(n);
     let mut part_sec = Vec::with_capacity(n);
     for _ in 0..n {
@@ -49,16 +48,22 @@ fn generate(
         part_sec.push(sec);
     }
     let mut dkgs = Vec::with_capacity(n);
-    for i in 0..n {
+    (0..n).for_each(|i| {
         let dkg = new_dist_key_generator(suite(), part_sec[i].clone(), &part_pubs, t).unwrap();
         dkgs.push(dkg);
+    });
+    TestData {
+        part_pubs,
+        part_sec,
+        dkgs,
     }
-    return (part_pubs, part_sec, dkgs);
 }
 
 #[test]
 fn test_dkg_new_dist_key_generator() {
-    let (part_pubs, part_sec, _) = generate(DEFAULT_N, *DEFAULT_T);
+    let test_data = generate(DEFAULT_N, *DEFAULT_T);
+    let part_pubs = test_data.part_pubs;
+    let part_sec = test_data.part_sec;
 
     let long = part_sec[0].clone();
     let dkg: DistKeyGenerator<SuiteEd25519, &'static [u8]> =
@@ -80,7 +85,7 @@ fn test_dkg_new_dist_key_generator() {
     assert!(dkg_res.is_err());
 
     let dkg_res =
-        new_dist_key_generator::<SuiteEd25519, &'static [u8]>(suite(), sec, &vec![], *DEFAULT_T);
+        new_dist_key_generator::<SuiteEd25519, &'static [u8]>(suite(), sec, &[], *DEFAULT_T);
     assert_eq!(
         dkg_res.err().unwrap().to_string(),
         "dkg: can't run with empty node list"
@@ -89,7 +94,7 @@ fn test_dkg_new_dist_key_generator() {
 
 #[test]
 fn test_dkg_deal() {
-    let (_, _, mut dkgs) = generate(DEFAULT_N, *DEFAULT_T);
+    let mut dkgs = generate(DEFAULT_N, *DEFAULT_T).dkgs;
     let dkg = &mut dkgs[0];
 
     let dks_res = dkg.dist_key_share();
@@ -108,7 +113,7 @@ fn test_dkg_deal() {
 
 #[test]
 fn test_dkg_process_deal() {
-    let (_, _, mut dkgs) = generate(DEFAULT_N, *DEFAULT_T);
+    let mut dkgs = generate(DEFAULT_N, *DEFAULT_T).dkgs;
     let dkg = &mut dkgs[0];
     let mut deals = dkg.deals().unwrap();
 
@@ -155,7 +160,7 @@ fn test_dkg_process_response() {
     // second peer processes it and returns a complaint
     // first peer process the complaint
 
-    let (_, _, mut dkgs) = generate(DEFAULT_N, *DEFAULT_T);
+    let mut dkgs = generate(DEFAULT_N, *DEFAULT_T).dkgs;
     let idx_rec = 1;
 
     // give a wrong deal
@@ -248,7 +253,9 @@ fn test_dkg_process_response() {
 fn test_dkg_resharing_threshold() {
     let n = 7;
     let old_t = vss::pedersen::vss::minimum_t(n);
-    let (publics, _, mut dkgs) = generate(n, old_t);
+    let test_data = generate(n, old_t);
+    let publics = test_data.part_pubs;
+    let mut dkgs = test_data.dkgs;
     full_exchange(&mut dkgs, true);
 
     let new_n = dkgs.len() + 1;
@@ -329,7 +336,7 @@ fn test_dkg_resharing_threshold() {
         resps.insert(i, Vec::new());
         for (j, d) in local_deals {
             for dkg in selected_dkgs.iter_mut() {
-                if dkg.new_present && dkg.nidx == j.clone() {
+                if dkg.new_present && dkg.nidx == *j {
                     let resp = dkg.process_deal(d).unwrap();
                     assert_eq!(resp.response.status, vss::pedersen::vss::STATUS_APPROVAL);
                     resps.get_mut(&i).unwrap().push(resp);
@@ -345,7 +352,7 @@ fn test_dkg_resharing_threshold() {
                 if resp.response.index == dkg.nidx as u32 {
                     continue;
                 }
-                let j = dkg.process_response(&resp).expect(&format!("old dkg at (oidx {}, nidx {}) has received response from idx {} for dealer idx {}\n", dkg.oidx, dkg.nidx, resp.response.index, resp.index));
+                let j = dkg.process_response(&resp).unwrap_or_else(|_| panic!("old dkg at (oidx {}, nidx {}) has received response from idx {} for dealer idx {}\n", dkg.oidx, dkg.nidx, resp.response.index, resp.index));
                 assert!(j.is_none());
             }
         }
@@ -404,7 +411,7 @@ fn test_dkg_threshold() {
     let n = 7;
     // should succeed with only this number of nodes
     let new_total = vss::pedersen::vss::minimum_t(n);
-    let (_, _, dkgs) = generate(n, new_total);
+    let dkgs = generate(n, new_total).dkgs;
 
     // only take a threshold of them
     let mut thr_dkgs = HashMap::new();
@@ -465,12 +472,12 @@ fn test_dkg_threshold() {
         for (i, v) in dkg.verifiers.iter_mut() {
             let mut app = 0;
             let responses = v.responses();
-            for (_, r) in responses {
+            responses.iter().for_each(|(_, r)| {
                 if r.status == vss::pedersen::vss::STATUS_APPROVAL {
                     app += 1;
                 }
-            }
-            if already_taken.contains_key(&(i.clone() as usize)) {
+            });
+            if already_taken.contains_key(&(*i as usize)) {
                 assert_eq!(already_taken.len(), app);
             } else {
                 assert_eq!(0, app);
@@ -502,7 +509,7 @@ fn test_dkg_threshold() {
 
 #[test]
 fn test_dist_key_share() {
-    let (_, _, mut dkgs) = generate(DEFAULT_N, *DEFAULT_T);
+    let mut dkgs = generate(DEFAULT_N, *DEFAULT_T).dkgs;
     full_exchange(&mut dkgs, true);
 
     for dkg in dkgs.iter() {
@@ -528,7 +535,7 @@ fn test_dist_key_share() {
     let mut shares = Vec::with_capacity(DEFAULT_N);
     for dks in dkss.iter() {
         assert!(
-            check_dks(&dks, &dkss[0]),
+            check_dks(dks, &dkss[0]),
             "dist key share not equal {} vs {}",
             dks.share.i,
             0
@@ -558,7 +565,7 @@ fn random_bytes(n: usize) -> Vec<u8> {
     for _ in 0..n {
         buff.push(rng.gen());
     }
-    return buff;
+    buff
 }
 
 fn check_dks<SUITE: Suite>(dks1: &DistKeyShare<SUITE>, dks2: &DistKeyShare<SUITE>) -> bool {
@@ -570,7 +577,7 @@ fn check_dks<SUITE: Suite>(dks1: &DistKeyShare<SUITE>, dks2: &DistKeyShare<SUITE
             return false;
         }
     }
-    return true;
+    true
 }
 
 fn full_exchange<SUITE: Suite, READ: Read + Clone + 'static>(
@@ -623,7 +630,10 @@ fn full_exchange<SUITE: Suite, READ: Read + Clone + 'static>(
 #[test]
 fn test_dkg_resharing() {
     let old_t = vss::pedersen::vss::minimum_t(DEFAULT_N);
-    let (publics, secrets, mut dkgs) = generate(DEFAULT_N, old_t);
+    let test_data = generate(DEFAULT_N, old_t);
+    let publics = test_data.part_pubs;
+    let secrets = test_data.part_sec;
+    let mut dkgs = test_data.dkgs;
     full_exchange(&mut dkgs, true);
 
     let mut shares = Vec::with_capacity(dkgs.len());
@@ -678,7 +688,10 @@ fn test_dkg_resharing() {
 #[test]
 fn test_dkg_resharing_remove_node() {
     let old_t = vss::pedersen::vss::minimum_t(DEFAULT_N);
-    let (publics, secrets, mut dkgs) = generate(DEFAULT_N, old_t);
+    let test_data = generate(DEFAULT_N, old_t);
+    let publics = test_data.part_pubs;
+    let secrets = test_data.part_sec;
+    let mut dkgs = test_data.dkgs;
     full_exchange(&mut dkgs, true);
 
     let new_n = publics.len() - 1;
@@ -738,7 +751,10 @@ fn test_dkg_resharing_remove_node() {
 fn test_dkg_resharing_new_nodes_threshold() {
     let old_n = DEFAULT_N;
     let old_t = vss::pedersen::vss::minimum_t(old_n);
-    let (old_pubs, old_privs, mut dkgs) = generate(old_n, old_t);
+    let test_data = generate(old_n, old_t);
+    let old_pubs = test_data.part_pubs;
+    let old_privs = test_data.part_sec;
+    let mut dkgs = test_data.dkgs;
     full_exchange(&mut dkgs, true);
 
     let mut shares = Vec::with_capacity(dkgs.len());
@@ -830,7 +846,7 @@ fn test_dkg_resharing_new_nodes_threshold() {
     for (i, local_deals) in deals.iter().enumerate() {
         resps.insert(i, vec![]);
         for (j, d) in local_deals {
-            let dkg = &mut new_dkgs[j.clone()];
+            let dkg = &mut new_dkgs[(*j)];
             let resp = dkg.process_deal(d).unwrap();
             assert_eq!(vss::pedersen::vss::STATUS_APPROVAL, resp.response.status);
             resps.get_mut(&i).unwrap().push(resp);
@@ -846,7 +862,7 @@ fn test_dkg_resharing_new_nodes_threshold() {
                 if resp.response.index == dkg.nidx as u32 {
                     continue;
                 }
-                let j = dkg.process_response(&resp).expect(&format!("old dkg at (oidx {}, nidx {}) has received response from idx {} for dealer idx {}\n", dkg.oidx, dkg.nidx, resp.response.index, resp.index));
+                let j = dkg.process_response(&resp).unwrap_or_else(|_| panic!("old dkg at (oidx {}, nidx {}) has received response from idx {} for dealer idx {}\n", dkg.oidx, dkg.nidx, resp.response.index, resp.index));
                 assert!(j.is_none());
             }
             // dispatch to the new dkgs
@@ -855,10 +871,12 @@ fn test_dkg_resharing_new_nodes_threshold() {
                 if resp.response.index == dkg.nidx as u32 {
                     continue;
                 }
-                let j = dkg.process_response(&resp).expect(&format!(
-                    "new dkg at nidx {} has received response from idx {} for dealer idx {}\n",
-                    dkg.nidx, resp.response.index, resp.index
-                ));
+                let j = dkg.process_response(&resp).unwrap_or_else(|_| {
+                    panic!(
+                        "new dkg at nidx {} has received response from idx {} for dealer idx {}\n",
+                        dkg.nidx, resp.response.index, resp.index
+                    )
+                });
                 assert!(j.is_none());
             }
         }
@@ -908,8 +926,10 @@ fn test_dkg_resharing_new_nodes_threshold() {
 /// Test resharing to a different set of nodes with two common.
 #[test]
 fn test_dkg_resharing_new_nodes() {
-    let (old_pubs, old_privs, mut dkgs) =
-        generate(DEFAULT_N, vss::pedersen::vss::minimum_t(DEFAULT_N));
+    let test_data = generate(DEFAULT_N, vss::pedersen::vss::minimum_t(DEFAULT_N));
+    let old_pubs = test_data.part_pubs;
+    let old_privs = test_data.part_sec;
+    let mut dkgs = test_data.dkgs;
     full_exchange(&mut dkgs, true);
 
     let mut shares = Vec::with_capacity(dkgs.len());
@@ -1047,7 +1067,7 @@ fn test_dkg_resharing_new_nodes() {
     for (i, local_deals) in deals.iter().enumerate() {
         resps.insert(i, vec![]);
         for (dest, d) in local_deals {
-            let dkg = &mut new_dkgs[dest.clone()];
+            let dkg = &mut new_dkgs[(*dest)];
             let resp = dkg.process_deal(d).unwrap();
             assert_eq!(vss::pedersen::vss::STATUS_APPROVAL, resp.response.status);
             resps.get_mut(&i).unwrap().push(resp);
@@ -1066,7 +1086,7 @@ fn test_dkg_resharing_new_nodes() {
             // the two last ones will be processed while doing this step on the
             // newDkgs, since they are in the new set.
             for dkg in old_dkgs[..old_n - 2].iter_mut() {
-                let j = dkg.process_response(&resp).expect(&format!("old dkg at (oidx {}, nidx {}) has received response from idx {} for dealer idx {}\n", dkg.oidx, dkg.nidx, resp.response.index, resp.index));
+                let j = dkg.process_response(&resp).unwrap_or_else(|_| panic!("old dkg at (oidx {}, nidx {}) has received response from idx {} for dealer idx {}\n", dkg.oidx, dkg.nidx, resp.response.index, resp.index));
                 assert!(j.is_none());
             }
             // dispatch to the new dkgs
@@ -1075,10 +1095,12 @@ fn test_dkg_resharing_new_nodes() {
                 if resp.response.index == dkg.nidx as u32 {
                     continue;
                 }
-                let j = dkg.process_response(&resp).expect(&format!(
-                    "new dkg at nidx {} has received response from idx {} for dealer idx {}\n",
-                    dkg.nidx, resp.response.index, resp.index
-                ));
+                let j = dkg.process_response(&resp).unwrap_or_else(|_| {
+                    panic!(
+                        "new dkg at nidx {} has received response from idx {} for dealer idx {}\n",
+                        dkg.nidx, resp.response.index, resp.index
+                    )
+                });
                 assert!(j.is_none());
             }
         }
@@ -1135,8 +1157,10 @@ fn test_dkg_resharing_new_nodes() {
 
 #[test]
 fn test_dkg_resharing_partial_new_nodes() {
-    let (old_pubs, old_privs, mut dkgs) =
-        generate(DEFAULT_N, vss::pedersen::vss::minimum_t(DEFAULT_N));
+    let test_data = generate(DEFAULT_N, vss::pedersen::vss::minimum_t(DEFAULT_N));
+    let old_pubs = test_data.part_pubs;
+    let old_privs = test_data.part_sec;
+    let mut dkgs = test_data.dkgs;
     full_exchange(&mut dkgs, true);
 
     let mut shares = Vec::with_capacity(dkgs.len());
@@ -1167,10 +1191,10 @@ fn test_dkg_resharing_partial_new_nodes() {
     // add two new nodes
     let (priv1, pub1) = gen_pair();
     let (priv2, pub2) = gen_pair();
-    new_privs.push(priv1.clone());
-    new_privs.push(priv2.clone());
-    new_pubs.push(pub1.clone());
-    new_pubs.push(pub2.clone());
+    new_privs.push(priv1);
+    new_privs.push(priv2);
+    new_pubs.push(pub1);
+    new_pubs.push(pub2);
 
     // creating all dkgs
     let mut total_dkgs: Vec<DistKeyGenerator<SuiteEd25519, &[u8]>> = Vec::with_capacity(total);
@@ -1259,7 +1283,7 @@ fn test_dkg_resharing_partial_new_nodes() {
     for (i, local_deals) in deals.iter().enumerate() {
         resps.insert(i, vec![]);
         for (j, d) in local_deals {
-            let dkg = &mut new_dkgs[j.clone()];
+            let dkg = &mut new_dkgs[(*j)];
             let resp = dkg.process_deal(d).unwrap();
             assert_eq!(vss::pedersen::vss::STATUS_APPROVAL, resp.response.status);
             resps.get_mut(&i).unwrap().push(resp);
@@ -1281,7 +1305,7 @@ fn test_dkg_resharing_partial_new_nodes() {
             // the other ones will be processed while doing this step on the
             // newDkgs, since they are in the new set.
             for dkg in old_dkgs[..1].iter_mut() {
-                let j = dkg.process_response(&resp).expect(&format!("old dkg at (oidx {}, nidx {}) has received response from idx {} for dealer idx {}\n", dkg.oidx, dkg.nidx, resp.response.index, resp.index));
+                let j = dkg.process_response(&resp).unwrap_or_else(|_| panic!("old dkg at (oidx {}, nidx {}) has received response from idx {} for dealer idx {}\n", dkg.oidx, dkg.nidx, resp.response.index, resp.index));
                 assert!(j.is_none());
             }
             // dispatch to the new dkgs
@@ -1290,10 +1314,12 @@ fn test_dkg_resharing_partial_new_nodes() {
                 if resp.response.index == dkg.nidx as u32 {
                     continue;
                 }
-                let j = dkg.process_response(&resp).expect(&format!(
-                    "new dkg at nidx {} has received response from idx {} for dealer idx {}\n",
-                    dkg.nidx, resp.response.index, resp.index
-                ));
+                let j = dkg.process_response(&resp).unwrap_or_else(|_| {
+                    panic!(
+                        "new dkg at nidx {} has received response from idx {} for dealer idx {}\n",
+                        dkg.nidx, resp.response.index, resp.index
+                    )
+                });
                 assert!(j.is_none());
             }
         }
@@ -1341,7 +1367,9 @@ fn test_dkg_resharing_partial_new_nodes() {
 #[test]
 fn test_reader_mixed_entropy() {
     let seed = "some stream to be used with crypto/rand";
-    let (part_pubs, part_sec, _) = generate(DEFAULT_N, *DEFAULT_T);
+    let test_data = generate(DEFAULT_N, *DEFAULT_T);
+    let part_pubs = test_data.part_pubs;
+    let part_sec = test_data.part_sec;
     let long = part_sec[0].clone();
     let r = seed.as_bytes();
     let c = Config {
@@ -1362,7 +1390,9 @@ fn test_reader_mixed_entropy() {
 #[test]
 fn test_user_only_flag_true_behavior() {
     let seed = "String to test reproducibility with";
-    let (part_pubs, part_sec, _) = generate(DEFAULT_N, *DEFAULT_T);
+    let test_data = generate(DEFAULT_N, *DEFAULT_T);
+    let part_pubs = test_data.part_pubs;
+    let part_sec = test_data.part_sec;
     let long = part_sec[0].clone();
 
     let r1 = seed.as_bytes();
@@ -1404,7 +1434,9 @@ fn test_user_only_flag_true_behavior() {
 #[test]
 fn test_user_only_flag_false_behavior() {
     let seed = "String to test reproducibility with";
-    let (part_pubs, part_sec, _) = generate(DEFAULT_N, *DEFAULT_T);
+    let test_data = generate(DEFAULT_N, *DEFAULT_T);
+    let part_pubs = test_data.part_pubs;
+    let part_sec = test_data.part_sec;
     let long = part_sec[0].clone();
 
     let r1 = seed.as_bytes();

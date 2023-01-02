@@ -10,16 +10,16 @@ use crate::group::Group;
 use crate::group::HashFactory;
 use crate::share::vss::suite::Suite;
 use crate::sign::dss;
+use crate::util;
 use crate::util::key::Generator;
 use crate::util::key::Suite as KeySuite;
-use crate::util::random;
 use crate::{xof, Random, XOFFactory};
 
 use super::Point;
 
 /// SuiteEd25519 implements some basic functionalities such as Group, HashFactory,
 /// and XOFFactory.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct SuiteEd25519 {
     // Curve
     // r: Box<dyn Stream>,
@@ -112,14 +112,14 @@ impl Group for SuiteEd25519 {
     }
 }
 
-impl Default for SuiteEd25519 {
-    fn default() -> Self {
-        SuiteEd25519 {
-            curve: Curve::default(),
-            // r: todo!(),
-        }
-    }
-}
+// impl Default for SuiteEd25519 {
+//     fn default() -> Self {
+//         SuiteEd25519 {
+//             curve: Curve::default(),
+//             // r: todo!(),
+//         }
+//     }
+// }
 
 impl Random for SuiteEd25519 {
     /// RandomStream returns a cipher.Stream that returns a key stream
@@ -128,14 +128,14 @@ impl Random for SuiteEd25519 {
         // if self.r != nil {
         //     return s.r;
         // }
-        Box::new(random::Randstream::default())
+        Box::<util::random::random::Randstream>::default()
     }
 }
 
 impl XOFFactory for SuiteEd25519 {
     /// xof returns an XOF which is implemented via the Blake2b hash.
     fn xof(&self, key: Option<&[u8]>) -> Box<dyn crate::XOF> {
-        Box::new(xof::blake::XOF::new(key))
+        Box::new(xof::blake::Xof::new(key))
     }
 }
 

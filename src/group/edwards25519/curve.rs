@@ -39,7 +39,7 @@ impl Group for Curve {
     /// ScalarLen returns 32, the size in bytes of an encoded scalar
     /// for the Ed25519 curve.
     fn scalar_len(&self) -> usize {
-        return 32;
+        32
     }
 
     fn point(&self) -> Point {
@@ -48,7 +48,7 @@ impl Group for Curve {
 
     /// PointLen returns 32, the size in bytes of an encoded Point on the Ed25519 curve.
     fn point_len(&self) -> usize {
-        return 32;
+        32
     }
 
     fn is_prime_order(&self) -> Option<bool> {
@@ -76,7 +76,7 @@ impl Curve {
         let mut secret = self.scalar();
         secret.v.copy_from_slice(&digest[0..32]);
 
-        return (secret, buffer, digest[32..].to_vec());
+        (secret, buffer, digest[32..].to_vec())
     }
 
     /// NewKeyAndSeed returns a formatted Ed25519 key (avoid subgroup attack by requiring

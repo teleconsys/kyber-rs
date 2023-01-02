@@ -17,7 +17,7 @@
 ///   - an approval, to confirm a correct deal
 ///   - a complaint to announce an incorrect deal notifying others that the
 ///     dealer might be malicious.
-///	 All Responses must be broadcasted to every verifiers and the dealer.
+///   All Responses must be broadcasted to every verifiers and the dealer.
 ///   3) The dealer can respond to each complaint by a justification revealing the
 ///   share he originally sent out to the accusing verifier. This is done by
 ///   calling `ProcessResponse` on the `Dealer`.
@@ -163,7 +163,7 @@ impl<POINT: Point + Serialize> BinaryMarshaler for EncryptedDeal<POINT> {
 
 /// Response is sent by the verifiers to all participants and holds each
 /// individual validation or refusal of a Deal.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Response {
     /// SessionID related to this run of the protocol
     pub session_id: Vec<u8>,
@@ -175,23 +175,12 @@ pub struct Response {
     pub signature: Vec<u8>,
 }
 
-impl Default for Response {
-    fn default() -> Self {
-        Self {
-            session_id: Default::default(),
-            index: Default::default(),
-            approved: Default::default(),
-            signature: Default::default(),
-        }
-    }
-}
-
 impl Response {
     /// Hash returns the Hash representation of the Response
     pub fn hash<SUITE: Suite>(&self, s: &SUITE) -> Result<Vec<u8>> {
         let mut h = s.hash();
-        h.write("response".as_bytes())?;
-        h.write(&self.session_id)?;
+        h.write_all("response".as_bytes())?;
+        h.write_all(&self.session_id)?;
         h.write_u32::<LittleEndian>(self.index)?;
         h.write_u32::<LittleEndian>(self.approved as u32)?;
         Ok(h.finalize().to_vec())
@@ -258,9 +247,9 @@ pub fn new_dealer<SUITE: Suite>(
     let c = f_caps.add(&g_caps)?;
     let (_, commitments) = c.info();
 
-    let session_id = session_id(&suite, &d_pubb, &verifiers, &commitments, t)?;
+    let session_id = session_id(&suite, &d_pubb, verifiers, &commitments, t)?;
 
-    let aggregator = new_aggregator(&suite, &d_pubb, &verifiers, &commitments, t, &session_id);
+    let aggregator = new_aggregator(&suite, &d_pubb, verifiers, &commitments, t, &session_id);
     // C = F + G
     let mut deals: Vec<Deal<SUITE>> = vec![];
     for i in 0..verifiers.len() {
@@ -271,16 +260,16 @@ pub fn new_dealer<SUITE: Suite>(
             sec_share: fi,
             rnd_share: gi,
             commitments: commitments.clone(),
-            t: t,
+            t,
         });
     }
 
-    let hkdf_context = context(&suite, &d_pubb, &verifiers).to_vec();
+    let hkdf_context = context(&suite, &d_pubb, verifiers).to_vec();
 
     Ok(Dealer {
-        suite: suite,
+        suite,
         long: longterm,
-        secret: secret,
+        secret,
         verifiers: verifiers.to_vec(),
         pubb: d_pubb,
         secret_commits,
@@ -316,7 +305,7 @@ where
     /// (AES256-GCM) scheme to encrypt the deal.
     pub fn encrypted_deal(&self, i: usize) -> Result<EncryptedDeal<SUITE::POINT>> {
         let v_pub = find_pub(&self.verifiers, i)
-            .ok_or(Error::msg("dealer: wrong index to generate encrypted deal"))?;
+            .ok_or_else(|| Error::msg("dealer: wrong index to generate encrypted deal"))?;
         // gen ephemeral key
         let dh_secret = self.suite.scalar().pick(&mut self.suite.random_stream());
         let dh_public = self.suite.point().mul(&dh_secret, None);
@@ -332,12 +321,12 @@ where
         // let dealBuff = protobuf.Encode(self.deals[i])?;
         let deal_buf = self.deals[i].marshal_binary()?;
         let encrypted = gcm.seal(None, &nonce, &deal_buf, Some(&self.hkdf_context))?;
-        return Ok(EncryptedDeal {
+        Ok(EncryptedDeal {
             dhkey: dh_public,
             signature,
             nonce: nonce.to_vec(),
             cipher: encrypted,
-        });
+        })
     }
 
     /// encrypted_deals calls `EncryptedDeal` for each index of the verifier and
@@ -387,7 +376,7 @@ where
         if !self.aggregator.clone().enough_approvals() || !self.aggregator.deal_certified() {
             return None;
         }
-        return Some(self.suite.point().mul(&self.secret, None));
+        Some(self.suite.point().mul(&self.secret, None))
     }
 
     /// Commits returns the commitments of the coefficient of the secret polynomial
@@ -396,18 +385,18 @@ where
         if !self.aggregator.clone().enough_approvals() || !self.aggregator.deal_certified() {
             return None;
         }
-        return Some(self.secret_commits.clone());
+        Some(self.secret_commits.clone())
     }
 
     /// Key returns the longterm key pair used by this Dealer.
-    fn key(self) -> (<SUITE::POINT as Point>::SCALAR, SUITE::POINT) {
-        return (self.long, self.pubb);
+    pub fn key(self) -> (<SUITE::POINT as Point>::SCALAR, SUITE::POINT) {
+        (self.long, self.pubb)
     }
 
     /// SessionID returns the current sessionID generated by this dealer for this
     /// protocol run.
     pub fn session_id(&self) -> Vec<u8> {
-        return self.session_id.clone();
+        self.session_id.clone()
     }
 
     /// SetTimeout tells this dealer to consider this moment the maximum time limit.
@@ -451,7 +440,7 @@ pub fn new_verifier<SUITE: Suite>(
     dealer_key: &SUITE::POINT,
     verifiers: &[SUITE::POINT],
 ) -> Result<Verifier<SUITE>> {
-    let pubb = suite.point().mul(&longterm, None);
+    let pubb = suite.point().mul(longterm, None);
     let mut ok = false;
     let mut index = 0;
     for (i, v) in verifiers.iter().enumerate() {
@@ -472,7 +461,7 @@ pub fn new_verifier<SUITE: Suite>(
         verifiers: verifiers.to_vec(),
         pubb,
         index,
-        hkdf_context: Vec::from(c),
+        hkdf_context: c,
         aggregator: None,
     })
 }
@@ -599,15 +588,13 @@ where
     /// deal returns the Deal that this verifier has received. It returns
     /// nil if the deal is not certified or there is not enough approvals.
     pub fn deal(&self) -> Option<Deal<SUITE>> {
-        if self.aggregator.clone().is_none() {
-            return None;
-        }
+        self.aggregator.clone()?;
         if !self.aggregator.clone().unwrap().enough_approvals()
             || !self.aggregator.clone().unwrap().deal_certified()
         {
             return None;
         }
-        return self.deal.clone();
+        self.deal.clone()
     }
 
     /// ProcessJustification takes a DealerResponse and returns an error if
@@ -623,20 +610,20 @@ where
 
     /// Key returns the longterm key pair this verifier is using during this protocol
     /// run.
-    fn key(self) -> (<SUITE::POINT as Point>::SCALAR, SUITE::POINT) {
-        return (self.longterm, self.pubb);
+    pub fn key(self) -> (<SUITE::POINT as Point>::SCALAR, SUITE::POINT) {
+        (self.longterm, self.pubb)
     }
 
     /// Index returns the index of the verifier in the list of participants used
     /// during this run of the protocol.
-    fn index(&self) -> usize {
-        return self.index;
+    pub fn index(&self) -> usize {
+        self.index
     }
 
     /// SessionID returns the session id generated by the Dealer. WARNING: it returns
     /// an nil slice if the verifier has not received the Deal yet !
     pub fn session_id(&self) -> Vec<u8> {
-        return self.sid.clone();
+        self.sid.clone()
     }
 
     /// SetTimeout tells this verifier to consider this moment the maximum time limit.
@@ -695,7 +682,7 @@ fn new_aggregator<SUITE: Suite>(
         verifiers: verifiers.to_vec(),
         commits: commitments.to_vec(),
         t,
-        sid: sid.clone().to_vec(),
+        sid: sid.to_vec(),
         responses: HashMap::new(),
         deal: None,
         bad_dealer: false,
@@ -711,7 +698,7 @@ pub enum VerifyDealError {
 impl fmt::Display for VerifyDealError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            VerifyDealError::DealAlreadyProcessedError => write!(f, "{}", self),
+            VerifyDealError::DealAlreadyProcessedError => self.fmt(f),
             VerifyDealError::TextError(t) => write!(f, "{}", t),
         }
     }
@@ -791,16 +778,13 @@ where
     /// response for all verifiers who have no response in the array.
     pub fn clean_verifiers(&mut self) {
         for i in 0..self.verifiers.len() {
-            if !self.responses.contains_key(&(i as u32)) {
-                self.responses.insert(
-                    i as u32,
-                    Response {
-                        session_id: self.sid.clone(),
-                        index: i as u32,
-                        approved: false,
-                        ..Response::default()
-                    },
-                );
+            if let std::collections::hash_map::Entry::Vacant(e) = self.responses.entry(i as u32) {
+                e.insert(Response {
+                    session_id: self.sid.clone(),
+                    index: i as u32,
+                    approved: false,
+                    ..Response::default()
+                });
             }
         }
     }
@@ -819,7 +803,7 @@ where
 
         schnorr::verify(self.suite, &public.unwrap(), &msg, &r.signature)?;
 
-        self.add_response(&r)
+        self.add_response(r)
     }
 
     fn verify_justification(&mut self, j: &Justification<SUITE>) -> Result<()> {
@@ -849,14 +833,14 @@ where
         // add the updated resp
         self.responses.insert(j.index, r);
 
-        return verification.map_err(|e| Error::msg(e.to_string()));
+        verification.map_err(|e| Error::msg(e.to_string()))
     }
 
     pub fn add_response(&mut self, r: &Response) -> Result<()> {
         if find_pub(&self.verifiers, r.index as usize).is_none() {
             bail!("vss: index out of bounds in Complaint");
         }
-        if self.responses.get(&(r.index as u32)).is_some() {
+        if self.responses.get(&r.index).is_some() {
             bail!("vss: already existing response from same origin")
         }
         self.responses.insert(r.index, r.clone());
@@ -867,12 +851,12 @@ where
     /// the deal they received.
     pub fn enough_approvals(&self) -> bool {
         let mut app = 0usize;
-        for (_, r) in &self.responses {
+        self.responses.iter().for_each(|(_, r)| {
             if r.approved {
                 app += 1;
             }
-        }
-        return app >= self.t;
+        });
+        app >= self.t
     }
 
     /// deal_certified returns true if there has been less than t complaints, all
@@ -888,7 +872,7 @@ where
         }
 
         let too_much_complaints = verifiers_unstable > 0 || self.bad_dealer;
-        return self.enough_approvals() && !too_much_complaints;
+        self.enough_approvals() && !too_much_complaints
     }
 
     /// UnsafeSetResponseDKG is an UNSAFE bypass method to allow DKG to use VSS
@@ -912,11 +896,11 @@ where
 /// the whole protocol insecure. Setting a higher T only makes it harder to
 /// reconstruct the secret.
 pub fn minimum_t(n: usize) -> usize {
-    return (n + 1) / 2;
+    (n + 1) / 2
 }
 
 fn valid_t<POINT: Point>(t: usize, verifiers: &[POINT]) -> bool {
-    return t >= 2 && t <= verifiers.len() && (t as u32) as i64 == t as i64;
+    t >= 2 && t <= verifiers.len() && (t as u32) as i64 == t as i64
 }
 
 fn derive_h<SUITE: Suite>(suite: SUITE, verifiers: &[SUITE::POINT]) -> SUITE::POINT {
@@ -928,8 +912,8 @@ fn derive_h<SUITE: Suite>(suite: SUITE, verifiers: &[SUITE::POINT]) -> SUITE::PO
     base
 }
 
-pub(crate) fn find_pub<POINT: Point>(verifiers: &Vec<POINT>, idx: usize) -> Option<POINT> {
-    verifiers.get(idx).map(|x| x.clone())
+pub(crate) fn find_pub<POINT: Point>(verifiers: &[POINT], idx: usize) -> Option<POINT> {
+    verifiers.get(idx).cloned()
 }
 
 pub(crate) fn session_id<SUITE: Suite>(
@@ -986,11 +970,11 @@ pub fn context<SUITE: Suite>(
 ) -> Vec<u8> {
     let mut h = suite.xof(Some("vss-dealer".as_bytes()));
     dealer.marshal_to(&mut h).unwrap();
-    h.write("vss-verifiers".as_bytes()).unwrap();
+    h.write_all("vss-verifiers".as_bytes()).unwrap();
     for v in verifiers {
         v.marshal_to(&mut h).unwrap();
     }
-    let mut sum = [0 as u8; KEY_SIZE];
-    h.read(&mut sum).unwrap();
+    let mut sum = [0_u8; KEY_SIZE];
+    h.read_exact(&mut sum).unwrap();
     sum.to_vec()
 }
