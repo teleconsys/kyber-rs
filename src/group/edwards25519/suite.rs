@@ -1,25 +1,25 @@
 use std::ops::DerefMut;
 
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use std::ops::Deref;
 
 use crate::cipher::Stream;
-use crate::dh::Dh;
 use crate::group::edwards25519::curve::Curve;
 use crate::group::edwards25519::scalar::Scalar;
 use crate::group::Group;
 use crate::group::HashFactory;
+use crate::share::vss::suite::Suite;
 use crate::sign::dss;
+use crate::util;
 use crate::util::key::Generator;
 use crate::util::key::Suite as KeySuite;
-use crate::util::random;
-use crate::{xof, Random, Suite, XOFFactory};
+use crate::{xof, Random, XOFFactory};
 
 use super::Point;
 
 /// SuiteEd25519 implements some basic functionalities such as Group, HashFactory,
 /// and XOFFactory.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct SuiteEd25519 {
     // Curve
     // r: Box<dyn Stream>,
@@ -78,9 +78,8 @@ impl DerefMut for SuiteEd25519 {
     }
 }
 
-impl Generator for SuiteEd25519 {
-    type SCALAR = Scalar;
-    fn new_key<S: crate::cipher::Stream>(self, stream: &mut S) -> anyhow::Result<Scalar> {
+impl Generator<Scalar> for SuiteEd25519 {
+    fn new_key<S: crate::cipher::Stream>(&self, stream: &mut S) -> anyhow::Result<Option<Scalar>> {
         self.curve.new_key(stream)
     }
 }
@@ -107,16 +106,20 @@ impl Group for SuiteEd25519 {
     fn point_len(&self) -> usize {
         self.curve.point_len()
     }
-}
 
-impl Default for SuiteEd25519 {
-    fn default() -> Self {
-        SuiteEd25519 {
-            curve: Curve::default(),
-            // r: todo!(),
-        }
+    fn is_prime_order(&self) -> Option<bool> {
+        self.curve.is_prime_order()
     }
 }
+
+// impl Default for SuiteEd25519 {
+//     fn default() -> Self {
+//         SuiteEd25519 {
+//             curve: Curve::default(),
+//             // r: todo!(),
+//         }
+//     }
+// }
 
 impl Random for SuiteEd25519 {
     /// RandomStream returns a cipher.Stream that returns a key stream
@@ -125,14 +128,14 @@ impl Random for SuiteEd25519 {
         // if self.r != nil {
         //     return s.r;
         // }
-        Box::new(random::Randstream::default())
+        Box::<util::random::random::Randstream>::default()
     }
 }
 
 impl XOFFactory for SuiteEd25519 {
     /// xof returns an XOF which is implemented via the Blake2b hash.
     fn xof(&self, key: Option<&[u8]>) -> Box<dyn crate::XOF> {
-        Box::new(xof::blake::XOF::new(key))
+        Box::new(xof::blake::Xof::new(key))
     }
 }
 

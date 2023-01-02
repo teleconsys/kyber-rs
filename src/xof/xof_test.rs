@@ -6,7 +6,7 @@ struct BlakeF {}
 impl XOFFactory for BlakeF {
     fn xof(&self, seed: Option<&[u8]>) -> Box<dyn XOF> {
         // return blake2xb.New(seed)
-        Box::new(blake::XOF::new(seed))
+        Box::new(blake::Xof::new(seed))
     }
 }
 
@@ -25,7 +25,7 @@ fn impls() -> Vec<Box<dyn XOFFactory>> {
 
 #[test]
 fn test_enc_dec() {
-    let lengths = vec![0, 1, 16, 1024, 8192 as usize];
+    let lengths = vec![0, 1, 16, 1024, 8192_usize];
 
     for i in impls() {
         for l in &lengths {
@@ -43,14 +43,14 @@ fn test_enc_dec_impl(s: &(impl XOFFactory + ?Sized), _size: &usize) {
 
     const SRC: &[u8] = "hello".as_bytes();
 
-    let mut dst = [0 as u8; SRC.len() + 1];
+    let mut dst = [0_u8; SRC.len() + 1];
     dst[dst.len() - 1] = 0xff;
 
     s1.xor_key_stream(&mut dst, SRC).unwrap();
     assert_ne!(SRC, dst, "SRC/dst should not be equal");
     assert_eq!(dst[dst.len() - 1], 0xff, "last byte of dst changed");
 
-    let mut dst2 = [0 as u8; SRC.len()];
+    let mut dst2 = [0_u8; SRC.len()];
     s2.xor_key_stream(&mut dst2, &dst[0..SRC.len()]).unwrap();
     assert_eq!(SRC, dst2, "SRC/dst2 should be equal");
 }
@@ -78,7 +78,7 @@ fn test_clone(s: &(impl XOFFactory + ?Sized)) {
     assert_ne!(src, &dst[0..src.len()], "src/dst should not be equal");
     assert_eq!(dst[dst_len - 1], 0xff, "last byte of dst chagned");
 
-    let mut dst2 = vec![0 as u8; src.len()];
+    let mut dst2 = vec![0_u8; src.len()];
     s2.xor_key_stream(&mut dst2, &dst[0..src.len()]).unwrap();
     assert_eq!(src, dst2, "src/dst2 should be equal");
 }
@@ -116,10 +116,10 @@ fn test_random(s: &(impl XOFFactory + ?Sized)) {
     let mut xof1 = s.xof(None);
 
     for _ in 0..1000 {
-        let mut dst1 = [0 as u8; 1024];
-        xof1.read(&mut dst1).unwrap();
-        let mut dst2 = [0 as u8; 1024];
-        xof1.read(&mut dst2).unwrap();
+        let mut dst1 = [0_u8; 1024];
+        xof1.read_exact(&mut dst1).unwrap();
+        let mut dst2 = [0_u8; 1024];
+        xof1.read_exact(&mut dst2).unwrap();
         let d = bit_diff(&dst1, &dst2);
 
         assert!((d - 0.50).abs() < 0.1, "bitDiff {}", d);
@@ -128,10 +128,10 @@ fn test_random(s: &(impl XOFFactory + ?Sized)) {
     // Check that two seeds give expected mean bitdiff on first block
     let mut xof1 = s.xof(Some("a".as_bytes()));
     let mut xof2 = s.xof(Some("b".as_bytes()));
-    let mut dst1 = [0 as u8; 1024];
-    xof1.read(&mut dst1).unwrap();
-    let mut dst2 = [0 as u8; 1024];
-    xof2.read(&mut dst2).unwrap();
+    let mut dst1 = [0_u8; 1024];
+    xof1.read_exact(&mut dst1).unwrap();
+    let mut dst2 = [0_u8; 1024];
+    xof2.read_exact(&mut dst2).unwrap();
     let d = bit_diff(&dst1, &dst2);
     assert!((d - 0.50).abs() < 0.1, "two seed bitDiff {}", d);
 }
@@ -141,7 +141,7 @@ fn test_random(s: &(impl XOFFactory + ?Sized)) {
 /// no comparison is made and a -1 is returned.
 fn bit_diff(a: &[u8], b: &[u8]) -> f64 {
     if a.len() != b.len() {
-        return -1 as f64;
+        return -1_f64;
     }
 
     let mut count = 0;
@@ -165,12 +165,12 @@ fn test_no_seed(s: &(impl XOFFactory + ?Sized)) {
     // t.Logf("implementation %T", s)
 
     let mut xof1 = s.xof(None);
-    let mut dst1 = [0 as u8; 1024];
-    xof1.read(&mut dst1).unwrap();
+    let mut dst1 = [0_u8; 1024];
+    xof1.read_exact(&mut dst1).unwrap();
 
     let mut xof2 = s.xof(Some(&[]));
-    let mut dst2 = [0 as u8; 1024];
-    xof2.read(&mut dst2).unwrap();
+    let mut dst2 = [0_u8; 1024];
+    xof2.read_exact(&mut dst2).unwrap();
     assert_eq!(dst1, dst2, "hash with two flavors of zero seed not same");
 }
 
@@ -186,15 +186,15 @@ fn test_reseed(s: &(impl XOFFactory + ?Sized)) {
     let seed = "seed".as_bytes();
 
     let mut xof1 = s.xof(Some(seed));
-    let mut dst1 = [0 as u8; 1024];
-    xof1.read(&mut dst1).unwrap();
+    let mut dst1 = [0_u8; 1024];
+    xof1.read_exact(&mut dst1).unwrap();
     assert!(xof1.write(seed).is_err(), "without reseed should be Err");
     xof1.reseed();
     let mut xof2 = xof1.clone();
     assert!(xof1.write(seed).is_ok(), "after reseed should be Ok");
 
-    let mut dst2 = [0 as u8; 1024];
-    xof2.read(&mut dst2).unwrap();
+    let mut dst2 = [0_u8; 1024];
+    xof2.read_exact(&mut dst2).unwrap();
 
     let d = bit_diff(&dst1, &dst2);
     assert!((d - 0.50).abs() < 0.1, "reseed bitDiff {}", d)
@@ -212,13 +212,13 @@ fn test_enc_dec_mismatch(s: &(impl XOFFactory + ?Sized)) {
     let seed = "seed".as_bytes();
     let mut x1 = s.xof(Some(seed));
     let mut x2 = s.xof(Some(seed));
-    let mut msg = "hello world".as_bytes().to_vec();
-    let mut enc = vec![0 as u8; msg.len()];
-    let mut dec = vec![0 as u8; msg.len()];
+    let msg = "hello world".as_bytes().to_vec();
+    let mut enc = vec![0_u8; msg.len()];
+    let mut dec = vec![0_u8; msg.len()];
     x1.xor_key_stream(&mut enc[0..3], &msg[0..3]).unwrap();
-    x1.xor_key_stream(&mut enc[3..4], &mut msg[3..4]).unwrap();
-    x1.xor_key_stream(&mut enc[4..], &mut msg[4..]).unwrap();
-    x2.xor_key_stream(&mut dec[0..5], &mut enc[0..5]).unwrap();
-    x2.xor_key_stream(&mut dec[5..], &mut enc[5..]).unwrap();
+    x1.xor_key_stream(&mut enc[3..4], &msg[3..4]).unwrap();
+    x1.xor_key_stream(&mut enc[4..], &msg[4..]).unwrap();
+    x2.xor_key_stream(&mut dec[0..5], &enc[0..5]).unwrap();
+    x2.xor_key_stream(&mut dec[5..], &enc[5..]).unwrap();
     assert_eq!(msg, dec, "wrong decode");
 }

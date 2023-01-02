@@ -10,10 +10,18 @@ use crate::{
     group::edwards25519::SuiteEd25519,
     share::{
         self,
-        dkg::{self, new_dist_key_handler, Config},
+        dkg::{
+            self,
+            pedersen::{
+                new_dist_key_handler,
+                structs::{Deal, Response},
+                Config,
+            },
+        },
+        vss::suite::Suite,
     },
     sign::dss::DistKeyShare,
-    Group, Point, Random, Scalar, Suite,
+    Group, Point, Random, Scalar,
 };
 
 use super::enc_test::el_gamal_encrypt;
@@ -22,8 +30,8 @@ struct Node<SUITE: Suite> {
     dkg: dkg::pedersen::DistKeyGenerator<SUITE, &'static [u8]>,
     _pub_key: SUITE::POINT,
     priv_key: <SUITE::POINT as Point>::SCALAR,
-    deals: Vec<dkg::pedersen::Deal<SUITE::POINT>>,
-    resps: Vec<dkg::pedersen::Response>,
+    deals: Vec<Deal<SUITE::POINT>>,
+    resps: Vec<Response>,
     secret_share: share::poly::PriShare<<SUITE::POINT as Point>::SCALAR>,
     distributed_public_key: SUITE::POINT,
 }
@@ -65,7 +73,7 @@ fn test_example_dkg() {
         pub_keys.push(pub_key.clone());
         nodes.push(Node::<SuiteEd25519> {
             _pub_key: pub_key,
-            priv_key: priv_key,
+            priv_key,
             deals: Vec::new(),
             resps: Vec::new(),
             secret_share: Default::default(),
@@ -176,7 +184,7 @@ fn test_example_dkg() {
         let s = suite.point().mul(&node.secret_share.v, Some(&k));
         partials.push(suite.point().sub(&c.clone(), &s).clone());
         pub_shares.push(Some(share::poly::PubShare {
-            i: i,
+            i,
             v: partials[i].clone(),
         }));
     }
@@ -246,7 +254,7 @@ fn test_example_dkg() {
         );
         partials.push(v);
         pub_shares.push(Some(share::poly::PubShare {
-            i: i,
+            i,
             v: partials[i].clone(),
         }));
     }
@@ -272,7 +280,7 @@ fn test_example_dkg() {
     for node in nodes.iter_mut() {
         let share = node.dkg.dist_key_share().unwrap();
         let c = Config {
-            suite: suite,
+            suite,
             longterm: node.priv_key.clone(),
             old_nodes: pub_keys.clone(),
             new_nodes: pub_keys.clone(),

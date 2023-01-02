@@ -18,24 +18,15 @@ use super::{
     Scalar,
 };
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Point {
     ge: ExtendedGroupElement,
     var_time: bool,
 }
 
-impl Default for Point {
-    fn default() -> Self {
-        Self {
-            ge: ExtendedGroupElement::default(),
-            var_time: false,
-        }
-    }
-}
-
 impl BinaryMarshaler for Point {
     fn marshal_binary(&self) -> Result<Vec<u8>> {
-        let mut b = [0 as u8; 32];
+        let mut b = [0_u8; 32];
         self.ge.to_bytes(&mut b);
         Ok(b.to_vec())
     }
@@ -80,8 +71,8 @@ impl group::Point for Point {
 
     /// Equality test for two Points on the same curve
     fn equal(&self, p2: &Self) -> bool {
-        let mut b1 = [0 as u8; 32];
-        let mut b2 = [0 as u8; 32];
+        let mut b1 = [0_u8; 32];
+        let mut b2 = [0_u8; 32];
         self.ge.to_bytes(&mut b1);
         p2.ge.to_bytes(&mut b2);
         for i in 0..b1.len() {
@@ -108,8 +99,9 @@ impl group::Point for Point {
         self.embed(None, rand)
     }
 
-    fn set(&mut self, _p: Self) -> &mut Self {
-        todo!()
+    fn set(&mut self, p: Self) -> Self {
+        self.ge = p.ge;
+        self.clone()
     }
 
     fn embed_len(&self) -> usize {
@@ -132,13 +124,13 @@ impl group::Point for Point {
 
         loop {
             // Pick a random point, with optional embedded data
-            let mut b = [0 as u8; 32];
-            rand.xor_key_stream(&mut b, &[0 as u8; 32]).unwrap();
-            if data.is_some() {
+            let mut b = [0_u8; 32];
+            rand.xor_key_stream(&mut b, &[0_u8; 32]).unwrap();
+            if let Some(d) = data {
                 // Encode length in low 8 bits
                 b[0] = dl as u8;
                 // Copy in data to embed
-                b[1..1 + dl].copy_from_slice(&data.unwrap()[0..dl]);
+                b[1..1 + dl].copy_from_slice(&d[0..dl]);
             }
             // Try to decode
             if !self.ge.from_bytes(&b) {
@@ -210,16 +202,17 @@ impl group::Point for Point {
         r.sub(&p1.ge, &t2);
         r.to_extended(&mut self.ge);
 
-        return self;
+        self
     }
 
-    fn neg(&self, _a: &Self) -> &mut Self {
-        todo!()
+    fn neg(&mut self, a: &Self) -> Self {
+        self.ge.neg(&a.ge);
+        self.clone()
     }
 
     /// Mul multiplies point p by scalar s using the repeated doubling method.
     fn mul(mut self, s: &Scalar, p: Option<&Self>) -> Self {
-        let mut a = s.v.clone();
+        let mut a = s.v;
 
         match p {
             None => {
@@ -261,22 +254,22 @@ impl PointCanCheckCanonicalAndSmallOrder for Point {
 
         let mut c = [0u8; 5];
 
-        for j in 0..31 {
+        (0..31).for_each(|j| {
             for i in 0..5 {
                 c[i] |= s[j] ^ WEAK_KEYS[i][j];
             }
-        }
+        });
         for i in 0..5 {
             c[i] |= (s[31] & 0x7f) ^ WEAK_KEYS[i][31];
         }
 
         // Constant time verification if one or more of the c's are zero
         let mut k = 0;
-        for i in 0..5 {
+        (0..5).for_each(|i| {
             k |= (c[i] as u16) - 1;
-        }
+        });
 
-        return (k >> 8) & 1 > 0;
+        (k >> 8) & 1 > 0
     }
 
     /// IsCanonical determines whether the group element is canonical
@@ -301,7 +294,7 @@ impl PointCanCheckCanonicalAndSmallOrder for Point {
 
         // subtraction might underflow
         c = (((c as u16) - 1) >> 8) as u8;
-        let d = ((0xed - 1 - (b[0] as u16)) >> 8) as u8;
+        let d = ((0xEDu16.wrapping_sub(1u16.wrapping_sub(b[0] as u16))) >> 8) as u8;
 
         1 - (c & d & 1) == 1
     }
@@ -311,7 +304,7 @@ impl Point {
     pub fn string(&self) -> String {
         let mut b = [0u8; 32];
         self.ge.to_bytes(&mut b);
-        return hex::encode(b);
+        hex::encode(b)
     }
 
     // func (P *point) MarshalBinary() ([]byte, error) {

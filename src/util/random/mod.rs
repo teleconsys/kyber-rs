@@ -1,4 +1,4 @@
-mod random;
+pub(crate) mod random;
 #[cfg(test)]
 mod random_test;
 

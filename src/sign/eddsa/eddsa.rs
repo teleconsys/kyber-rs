@@ -35,9 +35,9 @@ impl EdDSA<Curve> {
 
         Ok(EdDSA::<Curve> {
             seed: buffer,
-            prefix: prefix,
-            secret: secret,
-            public: public,
+            prefix,
+            secret,
+            public,
         })
     }
 }
@@ -106,7 +106,7 @@ impl EdDSA<Curve> {
     pub fn sign(&self, msg: &[u8]) -> Result<[u8; 64]> {
         let mut hash = Sha512::new();
         hash.update(self.prefix.clone());
-        hash.update(msg.clone());
+        hash.update(msg);
 
         // deterministic random secret and its commit
         let r = GROUP.scalar().set_bytes(&hash.finalize_reset());
@@ -197,5 +197,5 @@ pub fn verify_with_checks(public_key: &[u8], msg: &[u8], sig: &[u8]) -> Result<(
 /// sig is a valid signature for msg created by key public, or an error otherwise.
 pub fn verify<POINT: Point>(public: &POINT, msg: &[u8], sig: &[u8]) -> Result<()> {
     let p_buf = public.marshal_binary()?;
-    return verify_with_checks(&p_buf, msg, sig);
+    verify_with_checks(&p_buf, msg, sig)
 }

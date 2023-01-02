@@ -6,7 +6,7 @@ use super::{sign, verify};
 fn test_schnorr_signature() {
     let msg = "Hello Schnorr".as_bytes();
     let suite = SuiteEd25519::new_blake_sha256ed25519();
-    let kp = key::new_key_pair(suite).unwrap();
+    let kp = key::new_key_pair(&suite).unwrap();
 
     let s = sign(&suite, &kp.private, msg).unwrap();
 
@@ -35,15 +35,15 @@ fn test_schnorr_signature() {
     verify(suite, &kp.public, msg, &wr_resp).unwrap_err();
 
     // wrong public key
-    let wr_pk = key::new_key_pair(suite).unwrap();
-    verify(suite, &&wr_pk.public, msg, &s).unwrap_err();
+    let wr_pk = key::new_key_pair(&suite).unwrap();
+    verify(suite, &wr_pk.public, msg, &s).unwrap_err();
 }
 
 #[test]
 fn test_eddsa_compatibility() {
     let msg = "Hello Schnorr".as_bytes();
     let suite = SuiteEd25519::new_blake_sha256ed25519();
-    let kp = key::new_key_pair(suite).unwrap();
+    let kp = key::new_key_pair(&suite).unwrap();
 
     let s = sign(&suite, &kp.private, msg).unwrap();
 
@@ -93,7 +93,7 @@ fn test_schnorr_malleability() {
 
     let msg = "Hello Schnorr".as_bytes();
     let suite = SuiteEd25519::new_blake_sha256ed25519();
-    let kp = key::new_key_pair(suite).unwrap();
+    let kp = key::new_key_pair(&suite).unwrap();
 
     let mut s = sign(&suite, &kp.private, msg).unwrap();
 

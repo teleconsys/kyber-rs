@@ -34,7 +34,7 @@ pub fn encrypt<GROUP: Group>(
     let buf = derive_key::<GROUP>(&dh, len)?;
 
     let mut nonce = [0u8; NONCE_SIZE];
-    nonce.copy_from_slice(&buf.clone()[32..len]);
+    nonce.copy_from_slice(&buf[32..len]);
 
     let gcm = AEAD::<GROUP>::new(r_caps.clone(), &buf)?;
 
@@ -45,7 +45,7 @@ pub fn encrypt<GROUP: Group>(
     let mut ctx = Vec::new();
     r_caps.marshal_to(&mut ctx)?;
     for v in c {
-        ctx.push(v.clone());
+        ctx.push(v);
     }
     Ok(ctx)
 }
@@ -72,11 +72,11 @@ pub fn decrypt<GROUP: Group>(
     let buf = derive_key::<GROUP>(&dh, len)?;
 
     let mut nonce = [0u8; NONCE_SIZE];
-    nonce.copy_from_slice(&buf.clone()[32..len]);
+    nonce.copy_from_slice(&buf[32..len]);
 
     // Decrypt message using AES-GCM
     let gcm = AEAD::<GROUP>::new(r_caps.clone(), &buf)?;
-    return gcm.open(None, &nonce, &ctx[l..], None);
+    gcm.open(None, &nonce, &ctx[l..], None)
 }
 
 fn derive_key<GROUP: Group>(dh: &GROUP::POINT, len: usize) -> Result<Vec<u8>> {

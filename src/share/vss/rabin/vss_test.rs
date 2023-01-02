@@ -5,9 +5,12 @@ use crate::{
     dh::Dh,
     encoding::BinaryMarshaler,
     group::edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
-    share::vss::rabin::vss::{self, find_pub, new_verifier, recover_secret, session_id, Response},
+    share::vss::{
+        rabin::vss::{self, find_pub, new_verifier, recover_secret, session_id, Response},
+        suite::Suite,
+    },
     sign::schnorr,
-    Group, Point, Random, Scalar, Suite,
+    Group, Point, Random, Scalar,
 };
 
 use super::vss::{minimum_t, new_dealer, Dealer, Verifier};
@@ -244,7 +247,7 @@ fn test_vss_aggregator_enough_approvals() {
     }
     assert!(aggr.enough_approvals());
     assert_eq!(
-        test_data.suite.point().mul(&test_data.clone().secret, None),
+        test_data.suite.point().mul(&test_data.secret, None),
         dealer.secret_commit().unwrap()
     );
 }
@@ -406,7 +409,7 @@ fn test_vss_verifier_receive_deal() {
     v.aggregator = Some(v_aggr.clone());
     let resp = v.process_encrypted_deal(&enc_d);
     assert!(resp.is_err());
-    d.commitments[0] = good_commit.clone();
+    d.commitments[0] = good_commit;
 
     // valid complaint
     v_aggr.deal = None;
@@ -723,11 +726,11 @@ fn test_vss_verifier_set_timeout() {
 fn test_vss_session_id() {
     let test_data = new_test_data();
     let dealer = new_dealer(
-        test_data.suite.clone(),
+        test_data.suite,
         test_data.dealer_sec.clone(),
         test_data.secret.clone(),
         &test_data.verifiers_pub,
-        test_data.vss_threshold.clone(),
+        test_data.vss_threshold,
     )
     .unwrap();
     let commitments = &dealer.deals[0].commitments;
@@ -819,19 +822,19 @@ fn gen_commits(n: usize) -> (Vec<EdScalar>, Vec<EdPoint>) {
 
 fn gen_dealer<SUITE: Suite>(test_data: &TestData<SUITE>) -> Dealer<SUITE> {
     let test_data = test_data.clone();
-    let d = new_dealer(
+
+    new_dealer(
         test_data.suite,
         test_data.dealer_sec,
         test_data.secret,
         &test_data.verifiers_pub,
         test_data.vss_threshold,
     )
-    .unwrap();
-    d
+    .unwrap()
 }
 
 fn gen_all<SUITE: Suite>(test_data: &TestData<SUITE>) -> (Dealer<SUITE>, Vec<Verifier<SUITE>>) {
-    let dealer = gen_dealer(&test_data);
+    let dealer = gen_dealer(test_data);
     let mut verifiers = vec![];
     for i in 0..NB_VERIFIERS {
         let v = new_verifier(
@@ -851,5 +854,5 @@ fn random_bytes(n: usize) -> Vec<u8> {
     for v in &mut buff {
         *v = rand::random();
     }
-    return buff;
+    buff
 }

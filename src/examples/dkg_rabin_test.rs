@@ -9,9 +9,9 @@ the "happy" path where each node does its job correctly.
 use crate::{
     encoding::BinaryMarshaler,
     group::edwards25519::SuiteEd25519,
-    share::{self, dkg},
+    share::{self, dkg, vss::suite::Suite},
     sign::dss::DistKeyShare,
-    Group, Point, Random, Scalar, Suite,
+    Group, Point, Random, Scalar,
 };
 
 const NUM_NODES: usize = 3;
@@ -52,9 +52,13 @@ fn test_example_dkg() {
 
     // 2. Create the DKGs on each node
     for node in nodes.iter_mut() {
-        let dkg =
-            dkg::rabin::new_dist_key_generator(suite, node.priv_key.clone(), &pub_keys, THRESHOLD)
-                .unwrap();
+        let dkg = dkg::rabin::new_dist_key_generator(
+            &suite,
+            &node.priv_key.clone(),
+            &pub_keys,
+            THRESHOLD,
+        )
+        .unwrap();
         node.dkg = dkg;
     }
 

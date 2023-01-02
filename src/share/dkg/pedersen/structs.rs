@@ -5,10 +5,10 @@ use crate::{
     encoding::{self, BinaryMarshaler},
     share::{
         poly::PriShare,
-        vss::{self, pedersen},
+        vss::{self, pedersen, suite::Suite},
     },
     sign::dss,
-    Point, Suite,
+    Point,
 };
 
 /// DistKeyShare holds the share of a distributed key for a participant.
@@ -27,7 +27,7 @@ pub struct DistKeyShare<SUITE: Suite> {
 impl<SUITE: Suite> DistKeyShare<SUITE> {
     /// Public returns the public key associated with the distributed private key.
     pub fn public(&self) -> SUITE::POINT {
-        return self.commits[0].clone();
+        self.commits[0].clone()
     }
 }
 
@@ -35,13 +35,13 @@ impl<SUITE: Suite> dss::DistKeyShare<SUITE> for DistKeyShare<SUITE> {
     /// PriShare implements the dss.DistKeyShare interface so either pedersen or
     /// rabin dkg can be used with dss.
     fn pri_share(&self) -> PriShare<<SUITE::POINT as Point>::SCALAR> {
-        return self.share.clone();
+        self.share.clone()
     }
 
     /// Commitments implements the dss.DistKeyShare interface so either pedersen or
     /// rabin dkg can be used with dss.
     fn commitments(&self) -> Vec<SUITE::POINT> {
-        return self.commits.clone();
+        self.commits.clone()
     }
 }
 

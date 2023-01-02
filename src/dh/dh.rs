@@ -15,7 +15,7 @@ use digest::{
 };
 use hkdf::Hkdf;
 
-use crate::{group::HashFactory, Point, Suite};
+use crate::{group::HashFactory, share::vss::suite::Suite, Point};
 
 pub(crate) const NONCE_SIZE: usize = 12;
 
@@ -76,20 +76,13 @@ pub trait Dh {
         own_private: <SUITE::POINT as Point>::SCALAR,
         remote_public: SUITE::POINT,
     ) -> SUITE::POINT {
-        let sk = suite.point();
-        sk.mul(&own_private, Some(&remote_public))
+        suite.point().mul(&own_private, Some(&remote_public))
     }
 
     fn hkdf(ikm: &[u8], info: &[u8], output_size: Option<usize>) -> Result<Vec<u8>> {
-        let size = match output_size {
-            Some(s) => s,
-            None => 32,
-        };
+        let size = output_size.unwrap_or(32);
         let h = Hkdf::<Self::H>::new(None, ikm);
-        let mut out = Vec::with_capacity(size);
-        for _ in 0..size {
-            out.push(0u8);
-        }
+        let mut out = vec![0; size];
         h.expand(info, &mut out)
             .map_err(|_| Error::msg("unexpected error in hkdf_sha256"))?;
 
@@ -110,7 +103,7 @@ pub trait Dh {
         let nonce = GenericArray::from_slice(nonce);
 
         let payload: Payload = match additional_data {
-            None => data.into(),
+            None => Payload::from(data),
             Some(add_data) => Payload {
                 aad: add_data,
                 msg: data,
@@ -138,7 +131,7 @@ pub trait Dh {
         let nonce = GenericArray::from_slice(nonce);
 
         let payload: Payload = match additional_data {
-            None => ciphertext.into(),
+            None => Payload::from(ciphertext),
             Some(add_data) => Payload {
                 aad: add_data,
                 msg: ciphertext,
@@ -189,9 +182,9 @@ pub struct AEAD<T: Dh> {
 }
 
 impl<DH: Dh> AEAD<DH> {
-    pub fn new<POINT: Point>(pre: POINT, hkfd_context: &Vec<u8>) -> Result<Self> {
+    pub fn new<POINT: Point>(pre: POINT, hkfd_context: &[u8]) -> Result<Self> {
         let pre_buff = pre.marshal_binary()?;
-        let key = DH::hkdf(&pre_buff, &hkfd_context, None)?;
+        let key = DH::hkdf(&pre_buff, hkfd_context, None)?;
         if key.len() != 32 {
             bail!("Key length should be 32")
         }
@@ -215,9 +208,10 @@ impl<DH: Dh> AEAD<DH> {
         plaintext: &[u8],
         additional_data: Option<&[u8]>,
     ) -> Result<Vec<u8>> {
+        println!("{:?}", self.key);
         let encrypted = DH::aes_encrypt(&self.key, nonce, plaintext, additional_data)?;
-        if dst.is_some() {
-            dst.unwrap().copy_from_slice(&encrypted);
+        if let Some(d) = dst {
+            d.copy_from_slice(&encrypted);
         }
         Ok(encrypted)
     }
@@ -240,9 +234,10 @@ impl<DH: Dh> AEAD<DH> {
         ciphertext: &[u8],
         additional_data: Option<&[u8]>,
     ) -> Result<Vec<u8>> {
+        println!("{:?}", self.key);
         let decrypted = DH::aes_decrypt(&self.key, nonce, ciphertext, additional_data)?;
-        if dst.is_some() {
-            dst.unwrap().copy_from_slice(&decrypted);
+        if let Some(d) = dst {
+            d.copy_from_slice(&decrypted);
         }
         Ok(decrypted)
     }

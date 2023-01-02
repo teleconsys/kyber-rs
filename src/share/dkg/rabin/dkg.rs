@@ -63,7 +63,7 @@ pub struct DistKeyShare<SUITE: Suite> {
 impl<SUITE: Suite> DistKeyShare<SUITE> {
     /// Public returns the public key associated with the distributed private key.
     pub fn public(&self) -> SUITE::POINT {
-        return self.commits[0].clone();
+        self.commits[0].clone()
     }
 }
 
@@ -71,13 +71,13 @@ impl<SUITE: Suite> dss::DistKeyShare<SUITE> for DistKeyShare<SUITE> {
     /// PriShare implements the dss.DistKeyShare interface so either pedersen or
     /// rabin dkg can be used with dss.
     fn pri_share(&self) -> PriShare<<SUITE::POINT as Point>::SCALAR> {
-        return self.share.clone();
+        self.share.clone()
     }
 
     /// Commitments implements the dss.DistKeyShare interface so either pedersen or
     /// rabin dkg can be used with dss.
     fn commitments(&self) -> Vec<SUITE::POINT> {
-        return self.commits.clone();
+        self.commits.clone()
     }
 }
 
@@ -246,12 +246,12 @@ impl<SUITE: Suite> Default for DistKeyGenerator<SUITE> {
 /// threshold t parameter. It returns an error if the secret key's
 /// commitment can't be found in the list of participants.
 pub fn new_dist_key_generator<SUITE: Suite>(
-    suite: SUITE,
-    longterm: <SUITE::POINT as Point>::SCALAR,
+    suite: &SUITE,
+    longterm: &<SUITE::POINT as Point>::SCALAR,
     participants: &[SUITE::POINT],
     t: usize,
 ) -> Result<DistKeyGenerator<SUITE>> {
-    let pubb = suite.point().mul(&longterm, None);
+    let pubb = suite.point().mul(longterm, None);
     // find our index
     let mut found = false;
     let mut index = 0;
@@ -267,20 +267,20 @@ pub fn new_dist_key_generator<SUITE: Suite>(
     }
     // generate our dealer / deal
     let own_sec = suite.scalar().pick(&mut suite.random_stream());
-    let dealer = vss::rabin::vss::new_dealer(suite, longterm.clone(), own_sec, participants, t)?;
+    let dealer = vss::rabin::vss::new_dealer(*suite, longterm.clone(), own_sec, participants, t)?;
 
     Ok(DistKeyGenerator {
-        dealer: dealer,
+        dealer,
         verifiers: HashMap::new(),
         commitments: HashMap::new(),
         pending_reconstruct: HashMap::new(),
         reconstructed: HashMap::new(),
-        t: t,
-        suite: suite,
-        long: longterm,
-        pubb: pubb,
+        t,
+        suite: *suite,
+        long: longterm.clone(),
+        pubb,
         participants: participants.to_vec(),
-        index: index,
+        index,
     })
 }
 
@@ -321,7 +321,7 @@ where
 
                 // If processed own deal correctly, set positive response in this
                 // DKG's dealer's own verifier
-                let idx_clone = self.index.clone();
+                let idx_clone = self.index;
                 self.dealer.unsafe_set_response_dkg(idx_clone, true);
                 continue;
             }
@@ -417,7 +417,7 @@ where
     /// vss.Verifier.DealCertified()). If the distribution is certified, the protocol
     /// can continue using d.SecretCommits().
     pub fn certified(&self) -> bool {
-        return self.qual().len() >= self.t;
+        self.qual().len() >= self.t
     }
 
     /// QUAL returns the index in the list of participants that forms the QUALIFIED
@@ -429,9 +429,9 @@ where
         let mut good = Vec::new();
         self.qual_iter(|i, _| {
             good.push(i as usize);
-            return true;
+            true
         });
-        return good;
+        good
     }
 
     pub fn is_in_qual(&self, idx: u32) -> bool {
@@ -439,12 +439,12 @@ where
         self.qual_iter(|i, _| {
             if i == idx {
                 found = true;
-                return false;
+                false
             } else {
-                return true;
+                true
             }
         });
-        return found;
+        found
     }
 
     fn qual_iter<F>(&self, mut f: F)
@@ -452,10 +452,8 @@ where
         F: FnMut(u32, &vss::rabin::vss::Verifier<SUITE>) -> bool,
     {
         for (i, v) in self.verifiers.iter() {
-            if v.deal_certified() {
-                if !f(i.clone(), v) {
-                    break;
-                }
+            if v.deal_certified() && !f(*i, v) {
+                break;
             }
         }
     }
@@ -536,7 +534,7 @@ where
             let mut cc = ComplaintCommits::<SUITE> {
                 index: self.index,
                 dealer_index: sc.index,
-                deal: deal,
+                deal,
                 signature: Vec::new(),
             };
 
@@ -609,9 +607,9 @@ where
         let msg = rc.hash(&self.suite)?;
         rc.signature = schnorr::sign(&self.suite, &self.long, &msg)?;
 
-        if !self.pending_reconstruct.contains_key(&cc.dealer_index) {
-            self.pending_reconstruct.insert(cc.dealer_index, vec![]);
-        }
+        self.pending_reconstruct
+            .entry(cc.dealer_index)
+            .or_insert_with(std::vec::Vec::new);
         self.pending_reconstruct
             .get_mut(&cc.dealer_index)
             .unwrap()
@@ -640,9 +638,9 @@ where
         let msg = rc.hash(&self.suite)?;
         schnorr::verify(self.suite, &pubb, &msg, &rc.signature.clone())?;
 
-        if !self.pending_reconstruct.contains_key(&rc.dealer_index) {
-            self.pending_reconstruct.insert(rc.dealer_index, vec![]);
-        }
+        self.pending_reconstruct
+            .entry(rc.dealer_index)
+            .or_insert_with(std::vec::Vec::new);
         let arr = self.pending_reconstruct.get_mut(&rc.dealer_index).unwrap();
         // check if packet is already received or not
         // or if the session ID does not match the others
@@ -694,9 +692,9 @@ where
                 ret = false;
                 return false;
             }
-            return true;
+            true
         });
-        return nb >= self.t && ret;
+        nb >= self.t && ret
     }
 
     /// DistKeyShare generates the distributed key relative to this receiver
@@ -749,16 +747,16 @@ where
                     return true;
                 }
             }
-            return error.is_none();
+            error.is_none()
         });
 
-        if error.is_some() {
-            return Err(error.unwrap());
+        if let Some(e) = error {
+            return Err(e);
         }
         let (_, commits) = pubb.unwrap().info();
 
         Ok(DistKeyShare {
-            commits: commits,
+            commits,
             share: PriShare {
                 i: self.index as usize,
                 v: sh,
@@ -771,5 +769,5 @@ fn find_pub<POINT: Point>(list: &[POINT], i: usize) -> Option<POINT> {
     if i >= list.len() {
         return None;
     }
-    return Some(list[i].clone());
+    Some(list[i].clone())
 }

@@ -16,19 +16,11 @@ use subtle::ConstantTimeEq;
 
 use super::constants::{FULL_ORDER, L_MINUS2};
 
-const MARSHAL_SCALAR_ID: [u8; 8] = [
-    'e' as u8, 'd' as u8, '.' as u8, 's' as u8, 'c' as u8, 'a' as u8, 'l' as u8, 'a' as u8,
-];
+const MARSHAL_SCALAR_ID: [u8; 8] = [b'e', b'd', b'.', b's', b'c', b'a', b'l', b'a'];
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Scalar {
     pub v: [u8; 32],
-}
-
-impl Default for Scalar {
-    fn default() -> Self {
-        Scalar { v: [0; 32] }
-    }
 }
 
 impl Scalar {
@@ -39,13 +31,11 @@ impl Scalar {
     // string returns the string representation of this scalar (fixed length of 32 bytes, little endian).
     pub fn string(&self) -> String {
         let mut b = self.to_int().marshal_binary().unwrap().to_vec();
-        for _ in b.len()..32 {
-            b.push(0);
-        }
-        return hex::encode(b);
+        b.resize(32, 0);
+        hex::encode(b)
     }
 
-    fn set_int(mut self, i: &Int) -> Self {
+    fn set_int(mut self, i: &mut Int) -> Self {
         let b = i.little_endian(32, 32);
         self.v.as_mut_slice()[0..b.len()].copy_from_slice(b.as_ref());
         self
@@ -83,7 +73,7 @@ impl ScalarCanCheckCanonical for Scalar {
             // subtraction might lead to an underflow which needs
             // to be accounted for in the right shift
             c |= (((sb[i] as u16) - (l[i] as u16)) >> 8) as u8 & n;
-            n &= (((sb[i] as u16) ^ (l[i] as u16) - 1) >> 8) as u8;
+            n &= (((sb[i] as u16) ^ ((l[i] as u16) - 1)) >> 8) as u8;
         }
 
         c != 0
@@ -100,9 +90,7 @@ impl PartialEq for Scalar {
 impl BinaryMarshaler for Scalar {
     fn marshal_binary(&self) -> anyhow::Result<Vec<u8>> {
         let mut b = self.to_int().marshal_binary()?;
-        for _ in b.len()..32 {
-            b.push(0);
-        }
+        b.resize(32, 0);
 
         Ok(b)
     }
@@ -126,7 +114,7 @@ impl ToString for Scalar {
 
 use std::ops;
 impl_op_ex!(*|a: &Scalar, b: &Scalar| -> Scalar {
-    let mut v = [0 as u8; 32];
+    let mut v = [0_u8; 32];
     sc_mul(&mut v, &a.v, &b.v);
     Scalar { v }
 });
@@ -140,13 +128,13 @@ impl_op_ex!(+|a: &Scalar, b: &Scalar| -> Scalar {
 impl group::Scalar for Scalar {
     /// Set equal to another scalar a
     fn set(mut self, a: &Self) -> Self {
-        self.v = a.v.clone();
+        self.v = a.v;
         self
     }
 
     /// set_int64 sets the scalar to a small integer value.
     fn set_int64(self, v: i64) -> Self {
-        self.set_int(&Int::new_int64(v, constants::PRIME_ORDER.clone()))
+        self.set_int(&mut Int::new_int64(v, constants::PRIME_ORDER.clone()))
     }
 
     fn zero(mut self) -> Self {
@@ -161,15 +149,15 @@ impl group::Scalar for Scalar {
     }
 
     fn pick(self, rand: &mut impl Stream) -> Self {
-        let i = integer_field::integer_field::Int::new_int(
+        let mut i = integer_field::integer_field::Int::new_int(
             random::random_int(&PRIME_ORDER, rand),
             PRIME_ORDER.clone(),
         );
-        self.set_int(&i)
+        self.set_int(&mut i)
     }
 
     fn set_bytes(self, bytes: &[u8]) -> Self {
-        self.set_int(&Int::new_int_bytes(bytes, &PRIME_ORDER, LittleEndian))
+        self.set_int(&mut Int::new_int_bytes(bytes, &PRIME_ORDER, LittleEndian))
     }
 
     fn one(mut self) -> Self {
@@ -196,11 +184,11 @@ impl group::Scalar for Scalar {
         for i in (0..=255).rev() {
             let bit_is_set = L_MINUS2.bit(i);
             // square step
-            let res_v_clone = res.v.clone();
+            let res_v_clone = res.v;
             sc_mul(&mut res.v, &res_v_clone, &res_v_clone);
             if bit_is_set {
                 // multiply step
-                let res_v_clone = res.v.clone();
+                let res_v_clone = res.v;
                 sc_mul(&mut res.v, &res_v_clone, &ac.v);
             }
         }
@@ -212,7 +200,7 @@ impl group::Scalar for Scalar {
         let mut z = Scalar::default();
         z = z.zero();
         sc_sub(&mut self.v, &z.v, &a.v);
-        return self;
+        self
     }
 }
 
@@ -271,7 +259,7 @@ pub fn sc_mul_add(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32], c: &[u8; 32]) {
     let c9 = 2097151 & (load4(&c[23..]) >> 5);
     let c10 = 2097151 & (load3(&c[26..]) >> 2);
     let c11 = load4(&c[28..]) >> 7;
-    let mut carry = [0 as i64; 23];
+    let mut carry = [0_i64; 23];
 
     let mut s0 = c0 + a0 * b0;
     let mut s1 = c1 + a0 * b1 + a1 * b0;
@@ -358,7 +346,7 @@ pub fn sc_mul_add(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32], c: &[u8; 32]) {
     let mut s20 = a9 * b11 + a10 * b10 + a11 * b9;
     let mut s21 = a10 * b11 + a11 * b10;
     let mut s22 = a11 * b11;
-    let mut s23 = 0 as i64;
+    let mut s23 = 0_i64;
 
     carry[0] = (s0 + (1 << 20)) >> 21;
     s1 += carry[0];
@@ -665,7 +653,8 @@ pub fn sc_mul_add(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32], c: &[u8; 32]) {
     carry[10] = s10 >> 21;
     s11 += carry[10];
     s10 -= carry[10] << 21;
-    s[0] = (s0 >> 0) as u8;
+    //s[0] = (s0 >> 0) as u8;
+    s[0] = s0 as u8;
     s[1] = (s0 >> 8) as u8;
     s[2] = ((s0 >> 16) | (s1 << 5)) as u8;
     s[3] = (s1 >> 3) as u8;
@@ -686,7 +675,8 @@ pub fn sc_mul_add(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32], c: &[u8; 32]) {
     s[18] = ((s6 >> 18) | (s7 << 3)) as u8;
     s[19] = (s7 >> 5) as u8;
     s[20] = (s7 >> 13) as u8;
-    s[21] = (s8 >> 0) as u8;
+    //s[21] = (s8 >> 0) as u8;
+    s[21] = s8 as u8;
     s[22] = (s8 >> 8) as u8;
     s[23] = ((s8 >> 16) | (s9 << 5)) as u8;
     s[24] = (s9 >> 3) as u8;
@@ -1087,7 +1077,8 @@ fn sc_add(s: &mut [u8; 32], a: &[u8; 32], c: &[u8; 32]) {
     s11 += carry[10];
     s10 -= carry[10] << 21;
 
-    s[0] = (s0 >> 0) as u8;
+    //s[0] = (s0 >> 0) as u8;
+    s[0] = s0 as u8;
     s[1] = (s0 >> 8) as u8;
     s[2] = ((s0 >> 16) | (s1 << 5)) as u8;
     s[3] = (s1 >> 3) as u8;
@@ -1108,7 +1099,8 @@ fn sc_add(s: &mut [u8; 32], a: &[u8; 32], c: &[u8; 32]) {
     s[18] = ((s6 >> 18) | (s7 << 3)) as u8;
     s[19] = (s7 >> 5) as u8;
     s[20] = (s7 >> 13) as u8;
-    s[21] = (s8 >> 0) as u8;
+    //s[21] = (s8 >> 0) as u8;
+    s[21] = s8 as u8;
     s[22] = (s8 >> 8) as u8;
     s[23] = ((s8 >> 16) | (s9 << 5)) as u8;
     s[24] = (s9 >> 3) as u8;
@@ -1155,7 +1147,7 @@ fn sc_sub(s: &mut [u8; 32], a: &[u8; 32], c: &[u8; 32]) {
     let c9 = 2097151 & (load4(&c[23..]) >> 5);
     let c10 = 2097151 & (load3(&c[26..]) >> 2);
     let c11 = load4(&c[28..]) >> 7;
-    let mut carry = [0 as i64; 23]; // [23]int64;
+    let mut carry = [0_i64; 23]; // [23]int64;
 
     let mut s0 = 1916624 - c0 + a0;
     let mut s1 = 863866 - c1 + a1;
@@ -1490,7 +1482,8 @@ fn sc_sub(s: &mut [u8; 32], a: &[u8; 32], c: &[u8; 32]) {
     carry[10] = s10 >> 21;
     s11 += carry[10];
     s10 -= carry[10] << 21;
-    s[0] = (s0 >> 0) as u8;
+    //s[0] = (s0 >> 0) as u8;
+    s[0] = s0 as u8;
     s[1] = (s0 >> 8) as u8;
     s[2] = ((s0 >> 16) | (s1 << 5)) as u8;
     s[3] = (s1 >> 3) as u8;
@@ -1511,7 +1504,8 @@ fn sc_sub(s: &mut [u8; 32], a: &[u8; 32], c: &[u8; 32]) {
     s[18] = ((s6 >> 18) | (s7 << 3)) as u8;
     s[19] = (s7 >> 5) as u8;
     s[20] = (s7 >> 13) as u8;
-    s[21] = (s8 >> 0) as u8;
+    //s[21] = (s8 >> 0) as u8;
+    s[21] = s8 as u8;
     s[22] = (s8 >> 8) as u8;
     s[23] = ((s8 >> 16) | (s9 << 5)) as u8;
     s[24] = (s9 >> 3) as u8;
@@ -1986,7 +1980,8 @@ fn sc_mul(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32]) {
     s11 += carry[10];
     s10 -= carry[10] << 21;
 
-    s[0] = (s0 >> 0) as u8;
+    //s[0] = (s0 >> 0) as u8;
+    s[0] = s0 as u8;
     s[1] = (s0 >> 8) as u8;
     s[2] = ((s0 >> 16) | (s1 << 5)) as u8;
     s[3] = (s1 >> 3) as u8;
@@ -2007,7 +2002,8 @@ fn sc_mul(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32]) {
     s[18] = ((s6 >> 18) | (s7 << 3)) as u8;
     s[19] = (s7 >> 5) as u8;
     s[20] = (s7 >> 13) as u8;
-    s[21] = (s8 >> 0) as u8;
+    //s[21] = (s8 >> 0) as u8;
+    s[21] = s8 as u8;
     s[22] = (s8 >> 8) as u8;
     s[23] = ((s8 >> 16) | (s9 << 5)) as u8;
     s[24] = (s9 >> 3) as u8;
@@ -2022,5 +2018,5 @@ fn sc_mul(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32]) {
 
 pub(crate) fn new_scalar_int(i: BigInt) -> Scalar {
     let s = Scalar::default();
-    s.set_int(&Int::new_int(i, FULL_ORDER.clone()))
+    s.set_int(&mut Int::new_int(i, FULL_ORDER.clone()))
 }

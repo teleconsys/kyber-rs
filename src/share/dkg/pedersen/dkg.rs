@@ -5,10 +5,13 @@ use rand::{rngs::StdRng, RngCore, SeedableRng};
 use crate::{
     encoding::BinaryMarshaler,
     group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
-    share::{self, vss},
+    share::{
+        self,
+        vss::{self, suite::Suite},
+    },
     sign::schnorr,
     util::random::Randstream,
-    Point, Scalar, Suite,
+    Point, Scalar,
 };
 
 use super::structs::{Deal, DistKeyShare, Justification, Response};
@@ -185,7 +188,7 @@ where
     SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
     <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
 {
-    if c.new_nodes.len() == 0 && c.old_nodes.len() == 0 {
+    if c.new_nodes.is_empty() && c.old_nodes.is_empty() {
         bail!("dkg: can't run with empty node list")
     }
 
@@ -194,7 +197,7 @@ where
         is_resharing = true;
     }
     if is_resharing {
-        if c.old_nodes.len() == 0 {
+        if c.old_nodes.is_empty() {
             bail!("dkg: resharing config needs old nodes list");
         }
         if c.old_threshold == 0 {
@@ -211,12 +214,11 @@ where
         bail!("dkg: public key not found in old list or new list");
     }
 
-    let mut new_threshold = 0;
-    if c.threshold != 0 {
-        new_threshold = c.threshold;
+    let new_threshold = if c.threshold != 0 {
+        c.threshold
     } else {
-        new_threshold = vss::pedersen::vss::minimum_t(c.new_nodes.len());
-    }
+        vss::pedersen::vss::minimum_t(c.new_nodes.len())
+    };
 
     let mut dealer = vss::pedersen::vss::Dealer::default();
     let mut can_issue = false;
@@ -290,23 +292,23 @@ where
         can_receive = true;
         old_threshold = c.public_coeffs.clone().unwrap().len();
     }
-    let mut dkg = DistKeyGenerator::<SUITE, READ> {
-        dealer: dealer,
+    let dkg = DistKeyGenerator::<SUITE, READ> {
+        dealer,
         old_aggregators: HashMap::new(),
         suite: c.suite,
         long: c.longterm.clone(),
-        pubb: pubb,
-        can_receive: can_receive,
-        can_issue: can_issue,
-        is_resharing: is_resharing,
-        dpub: dpub,
-        oidx: oidx,
-        nidx: nidx,
+        pubb,
+        can_receive,
+        can_issue,
+        is_resharing,
+        dpub,
+        oidx,
+        nidx,
         c: c.clone(),
         old_t: old_threshold,
         new_t: new_threshold,
-        new_present: new_present,
-        old_present: old_present,
+        new_present,
+        old_present,
         verifiers: HashMap::new(),
         processed: false,
         timeout: false,
@@ -335,8 +337,8 @@ where
     <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
 {
     let c = Config {
-        suite: suite,
-        longterm: longterm,
+        suite,
+        longterm,
         new_nodes: participants.to_vec(),
         threshold: t,
         old_nodes: Vec::new(),
@@ -359,9 +361,9 @@ where
     /// and is ommitted from the returned map. To know which participant a deal
     /// belongs to, loop over the keys as indices in the list of new participants:
     ///
-    ///	for i,dd := range distDeals {
-    ///	   sendTo(participants[i],dd)
-    ///	}
+    /// for i,dd := range distDeals {
+    ///    sendTo(participants[i],dd)
+    /// }
     ///
     /// If this method cannot process its own Deal, that indicates a
     /// severe problem with the configuration or implementation and
@@ -464,15 +466,8 @@ where
                         vss::pedersen::vss::STATUS_COMPLAINT,
                     );
                 resp.status = vss::pedersen::vss::STATUS_COMPLAINT;
-                let msg_res = resp.hash(&self.suite);
-                if msg_res.is_err() {
-                    return Err(msg_res.unwrap_err());
-                }
-                let s_res = schnorr::sign(&self.suite, &self.long, &msg_res.unwrap());
-                if s_res.is_err() {
-                    return Err(s_res.unwrap_err());
-                }
-                resp.signature = s_res.unwrap();
+                let msg = resp.hash(&self.suite)?;
+                resp.signature = schnorr::sign(&self.suite, &self.long, &msg)?;
                 Ok(Response {
                     index: dd.index,
                     response: resp,
@@ -592,7 +587,7 @@ where
             bail!("dkg: Justification received but no deal for it")
         }
         let v = self.verifiers.get_mut(&j.index).unwrap();
-        return v.process_justification(&j.justification);
+        v.process_justification(&j.justification)
     }
 
     /// SetTimeout triggers the timeout on all verifiers, and thus makes sure
@@ -623,7 +618,7 @@ where
             return self.qual().len() >= self.c.old_threshold;
         }
         // in dkg case, the threshold is symmetric -> # verifiers = # dealers
-        return self.qual().len() >= self.c.threshold;
+        self.qual().len() >= self.c.threshold
     }
 
     /// Certified returns true if *all* deals are certified. This method should
@@ -633,22 +628,22 @@ where
         let mut good = Vec::new();
         if self.is_resharing && self.can_issue && !self.new_present {
             self.old_qual_iter(|i, v| {
-                if v.missing_responses().len() > 0 {
+                if !v.missing_responses().is_empty() {
                     return false;
                 }
                 good.push(i as usize);
-                return true;
+                true
             });
         }
         self.qual_iter(|i, v| {
-            if v.missing_responses().len() > 0 {
+            if !v.missing_responses().is_empty() {
                 return false;
             }
             good.push(i as usize);
-            return true;
+            true
         });
 
-        return good.len() >= self.c.old_nodes.len();
+        good.len() >= self.c.old_nodes.len()
     }
 
     /// QualifiedShares returns the set of shares holder index that are considered
@@ -669,7 +664,7 @@ where
         // compute list of invalid deals according to 1.
         for (dealer_index, verifier) in self.verifiers.iter() {
             let responses = verifier.responses();
-            if responses.len() == 0 {
+            if responses.is_empty() {
                 // don't analyzes "empty" deals - i.e. dealers that never sent
                 // their deal in the first place.
                 invalid_deals.insert(dealer_index, true);
@@ -711,18 +706,18 @@ where
             }
             valid_holders.push(i);
         }
-        return valid_holders;
+        valid_holders
     }
 
     /// ExpectedDeals returns the number of deals that this node will
     /// receive from the other participants.
-    fn expected_deals(&self) -> usize {
+    pub fn expected_deals(&self) -> usize {
         match self.new_present {
             true => match self.old_present {
-                true => return self.c.old_nodes.len() - 1,
-                false => return self.c.old_nodes.len(),
+                true => self.c.old_nodes.len() - 1,
+                false => self.c.old_nodes.len(),
             },
-            false => return 0,
+            false => 0,
         }
     }
 
@@ -735,15 +730,15 @@ where
         if self.is_resharing && self.can_issue && !self.new_present {
             self.old_qual_iter(|i, _| {
                 good.push(i as usize);
-                return true;
+                true
             });
             return good;
         }
         self.qual_iter(|i, _| {
             good.push(i as usize);
-            return true;
+            true
         });
-        return good;
+        good
     }
 
     pub fn is_in_qual(&self, idx: u32) -> bool {
@@ -751,12 +746,12 @@ where
         self.qual_iter(|i, _| {
             if i == idx {
                 found = true;
-                return false;
+                false
             } else {
-                return true;
+                true
             }
         });
-        return found;
+        found
     }
 
     fn qual_iter<F>(&self, mut f: F)
@@ -764,10 +759,8 @@ where
         F: FnMut(u32, &vss::pedersen::vss::Verifier<SUITE>) -> bool,
     {
         for (i, v) in self.verifiers.iter() {
-            if v.deal_certified() {
-                if !f(i.clone(), v) {
-                    break;
-                }
+            if v.deal_certified() && !f(*i, v) {
+                break;
             }
         }
     }
@@ -777,10 +770,8 @@ where
         F: FnMut(u32, &vss::pedersen::vss::Aggregator<SUITE>) -> bool,
     {
         for (i, v) in self.old_aggregators.iter() {
-            if v.deal_certified() {
-                if !f(i.clone(), v) {
-                    break;
-                }
+            if v.deal_certified() && !f(*i, v) {
+                break;
             }
         }
     }
@@ -804,7 +795,7 @@ where
             return self.resharing_key();
         }
 
-        return self.dkg_key();
+        self.dkg_key()
     }
 
     fn dkg_key(&self) -> Result<DistKeyShare<SUITE>> {
@@ -812,7 +803,7 @@ where
         let mut pubb: Option<share::poly::PubPoly<SUITE>> = None;
         // TODO: fix this weird error management
         let mut error: Option<anyhow::Error> = None;
-        self.qual_iter(|i, v| {
+        self.qual_iter(|_i, v| {
             // share of dist. secret = sum of all share received.
             let (s, deal) = match v.deal() {
                 Some(deal) => (deal.clone().sec_share.v, deal),
@@ -836,22 +827,22 @@ where
                 },
                 None => {
                     // first polynomial we see (instead of generating n empty commits)
-                    pubb = Some(poly.clone());
+                    pubb = Some(poly);
                     return true;
                 }
             }
-            return error.is_none();
+            error.is_none()
         });
 
-        if error.is_some() {
-            return Err(error.unwrap());
+        if let Some(e) = error {
+            return Err(e);
         }
         let (_, commits) = pubb.unwrap().info();
 
         Ok(DistKeyShare {
-            commits: commits,
+            commits,
             share: share::poly::PriShare {
-                i: self.nidx as usize,
+                i: self.nidx,
                 v: sh,
             },
             private_poly: self.dealer.private_poly().coefficients(),
@@ -882,7 +873,7 @@ where
             // share of dist. secret. Invertion of rows/column
             deal.sec_share.i = i as usize;
             shares[i as usize] = Some(deal.sec_share);
-            return true;
+            true
         });
 
         // the private polynomial is generated from the old nodes, thus inheriting
@@ -907,7 +898,7 @@ where
             let mut tmp_coeffs = Vec::with_capacity(coeffs.len());
             // take all i-th coefficients
             for (j, _) in coeffs.iter().enumerate() {
-                if coeffs[j] == None {
+                if coeffs[j].is_none() {
                     tmp_coeffs.push(None);
                     continue;
                 }
@@ -944,7 +935,7 @@ where
 
     // Verifiers returns the verifiers keeping state of each deals
     pub fn verifiers(&self) -> &HashMap<u32, vss::pedersen::vss::Verifier<SUITE>> {
-        return &self.verifiers;
+        &self.verifiers
     }
 
     fn init_verifiers(&mut self, c: Config<SUITE, READ>) -> Result<()> {
@@ -971,7 +962,7 @@ where
 
 impl<SUITE: Suite> DistKeyShare<SUITE> {
     /// Renew adds the new distributed key share g (with secret 0) to the distributed key share d.
-    fn renew(&self, suite: SUITE, g: DistKeyShare<SUITE>) -> Result<DistKeyShare<SUITE>> {
+    pub fn renew(&self, suite: SUITE, g: DistKeyShare<SUITE>) -> Result<DistKeyShare<SUITE>> {
         // Check G(0) = 0*G.
         if !g
             .public()
@@ -1005,7 +996,7 @@ fn get_pub<POINT: Point>(list: &[POINT], i: usize) -> (POINT, bool) {
     if i >= list.len() {
         return (Default::default(), false);
     }
-    return (list[i].clone(), true);
+    (list[i].clone(), true)
 }
 
 fn find_pub<POINT: Point>(list: &[POINT], to_find: &POINT) -> (usize, bool) {
@@ -1014,13 +1005,13 @@ fn find_pub<POINT: Point>(list: &[POINT], to_find: &POINT) -> (usize, bool) {
             return (i, true);
         }
     }
-    return (0, false);
+    (0, false)
 }
 
-fn checks_deal_certified<SUITE: Suite>(i: u32, v: vss::pedersen::vss::Verifier<SUITE>) -> bool
+pub fn checks_deal_certified<SUITE: Suite>(_i: u32, v: vss::pedersen::vss::Verifier<SUITE>) -> bool
 where
     SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
     <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
 {
-    return v.deal_certified();
+    v.deal_certified()
 }

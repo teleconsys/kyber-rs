@@ -31,7 +31,7 @@ pub fn sign<SUITE: Suite>(
     let r = s.point().mul(&k, None);
 
     // create hash(public || R || message)
-    let public = s.point().mul(&private, None);
+    let public = s.point().mul(private, None);
     let h = hash(s, &public, &r, msg)?;
 
     // compute response s = k + x*h
@@ -115,7 +115,7 @@ where
     let p_buf = public
         .marshal_binary()
         .map_err(|op| Error::msg(format!("error unmarshalling public key: {}", op)))?;
-    return verify_with_checks(g, &p_buf, msg, sig);
+    verify_with_checks(g, &p_buf, msg, sig)
 }
 
 fn hash<GROUP: Group>(
