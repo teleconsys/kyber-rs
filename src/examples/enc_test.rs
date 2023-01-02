@@ -20,7 +20,7 @@ pub fn el_gamal_encrypt<GROUP: Group>(
     // ElGamal-encrypt the point to produce ciphertext (K,C).
     let k = group.scalar().pick(&mut Randstream::default()); // ephemeral private key
     let k_caps = group.point().mul(&k, None); // ephemeral DH public key
-    let s = group.point().mul(&k, Some(&pubkey)); // ephemeral DH shared secret
+    let s = group.point().mul(&k, Some(pubkey)); // ephemeral DH shared secret
     let c = s.clone().add(&s, &m); // message blinded with secret
     (k_caps, c, remainder)
 }
@@ -32,7 +32,7 @@ pub fn el_gamal_decrypt<GROUP: Group>(
     c: GROUP::POINT,
 ) -> Result<Vec<u8>> {
     // ElGamal-decrypt the ciphertext (K,C) to reproduce the message.
-    let s = group.point().mul(&prikey, Some(&k)); // regenerate shared secret
+    let s = group.point().mul(prikey, Some(&k)); // regenerate shared secret
     let p = group.point();
     let m = p.sub(&c, &s); // use to un-blind the message
     m.data()

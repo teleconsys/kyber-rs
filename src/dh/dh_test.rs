@@ -4,7 +4,7 @@ use crate::dh::{AEAD, NONCE_SIZE};
 use crate::encoding::BinaryUnmarshaler;
 use crate::group::edwards25519::{Point, SuiteEd25519};
 use crate::util::{key, random};
-use crate::{Random, Group, Scalar, Point as PointTrait};
+use crate::Random;
 
 use super::Dh;
 
@@ -163,14 +163,16 @@ fn test_aead_random() {
         let nonce = [0u8; NONCE_SIZE];
 
         let pre = SuiteEd25519::dh_exchange(suite, priv1, pub2);
-        let gcm = AEAD::<SuiteEd25519>::new(pre, &vec![]).unwrap();
+        let gcm = AEAD::<SuiteEd25519>::new(pre, &[]).unwrap();
 
         let ciphertext = gcm.seal(None, &nonce, &message, None).unwrap();
 
         let pre2 = SuiteEd25519::dh_exchange(suite, priv2, pub1);
-        let gcm2 = AEAD::<SuiteEd25519>::new(pre2, &vec![]).unwrap();
+        let gcm2 = AEAD::<SuiteEd25519>::new(pre2, &[]).unwrap();
 
-        let decrypted = gcm2.open(None, &nonce, &ciphertext, None).expect(&format!("decryption failed at iteration {}", i));
+        let decrypted = gcm2
+            .open(None, &nonce, &ciphertext, None)
+            .unwrap_or_else(|_| panic!("decryption failed at iteration {}", i));
 
         assert_eq!(decrypted, message, "assertion failed at iteration {}", i);
     }

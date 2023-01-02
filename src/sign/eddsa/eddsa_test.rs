@@ -18,7 +18,7 @@ struct EdDSATestVector<'a> {
 }
 
 /// EdDSATestVectors taken from RFC8032 section 7.1
-static EDDSA_TEST_VECTORS: &'static [EdDSATestVector<'static>] = &[
+static EDDSA_TEST_VECTORS: &[EdDSATestVector<'static>] = &[
     EdDSATestVector{
 	    private: "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
 		public: "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
@@ -71,7 +71,7 @@ fn test_eddsa_marshalling() {
 /// Comparing our implementation with the test vectors of the RFC
 #[test]
 fn test_eddsa_signing() {
-    for (i, vec) in EDDSA_TEST_VECTORS.into_iter().enumerate() {
+    for (i, vec) in EDDSA_TEST_VECTORS.iter().enumerate() {
         let seed = hex::decode(vec.private).unwrap();
 
         if vec.private.len() != 64 || seed.len() != 32 {
@@ -182,9 +182,9 @@ fn test_eddsa_verify_non_canonical_r() {
     let mut sig = ed.sign(&msg).unwrap();
     verify(&ed.public, &msg, &sig).unwrap();
 
-    for i in 0..32 {
+    (0..32).for_each(|i| {
         sig[i] = non_canonical_r[i];
-    }
+    });
 
     assert_eq!(
         verify(&ed.public, &msg, &sig).unwrap_err().to_string(),
@@ -236,9 +236,9 @@ fn test_eddsa_verify_small_order_r() {
     let mut sig = ed.sign(&msg).unwrap();
     verify(&ed.public, &msg, &sig).unwrap();
 
-    for i in 0..32 {
+    (0..32).for_each(|i| {
         sig[i] = small_order_r[i];
-    }
+    });
 
     assert_eq!(
         verify(&ed.public, &msg, &sig).unwrap_err().to_string(),
@@ -278,14 +278,15 @@ pub struct ConstantStream {
 
 impl cipher::Stream for ConstantStream {
     fn xor_key_stream(&mut self, dst: &mut [u8], _: &[u8]) -> Result<()> {
-        Ok(dst.copy_from_slice(&self.seed))
+        dst.copy_from_slice(&self.seed);
+        Ok(())
     }
 }
 
 // ConstantStream is a cipher.Stream which always returns
 // the same value.
 pub fn constant_stream(buff: Vec<u8>) -> Box<dyn cipher::Stream> {
-    return Box::new(ConstantStream {
+    Box::new(ConstantStream {
         seed: buff[..32].to_vec(),
-    });
+    })
 }

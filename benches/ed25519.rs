@@ -68,7 +68,7 @@ fn benchmark_ct_scalar_add(bench: &mut Bencher) {
 }
 
 fn benchmark_ct_scalar_simple_add(bench: &mut Bencher) {
-    bench_scalar_add(bench, || SimpleCTScalar::default());
+    bench_scalar_add(bench, SimpleCTScalar::default);
 }
 
 // func BenchmarkCTScalarFactoredAdd(b *testing.B) { benchScalarAdd(b, newFactoredScalar) }

@@ -38,14 +38,14 @@ fn new_test_data() -> TestData<SuiteEd25519, dkg::rabin::DistKeyShare<SuiteEd255
     let longterms = gen_dist_secret(&part_sec, &part_pubs, suite());
     let randoms = gen_dist_secret(&part_sec, &part_pubs, suite());
 
-    return TestData::<SuiteEd25519, dkg::rabin::DistKeyShare<SuiteEd25519>> {
+    TestData::<SuiteEd25519, dkg::rabin::DistKeyShare<SuiteEd25519>> {
         suite: suite(),
         nb_participants: NB_PARTICIPANTS,
         part_pubs,
         part_sec,
         longterms,
         randoms,
-    };
+    }
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn test_dss_partial_sigs() {
 
     // wrong Signature
     let good_sig = ps0.signature.clone();
-    ps0.signature = random_bytes(ps0.signature.clone().len());
+    ps0.signature = random_bytes(ps0.signature.len());
     assert!(dss1.process_partial_sig(ps0.clone()).is_err());
     ps0.signature = good_sig.clone();
 
@@ -169,7 +169,7 @@ fn get_dss<SUITE: Suite, DKS: DistKeyShare<SUITE>>(
         t.nb_participants / 2 + 1,
     )
     .unwrap();
-    return dss;
+    dss
 }
 
 fn gen_dist_secret<SUITE: crate::share::vss::suite::Suite>(
@@ -182,7 +182,7 @@ where
     SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
 {
     let mut dkgs = Vec::with_capacity(NB_PARTICIPANTS);
-    for i in 0..NB_PARTICIPANTS {
+    (0..NB_PARTICIPANTS).for_each(|i| {
         let dkg = dkg::rabin::new_dist_key_generator::<SUITE>(
             &suite,
             &part_sec[i],
@@ -191,7 +191,7 @@ where
         )
         .unwrap();
         dkgs.push(dkg);
-    }
+    });
     // full secret sharing exchange
     // 1. broadcast deals
     let mut all_deals = Vec::new();
@@ -240,7 +240,7 @@ where
         let dks = dkg.dist_key_share().unwrap();
         dkss.push(dks);
     }
-    return dkss;
+    dkss
 }
 
 use crate::group::edwards25519::scalar::Scalar as EdScalar;
@@ -258,5 +258,5 @@ fn random_bytes(n: usize) -> Vec<u8> {
     for _ in 0..n {
         buff.push(rng.gen());
     }
-    return buff;
+    buff
 }

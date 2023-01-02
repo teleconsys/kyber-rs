@@ -35,12 +35,12 @@ fn new_test_data() -> TestData<SuiteEd25519> {
         part_sec.push(sec);
     }
 
-    return TestData::<SuiteEd25519> {
+    TestData::<SuiteEd25519> {
         suite: suite(),
         nb_participants: NB_PARTICIPANTS,
         part_pubs,
         part_sec,
-    };
+    }
 }
 
 fn dkg_gen<SUITE: Suite>(t: &TestData<SUITE>) -> Vec<DistKeyGenerator<SUITE>> {
@@ -55,7 +55,7 @@ fn dkg_gen<SUITE: Suite>(t: &TestData<SUITE>) -> Vec<DistKeyGenerator<SUITE>> {
         .unwrap();
         dkgs.push(dkg);
     }
-    return dkgs;
+    dkgs
 }
 
 #[test]
@@ -89,10 +89,10 @@ fn test_dkg_deal() {
 
     for (_, d) in deals {
         //assert.NotNil(t, deals[i])
-        assert_eq!(0 as u32, d.index);
+        assert_eq!(0_u32, d.index);
     }
 
-    let own_index = dkg.index.clone();
+    let own_index = dkg.index;
     assert!(dkg.verifiers.contains_key(&own_index));
     assert!(dkg.verifiers.get(&own_index).is_some());
 }
@@ -257,7 +257,7 @@ fn test_dkg_secret_commits() {
 
     // invalid sig
     let good_sig = sc.signature.clone();
-    sc.signature = random_bytes(good_sig.clone().len());
+    sc.signature = random_bytes(good_sig.len());
     let res = dkgs[1].process_secret_commits(&sc);
     assert!(res.is_err());
     sc.signature = good_sig;
@@ -306,7 +306,7 @@ fn test_dkg_complaint_commits() {
 
     // change the sc for the second one
     let mut wrong_sc = SecretCommits {
-        index: scs[0].index.clone(),
+        index: scs[0].index,
         session_id: scs[0].session_id.clone(),
         commitments: scs[0].commitments.clone(),
         signature: Vec::new(),
@@ -344,7 +344,7 @@ fn test_dkg_complaint_commits() {
         session_id: good_deal.session_id.clone(),
         sec_share: good_deal.sec_share.clone(),
         rnd_share: good_deal.rnd_share.clone(),
-        t: good_deal.t.clone(),
+        t: good_deal.t,
         commitments: good_deal.commitments.clone(),
     };
     let res = dkgs[2].process_complaint_commits(&cc);
@@ -443,7 +443,7 @@ fn test_dkg_reconstruct_commits() {
 
     // invalid sig
     let good_sig = rc.signature.clone();
-    rc.signature = random_bytes(good_sig.clone().len());
+    rc.signature = random_bytes(good_sig.len());
     assert!(dkgs[2].process_reconstruct_commits(&rc).is_err());
     rc.signature = good_sig;
 
@@ -478,18 +478,16 @@ fn test_dkg_reconstruct_commits() {
     }
 
     for rc in rcs.iter_mut() {
-        if dkgs[2].reconstructed.contains_key(&0) {
-            if *dkgs[2].reconstructed.get(&0).unwrap() {
-                break;
-            }
+        if dkgs[2].reconstructed.contains_key(&0) && *dkgs[2].reconstructed.get(&0).unwrap() {
+            break;
         }
         // invalid session ID
         let good_sid = rc.session_id.clone();
         rc.session_id = random_bytes(good_sid.len());
-        assert!(dkgs[2].process_reconstruct_commits(&rc).is_err());
+        assert!(dkgs[2].process_reconstruct_commits(rc).is_err());
         rc.session_id = good_sid;
 
-        dkgs[2].process_reconstruct_commits(&rc).unwrap();
+        dkgs[2].process_reconstruct_commits(rc).unwrap();
     }
     assert!(dkgs[2].reconstructed.contains_key(&0));
     let com = dkgs[2].commitments.get(&0);
@@ -540,12 +538,12 @@ fn test_set_timeout() {
     // 3. make sure everyone has the same QUAL set
     let mut dkg_idxs = Vec::with_capacity(dkgs.len());
     for dkg in dkgs.iter() {
-        dkg_idxs.push(dkg.index.clone());
+        dkg_idxs.push(dkg.index);
     }
 
     for dkg in dkgs.iter() {
         for idx in dkg_idxs.iter() {
-            assert!(!dkg.is_in_qual(idx.clone()));
+            assert!(!dkg.is_in_qual(*idx));
         }
     }
 
@@ -555,7 +553,7 @@ fn test_set_timeout() {
 
     for dkg in dkgs.iter() {
         for idx in dkg_idxs.iter() {
-            assert!(dkg.is_in_qual(idx.clone()));
+            assert!(dkg.is_in_qual(*idx));
         }
     }
 }
@@ -610,10 +608,10 @@ fn test_dist_key_share() {
     {
         let last_dkg = &mut dkgs[dkgs_len - 1];
         // missing one commitment
-        let last_commitment_0 = last_dkg.commitments.remove(&(0 as u32)).unwrap();
+        let last_commitment_0 = last_dkg.commitments.remove(&0_u32).unwrap();
         let res = last_dkg.dist_key_share();
         assert!(res.is_err());
-        last_dkg.commitments.insert(0 as u32, last_commitment_0);
+        last_dkg.commitments.insert(0_u32, last_commitment_0);
     }
 
     // everyone should be finished
@@ -659,7 +657,7 @@ fn random_bytes(n: usize) -> Vec<u8> {
     for _ in 0..n {
         buff.push(rng.gen());
     }
-    return buff;
+    buff
 }
 
 fn check_dks<SUITE: Suite>(dks1: &DistKeyShare<SUITE>, dks2: &DistKeyShare<SUITE>) -> bool {
@@ -671,7 +669,7 @@ fn check_dks<SUITE: Suite>(dks1: &DistKeyShare<SUITE>, dks2: &DistKeyShare<SUITE
             return false;
         }
     }
-    return true;
+    true
 }
 
 fn full_exchange(t: &TestData<SuiteEd25519>) -> Vec<DistKeyGenerator<SuiteEd25519>> {
@@ -710,5 +708,5 @@ fn full_exchange(t: &TestData<SuiteEd25519>) -> Vec<DistKeyGenerator<SuiteEd2551
         }
     }
 
-    return dkgs;
+    dkgs
 }

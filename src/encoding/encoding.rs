@@ -56,12 +56,12 @@ pub trait BinaryUnmarshaler {
 }
 
 pub fn marshal_binary<T: Serialize>(x: &T) -> Result<Vec<u8>> {
-    return match bincode::serialize(x) {
+    match bincode::serialize(x) {
         Ok(v) => Ok(v),
         Err(e) => {
             bail!(MarshallingError::Serialization(e))
         }
-    };
+    }
 }
 
 pub fn unmarshal_binary<'de, T: Deserialize<'de>>(x: &mut T, data: &'de [u8]) -> Result<()> {

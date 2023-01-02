@@ -29,7 +29,7 @@ use num_bigint::BigInt;
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 use sha2::{Digest, Sha256};
 
-use crate::{cipher::cipher::Stream, xof::blake::XOF};
+use crate::{cipher::cipher::Stream, xof::blake::Xof};
 
 /// random_int chooses a uniform random big.Int less than a given modulus
 pub fn random_int(modulus: &BigInt, rand: &mut impl Stream) -> BigInt {
@@ -38,7 +38,7 @@ pub fn random_int(modulus: &BigInt, rand: &mut impl Stream) -> BigInt {
     loop {
         let bits = bits(bitlen, false, rand);
         let i = BigInt::from_bytes_be(num_bigint::Sign::Plus, bits.as_ref());
-        if i.sign() == num_bigint::Sign::Plus && i.cmp(&modulus) == Ordering::Less {
+        if i.sign() == num_bigint::Sign::Plus && i.cmp(modulus) == Ordering::Less {
             return i;
         }
     }
@@ -72,15 +72,15 @@ impl Randstream {
     /// then hashed, and the resulting hash is used as a seed to a PRNG.
     /// The resulting cipher.Stream can be used in multiple threads.
     pub fn new(readers: Vec<Box<dyn Read>>) -> Randstream {
-        if readers.len() == 0 {
+        if readers.is_empty() {
             return Randstream::default();
         }
-        return Randstream {
+        Randstream {
             readers: readers
                 .into_iter()
                 .map(|r| Box::new(r) as Box<dyn Read>)
                 .collect(),
-        };
+        }
     }
 }
 
@@ -97,8 +97,8 @@ impl Stream for Randstream {
         // try to read readerBytes bytes from all readers and write them in a buffer
         // let b: bytes.Buffer;
         let mut b = vec![];
-        let mut nerr = 0 as usize;
-        let mut buff = vec![0 as u8; reader_bytes];
+        let mut nerr = 0_usize;
+        let mut buff = vec![0_u8; reader_bytes];
         for reader in &mut self.readers {
             let result = reader.read_exact(&mut buff);
             // n, err := io.ReadFull(reader, buff)
@@ -106,7 +106,7 @@ impl Stream for Randstream {
                 nerr += 1;
                 continue;
             }
-            b.write(&buff[..buff.len()]).unwrap();
+            b.write_all(&buff[..buff.len()]).unwrap();
         }
 
         // we are ok with few sources being insecure (i.e., providing less than
@@ -121,7 +121,7 @@ impl Stream for Randstream {
         let seed = h.finalize();
         // h.Write(b.Bytes())
         // seed := h.Sum(nil)
-        let mut blake = XOF::new(Some(&seed));
+        let mut blake = Xof::new(Some(&seed));
         blake.xor_key_stream(dst, src)
         // blake2 := blake2xb.New(seed)
         // blake2.XORKeyStream(dst, src)

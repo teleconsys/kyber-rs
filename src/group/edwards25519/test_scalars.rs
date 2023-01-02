@@ -19,17 +19,9 @@ lazy_static! {
 
 /// SimpleCTScalar implements the scalar operations only using `ScMulAdd` by
 /// playing with the parameters.
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct SimpleCTScalar {
     s: EdScalar,
-}
-
-impl Default for SimpleCTScalar {
-    fn default() -> Self {
-        SimpleCTScalar {
-            s: EdScalar::default(),
-        }
-    }
 }
 
 impl Add for SimpleCTScalar {
@@ -142,15 +134,15 @@ impl Scalar for SimpleCTScalar {
         todo!()
     }
 
-    fn div(self, a: &Self, b: &Self) -> Self {
+    fn div(self, _a: &Self, _b: &Self) -> Self {
         todo!()
     }
 
-    fn inv(self, a: &Self) -> Self {
+    fn inv(self, _a: &Self) -> Self {
         todo!()
     }
 
-    fn neg(self, a: &Self) -> Self {
+    fn neg(self, _a: &Self) -> Self {
         todo!()
     }
 }

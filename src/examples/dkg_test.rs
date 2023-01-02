@@ -73,7 +73,7 @@ fn test_example_dkg() {
         pub_keys.push(pub_key.clone());
         nodes.push(Node::<SuiteEd25519> {
             _pub_key: pub_key,
-            priv_key: priv_key,
+            priv_key,
             deals: Vec::new(),
             resps: Vec::new(),
             secret_share: Default::default(),
@@ -184,7 +184,7 @@ fn test_example_dkg() {
         let s = suite.point().mul(&node.secret_share.v, Some(&k));
         partials.push(suite.point().sub(&c.clone(), &s).clone());
         pub_shares.push(Some(share::poly::PubShare {
-            i: i,
+            i,
             v: partials[i].clone(),
         }));
     }
@@ -254,7 +254,7 @@ fn test_example_dkg() {
         );
         partials.push(v);
         pub_shares.push(Some(share::poly::PubShare {
-            i: i,
+            i,
             v: partials[i].clone(),
         }));
     }
@@ -280,7 +280,7 @@ fn test_example_dkg() {
     for node in nodes.iter_mut() {
         let share = node.dkg.dist_key_share().unwrap();
         let c = Config {
-            suite: suite,
+            suite,
             longterm: node.priv_key.clone(),
             old_nodes: pub_keys.clone(),
             new_nodes: pub_keys.clone(),

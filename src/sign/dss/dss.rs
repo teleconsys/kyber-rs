@@ -91,7 +91,7 @@ pub fn new_dss<SUITE: Suite, DKS: DistKeyShare<SUITE>>(
     msg: &[u8],
     t: usize,
 ) -> Result<DSS<SUITE, DKS>> {
-    let public = suite.point().mul(&secret, None);
+    let public = suite.point().mul(secret, None);
     let mut i = 0;
     let mut found = false;
     for (j, p) in participants.iter().enumerate() {
@@ -108,7 +108,7 @@ pub fn new_dss<SUITE: Suite, DKS: DistKeyShare<SUITE>>(
     Ok(DSS::<SUITE, DKS> {
         suite: suite.clone(),
         secret: secret.clone(),
-        public: public,
+        public,
         index: i,
         participants: participants.to_vec(),
         long: long.clone(),
@@ -116,7 +116,7 @@ pub fn new_dss<SUITE: Suite, DKS: DistKeyShare<SUITE>>(
         random: random.clone(),
         random_poly: PubPoly::new(&suite, Some(suite.point().base()), &random.commitments()),
         msg: msg.to_vec(),
-        t: t,
+        t,
         partials_idx: HashMap::new(),
         session_id: session_id(suite, long, random)?,
         partials: Vec::new(),
@@ -197,7 +197,7 @@ impl<SUITE: Suite, DKS: DistKeyShare<SUITE>> DSS<SUITE, DKS> {
     /// the distributed signature. It returns false otherwise. If there are enough
     /// partial signatures, one can issue the signature with `Signature()`.
     pub fn enough_partial_sig(&self) -> bool {
-        return self.partials.len() >= self.t;
+        self.partials.len() >= self.t
     }
 
     /// Signature computes the distributed signature from the list of partial
