@@ -354,12 +354,12 @@ where
 
     /// Commits returns the commitments of the coefficient of the secret polynomial
     /// the Dealer is sharing.
-    fn commits(&self) -> Vec<SUITE::POINT> {
+    pub fn commits(&self) -> Vec<SUITE::POINT> {
         self.secret_commits.clone()
     }
 
     /// Key returns the longterm key pair used by this Dealer.
-    fn key(&self) -> (<SUITE::POINT as Point>::SCALAR, SUITE::POINT) {
+    pub fn key(&self) -> (<SUITE::POINT as Point>::SCALAR, SUITE::POINT) {
         (self.long.clone(), self.pubb.clone())
     }
 
@@ -576,13 +576,13 @@ where
 
     /// Key returns the longterm key pair this verifier is using during this protocol
     /// run.
-    fn key(self) -> (<SUITE::POINT as Point>::SCALAR, SUITE::POINT) {
+    pub fn key(self) -> (<SUITE::POINT as Point>::SCALAR, SUITE::POINT) {
         (self.longterm, self.pubb)
     }
 
     /// Index returns the index of the verifier in the list of participants used
     /// during this run of the protocol.
-    fn index(&self) -> usize {
+    pub fn index(&self) -> usize {
         self.index
     }
 
@@ -920,7 +920,7 @@ where
         if self.timeout {
             return base_condition && !too_much_absents;
         }
-        base_condition && !(absent_verifiers > 0)
+        base_condition && absent_verifiers == 0
     }
 
     /// MissingResponses returns the indexes of the expected but missing responses.
@@ -948,7 +948,7 @@ fn valid_t<POINT: Point>(t: usize, verifiers: &[POINT]) -> bool {
     t >= 2 && t <= verifiers.len() && (t as u32) as i64 == t as i64
 }
 
-fn derive_h<SUITE: Suite>(suite: SUITE, verifiers: &[SUITE::POINT]) -> SUITE::POINT {
+pub fn derive_h<SUITE: Suite>(suite: SUITE, verifiers: &[SUITE::POINT]) -> SUITE::POINT {
     let mut b = vec![];
     for v in verifiers {
         v.marshal_to(&mut b).unwrap();

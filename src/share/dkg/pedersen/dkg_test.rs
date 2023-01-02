@@ -33,14 +33,13 @@ lazy_static! {
     static ref DEFAULT_T: usize = vss::pedersen::vss::minimum_t(DEFAULT_N);
 }
 
-fn generate(
-    n: usize,
-    t: usize,
-) -> (
-    Vec<EdPoint>,
-    Vec<EdScalar>,
-    Vec<DistKeyGenerator<SuiteEd25519, &'static [u8]>>,
-) {
+struct TestData<SUITE: Suite> {
+    part_pubs: Vec<SUITE::POINT>,
+    part_sec: Vec<<SUITE::POINT as Point>::SCALAR>,
+    dkgs: Vec<DistKeyGenerator<SUITE, &'static [u8]>>,
+}
+
+fn generate(n: usize, t: usize) -> TestData<SuiteEd25519> {
     let mut part_pubs = Vec::with_capacity(n);
     let mut part_sec = Vec::with_capacity(n);
     for _ in 0..n {
@@ -53,12 +52,18 @@ fn generate(
         let dkg = new_dist_key_generator(suite(), part_sec[i].clone(), &part_pubs, t).unwrap();
         dkgs.push(dkg);
     });
-    (part_pubs, part_sec, dkgs)
+    TestData {
+        part_pubs,
+        part_sec,
+        dkgs,
+    }
 }
 
 #[test]
 fn test_dkg_new_dist_key_generator() {
-    let (part_pubs, part_sec, _) = generate(DEFAULT_N, *DEFAULT_T);
+    let test_data = generate(DEFAULT_N, *DEFAULT_T);
+    let part_pubs = test_data.part_pubs;
+    let part_sec = test_data.part_sec;
 
     let long = part_sec[0].clone();
     let dkg: DistKeyGenerator<SuiteEd25519, &'static [u8]> =
@@ -89,7 +94,7 @@ fn test_dkg_new_dist_key_generator() {
 
 #[test]
 fn test_dkg_deal() {
-    let (_, _, mut dkgs) = generate(DEFAULT_N, *DEFAULT_T);
+    let mut dkgs = generate(DEFAULT_N, *DEFAULT_T).dkgs;
     let dkg = &mut dkgs[0];
 
     let dks_res = dkg.dist_key_share();
@@ -108,7 +113,7 @@ fn test_dkg_deal() {
 
 #[test]
 fn test_dkg_process_deal() {
-    let (_, _, mut dkgs) = generate(DEFAULT_N, *DEFAULT_T);
+    let mut dkgs = generate(DEFAULT_N, *DEFAULT_T).dkgs;
     let dkg = &mut dkgs[0];
     let mut deals = dkg.deals().unwrap();
 
@@ -155,7 +160,7 @@ fn test_dkg_process_response() {
     // second peer processes it and returns a complaint
     // first peer process the complaint
 
-    let (_, _, mut dkgs) = generate(DEFAULT_N, *DEFAULT_T);
+    let mut dkgs = generate(DEFAULT_N, *DEFAULT_T).dkgs;
     let idx_rec = 1;
 
     // give a wrong deal
@@ -248,7 +253,9 @@ fn test_dkg_process_response() {
 fn test_dkg_resharing_threshold() {
     let n = 7;
     let old_t = vss::pedersen::vss::minimum_t(n);
-    let (publics, _, mut dkgs) = generate(n, old_t);
+    let test_data = generate(n, old_t);
+    let publics = test_data.part_pubs;
+    let mut dkgs = test_data.dkgs;
     full_exchange(&mut dkgs, true);
 
     let new_n = dkgs.len() + 1;
@@ -404,7 +411,7 @@ fn test_dkg_threshold() {
     let n = 7;
     // should succeed with only this number of nodes
     let new_total = vss::pedersen::vss::minimum_t(n);
-    let (_, _, dkgs) = generate(n, new_total);
+    let dkgs = generate(n, new_total).dkgs;
 
     // only take a threshold of them
     let mut thr_dkgs = HashMap::new();
@@ -502,7 +509,7 @@ fn test_dkg_threshold() {
 
 #[test]
 fn test_dist_key_share() {
-    let (_, _, mut dkgs) = generate(DEFAULT_N, *DEFAULT_T);
+    let mut dkgs = generate(DEFAULT_N, *DEFAULT_T).dkgs;
     full_exchange(&mut dkgs, true);
 
     for dkg in dkgs.iter() {
@@ -623,7 +630,10 @@ fn full_exchange<SUITE: Suite, READ: Read + Clone + 'static>(
 #[test]
 fn test_dkg_resharing() {
     let old_t = vss::pedersen::vss::minimum_t(DEFAULT_N);
-    let (publics, secrets, mut dkgs) = generate(DEFAULT_N, old_t);
+    let test_data = generate(DEFAULT_N, old_t);
+    let publics = test_data.part_pubs;
+    let secrets = test_data.part_sec;
+    let mut dkgs = test_data.dkgs;
     full_exchange(&mut dkgs, true);
 
     let mut shares = Vec::with_capacity(dkgs.len());
@@ -678,7 +688,10 @@ fn test_dkg_resharing() {
 #[test]
 fn test_dkg_resharing_remove_node() {
     let old_t = vss::pedersen::vss::minimum_t(DEFAULT_N);
-    let (publics, secrets, mut dkgs) = generate(DEFAULT_N, old_t);
+    let test_data = generate(DEFAULT_N, old_t);
+    let publics = test_data.part_pubs;
+    let secrets = test_data.part_sec;
+    let mut dkgs = test_data.dkgs;
     full_exchange(&mut dkgs, true);
 
     let new_n = publics.len() - 1;
@@ -738,7 +751,10 @@ fn test_dkg_resharing_remove_node() {
 fn test_dkg_resharing_new_nodes_threshold() {
     let old_n = DEFAULT_N;
     let old_t = vss::pedersen::vss::minimum_t(old_n);
-    let (old_pubs, old_privs, mut dkgs) = generate(old_n, old_t);
+    let test_data = generate(old_n, old_t);
+    let old_pubs = test_data.part_pubs;
+    let old_privs = test_data.part_sec;
+    let mut dkgs = test_data.dkgs;
     full_exchange(&mut dkgs, true);
 
     let mut shares = Vec::with_capacity(dkgs.len());
@@ -910,8 +926,10 @@ fn test_dkg_resharing_new_nodes_threshold() {
 /// Test resharing to a different set of nodes with two common.
 #[test]
 fn test_dkg_resharing_new_nodes() {
-    let (old_pubs, old_privs, mut dkgs) =
-        generate(DEFAULT_N, vss::pedersen::vss::minimum_t(DEFAULT_N));
+    let test_data = generate(DEFAULT_N, vss::pedersen::vss::minimum_t(DEFAULT_N));
+    let old_pubs = test_data.part_pubs;
+    let old_privs = test_data.part_sec;
+    let mut dkgs = test_data.dkgs;
     full_exchange(&mut dkgs, true);
 
     let mut shares = Vec::with_capacity(dkgs.len());
@@ -1139,8 +1157,10 @@ fn test_dkg_resharing_new_nodes() {
 
 #[test]
 fn test_dkg_resharing_partial_new_nodes() {
-    let (old_pubs, old_privs, mut dkgs) =
-        generate(DEFAULT_N, vss::pedersen::vss::minimum_t(DEFAULT_N));
+    let test_data = generate(DEFAULT_N, vss::pedersen::vss::minimum_t(DEFAULT_N));
+    let old_pubs = test_data.part_pubs;
+    let old_privs = test_data.part_sec;
+    let mut dkgs = test_data.dkgs;
     full_exchange(&mut dkgs, true);
 
     let mut shares = Vec::with_capacity(dkgs.len());
@@ -1347,7 +1367,9 @@ fn test_dkg_resharing_partial_new_nodes() {
 #[test]
 fn test_reader_mixed_entropy() {
     let seed = "some stream to be used with crypto/rand";
-    let (part_pubs, part_sec, _) = generate(DEFAULT_N, *DEFAULT_T);
+    let test_data = generate(DEFAULT_N, *DEFAULT_T);
+    let part_pubs = test_data.part_pubs;
+    let part_sec = test_data.part_sec;
     let long = part_sec[0].clone();
     let r = seed.as_bytes();
     let c = Config {
@@ -1368,7 +1390,9 @@ fn test_reader_mixed_entropy() {
 #[test]
 fn test_user_only_flag_true_behavior() {
     let seed = "String to test reproducibility with";
-    let (part_pubs, part_sec, _) = generate(DEFAULT_N, *DEFAULT_T);
+    let test_data = generate(DEFAULT_N, *DEFAULT_T);
+    let part_pubs = test_data.part_pubs;
+    let part_sec = test_data.part_sec;
     let long = part_sec[0].clone();
 
     let r1 = seed.as_bytes();
@@ -1410,7 +1434,9 @@ fn test_user_only_flag_true_behavior() {
 #[test]
 fn test_user_only_flag_false_behavior() {
     let seed = "String to test reproducibility with";
-    let (part_pubs, part_sec, _) = generate(DEFAULT_N, *DEFAULT_T);
+    let test_data = generate(DEFAULT_N, *DEFAULT_T);
+    let part_pubs = test_data.part_pubs;
+    let part_sec = test_data.part_sec;
     let long = part_sec[0].clone();
 
     let r1 = seed.as_bytes();

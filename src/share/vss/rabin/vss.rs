@@ -389,7 +389,7 @@ where
     }
 
     /// Key returns the longterm key pair used by this Dealer.
-    fn key(self) -> (<SUITE::POINT as Point>::SCALAR, SUITE::POINT) {
+    pub fn key(self) -> (<SUITE::POINT as Point>::SCALAR, SUITE::POINT) {
         (self.long, self.pubb)
     }
 
@@ -610,13 +610,13 @@ where
 
     /// Key returns the longterm key pair this verifier is using during this protocol
     /// run.
-    fn key(self) -> (<SUITE::POINT as Point>::SCALAR, SUITE::POINT) {
+    pub fn key(self) -> (<SUITE::POINT as Point>::SCALAR, SUITE::POINT) {
         (self.longterm, self.pubb)
     }
 
     /// Index returns the index of the verifier in the list of participants used
     /// during this run of the protocol.
-    fn index(&self) -> usize {
+    pub fn index(&self) -> usize {
         self.index
     }
 

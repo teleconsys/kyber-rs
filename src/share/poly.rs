@@ -358,7 +358,7 @@ pub fn recover_pri_poly<GROUP: Group>(
 }
 
 impl<GROUP: Group> PriPoly<GROUP> {
-    fn string(&self) -> String {
+    pub fn string(&self) -> String {
         let mut strs = Vec::with_capacity(self.coeffs.len());
         for c in self.coeffs.clone() {
             strs.push(c.to_string());
@@ -377,7 +377,7 @@ pub struct PubShare<POINT: Point> {
 
 impl<POINT: Point> PubShare<POINT> {
     /// Hash returns the hash representation of this share
-    fn hash<HASHFACTORY: HashFactory>(&self, s: HASHFACTORY) -> Result<Vec<u8>> {
+    pub fn hash<HASHFACTORY: HashFactory>(&self, s: HASHFACTORY) -> Result<Vec<u8>> {
         let mut h = s.hash();
         self.v.marshal_to(&mut h)?;
         h.write_u32::<LittleEndian>(self.i as u32)?;
