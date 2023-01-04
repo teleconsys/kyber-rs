@@ -311,7 +311,7 @@ impl Point {
 
     /// marshal_id returns the type tag used in encoding/decoding
     pub fn marshal_id(&self) -> [u8; 8] {
-    	MARSHAL_POINT_ID
+        MARSHAL_POINT_ID
     }
 
     // func (P *point) UnmarshalFrom(r io.Reader) (int, error) {

@@ -1,4 +1,5 @@
-use std::cmp::Ordering::{Equal, Greater};
+use lazy_static::lazy_static;
+use std::cmp::Ordering::{self, Equal, Greater};
 use std::ops::{Add, Mul};
 
 use anyhow::{bail, Result};
@@ -8,22 +9,26 @@ use num_traits::{Num, Signed};
 
 use crate::cipher::cipher::Stream;
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
+use crate::group::internal::marshalling;
 use crate::group::Scalar;
+use crate::util::random::random_int;
 use serde::{Deserialize, Serialize};
 
 use crate::group::integer_field::integer_field::ByteOrder::{BigEndian, LittleEndian};
 
-// const ONE: u8 = 1;
-// const TWO: u8 = 2;
+lazy_static! {
+    pub static ref ONE: BigInt = BigInt::from(1_i64);
+    pub static ref TWO: BigInt = BigInt::from(2_i64);
+}
 
-// var marshalScalarID = [8]byte{'m', 'o', 'd', '.', 'i', 'n', 't', ' '}
+const MARSHAL_SCALAR_ID: [u8; 8] = [b'm', b'o', b'd', b'.', b'i', b'n', b't', b' '];
 
-// ByteOrder denotes the endianness of the operation.
+/// ByteOrder denotes the endianness of the operation.
 #[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 pub enum ByteOrder {
-    // little_endian endianness
+    /// little_endian endianness
     LittleEndian,
-    // BigEndian endianness
+    /// BigEndian endianness
     BigEndian,
 }
 
@@ -65,11 +70,11 @@ impl From<bool> for ByteOrder {
 /// whose target is assumed never to change.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Int {
-    // Integer value from 0 through m-1
+    /// Integer value from 0 through m-1
     pub(crate) v: BigInt,
-    // Modulus for finite field arithmetic
+    /// Modulus for finite field arithmetic
     pub(crate) m: BigInt,
-    // Endianness which will be used on input and output
+    /// Endianness which will be used on input and output
     pub bo: ByteOrder,
 }
 
@@ -159,15 +164,15 @@ impl Int {
         Int::default().init_string(n, d, base, m)
     }
 
-    // Equal returns true if the TWO Ints are equal
+    /// Equal returns true if the TWO Ints are equal
     pub fn equal(&self, s2: &Self) -> bool {
         self.v.cmp(&s2.v) == Equal
     }
 
-    // // Cmp compares TWO Ints for equality or inequality
-    // fn  Cmp(&self, s2 kyber.scalar) -> i32 {
-    //     return i.V.Cmp(&s2.(*Int).V)
-    // }
+    /// cmpr compares TWO Ints for equality or inequality
+    pub fn cmpr(&self, s2: &Self) -> Ordering {
+        self.v.cmp(&s2.v)
+    }
 
     // init_bytes init the Int to a number represented in a big-endian byte string.
     pub fn init_bytes(self, a: &[u8], m: &BigInt, byte_order: ByteOrder) -> Self {
@@ -285,18 +290,19 @@ impl BinaryUnmarshaler for Int {
 }
 
 impl Marshaling for Int {
-    fn marshal_to(&self, _w: &mut impl std::io::Write) -> Result<()> {
-        todo!()
+    fn marshal_to(&self, w: &mut impl std::io::Write) -> anyhow::Result<()> {
+        marshalling::scalar_marshal_to(self, w)
     }
 
     fn marshal_size(&self) -> usize {
-        todo!()
+        ((self.m.abs().bits() as usize) + 7) / 8
     }
 }
 
 impl ToString for Int {
     fn to_string(&self) -> String {
-        todo!()
+        let (_, data) = self.v.to_bytes_be();
+        hex::encode(data)
     }
 }
 
@@ -317,7 +323,13 @@ impl Add for Int {
 }
 
 impl Scalar for Int {
+    /// Set both value and modulus to be equal to another Int.
+    /// Since this method copies the modulus as well,
     fn set(self, _a: &Self) -> Self {
+        // ai := a.(*Int)
+        // i.V.Set(&ai.V)
+        // i.M = ai.M
+        // return i
         todo!()
     }
 
@@ -329,7 +341,9 @@ impl Scalar for Int {
         todo!()
     }
 
+    /// Zero set the Int to the value 0.  The modulus must already be initialized.
     fn zero(self) -> Self {
+        // i.V.SetInt64(0)
         todo!()
     }
 
@@ -343,8 +357,12 @@ impl Scalar for Int {
         self
     }
 
-    fn pick(self, _rand: &mut impl Stream) -> Self {
-        todo!()
+    /// Pick a [pseudo-]random integer modulo m
+    /// using bits from the given stream cipher.
+    fn pick(self, rand: &mut impl Stream) -> Self {
+        let mut s = self.clone();
+        s.v.clone_from(&random_int(&self.m, rand));
+        s
     }
 
     /// set_bytes set the value value to a number represented
@@ -362,111 +380,66 @@ impl Scalar for Int {
         }
     }
 
+    /// One sets the Int to the value 1.  The modulus must already be initialized.
     fn one(self) -> Self {
+        // i.V.SetInt64(1)
         todo!()
     }
 
     fn div(self, _a: &Self, _bb: &Self) -> Self {
         todo!()
     }
-
+    // // Inv sets the target to the modular inverse of a with respect to modulus m.
+    /// Inv sets the target to the modular inverse of a with respect to modulus m.
     fn inv(self, _a: &Self) -> Self {
+        // ai := a.(*Int)
+        // i.M = ai.M
+        // i.V.ModInverse(&a.(*Int).V, i.M)
+        // return i
+        // }
         todo!()
     }
 
+    /// Neg sets the target to -a mod m.
     fn neg(self, _a: &Self) -> Self {
+        // ai := a.(*Int)
+        // i.M = ai.M
+        // if ai.V.Sign() > 0 {
+        // i.V.Sub(i.M, &ai.V)
+        // } else {
+        // i.V.SetUint64(0)
+        // }
+        // return i
+        // }
         todo!()
     }
 }
-
-// // new_int_bytes creates a new Int with a given slice of bytes and a big.Int
-// // modulus.
-// func new_int_bytes(a []byte, m *big.Int, byteOrder ByteOrder) *Int {
-// return new(Int).init_bytes(a, m, byteOrder)
-// }
-
-// // init a Int with a given big.Int value and modulus pointer.
-// // Note that the value is copied; the modulus is not.
-// func (i *Int) init(V *big.Int, m *big.Int) *Int {
-// i.M = m
-// i.BO = BigEndian
-// i.V.Set(V).Mod(&i.V, m)
-// return i
-// }
 
 // // Nonzero returns true if the integer value is nonzero.
 // func (i *Int) Nonzero() bool {
 // return i.V.Sign() != 0
 // }
 //
-// // Set both value and modulus to be equal to another Int.
-// // Since this method copies the modulus as well,
-// // it may be used as an alternative to init().
-// func (i *Int) Set(a kyber.scalar) kyber.scalar {
-// ai := a.(*Int)
-// i.V.Set(&ai.V)
-// i.M = ai.M
-// return i
-// }
-//
-// // Clone returns a separate duplicate of this Int.
-// func (i *Int) Clone() kyber.scalar {
-// ni := new(Int).init(&i.V, i.M)
-// ni.BO = i.BO
-// return ni
-// }
-//
-// // Zero set the Int to the value 0.  The modulus must already be initialized.
-// func (i *Int) Zero() kyber.scalar {
-// i.V.SetInt64(0)
-// return i
-// }
-//
-// // One sets the Int to the value 1.  The modulus must already be initialized.
-// func (i *Int) One() kyber.scalar {
-// i.V.SetInt64(1)
-// return i
-// }
 
 // // Int64 returns the int64 representation of the value.
 // // If the value is not representable in an int64 the result is undefined.
 // func (i *Int) Int64() int64 {
 // return i.V.Int64()
 // }
-//
+
 // // SetUint64 sets the Int to an arbitrary uint64 value.
 // // The modulus must already be initialized.
 // func (i *Int) SetUint64(v uint64) kyber.scalar {
 // i.V.SetUint64(v).Mod(&i.V, i.M)
 // return i
 // }
-//
+
 // // Uint64 returns the uint64 representation of the value.
 // // If the value is not representable in an uint64 the result is undefined.
 // func (i *Int) Uint64() uint64 {
 // return i.V.Uint64()
 // }
 
-// // Neg sets the target to -a mod m.
-// func (i *Int) Neg(a kyber.scalar) kyber.scalar {
-// ai := a.(*Int)
-// i.M = ai.M
-// if ai.V.Sign() > 0 {
-// i.V.Sub(i.M, &ai.V)
-// } else {
-// i.V.SetUint64(0)
-// }
-// return i
-// }
-
-// // Inv sets the target to the modular inverse of a with respect to modulus m.
-// func (i *Int) Inv(a kyber.scalar) kyber.scalar {
-// ai := a.(*Int)
-// i.M = ai.M
-// i.V.ModInverse(&a.(*Int).V, i.M)
-// return i
-// }
-//
 // // Exp sets the target to a^e mod m,
 // // where e is an arbitrary big.Int exponent (not necessarily 0 <= e < m).
 // func (i *Int) Exp(a kyber.scalar, e *big.Int) kyber.scalar {
@@ -478,7 +451,7 @@ impl Scalar for Int {
 // i.V = tmp
 // return i
 // }
-//
+
 // // Jacobi computes the Jacobi symbol of (a/m), which indicates whether a is
 // // zero (0), a positive square in m (1), or a non-square in m (-1).
 // func (i *Int) Jacobi(as kyber.scalar) kyber.scalar {
@@ -487,7 +460,7 @@ impl Scalar for Int {
 // i.V.SetInt64(int64(big.Jacobi(&ai.V, i.M)))
 // return i
 // }
-//
+
 // // Sqrt computes some square root of a mod m of ONE exists.
 // // Assumes the modulus m is an odd prime.
 // // Returns true on success, false if input a is not a square.
@@ -498,47 +471,17 @@ impl Scalar for Int {
 // return out != nil
 // }
 //
-// // Pick a [pseudo-]random integer modulo m
-// // using bits from the given stream cipher.
-// func (i *Int) Pick(rand cipher.Stream) kyber.scalar {
-// i.V.Set(random.Int(i.M, rand))
-// return i
-// }
 
-// // marshal_binary encodes the value of this Int into a byte-slice exactly Len() bytes long.
-// // It uses i's ByteOrder to determine which byte order to output.
-// func (i *Int) marshal_binary() ([]byte, error) {
-// l := i.marshal_size()
-// b := i.V.Bytes() // may be shorter than l
-// offset := l - len(b)
-//
-// if i.BO == little_endian {
-// return i.little_endian(l, l), nil
-// }
-//
-// if offset != 0 {
-// nb := make([]byte, l)
-// copy(nb[offset:], b)
-// b = nb
-// }
-// return b, nil
-// }
-//
 // // MarshalID returns a unique identifier for this type
 // func (i *Int) MarshalID() [8]byte {
 // return marshalScalarID
 // }
 
-// // MarshalTo encodes this Int to the given Writer.
-// func (i *Int) MarshalTo(w io.Writer) (int, error) {
-// return marshalling.ScalarMarshalTo(i, w)
-// }
-//
 // // UnmarshalFrom tries to decode an Int from the given Reader.
 // func (i *Int) UnmarshalFrom(r io.Reader) (int, error) {
 // return marshalling.ScalarUnmarshalFrom(i, r)
 // }
-//
+
 // // BigEndian encodes the value of this Int into a big-endian byte-slice
 // // at least min bytes but no more than max bytes long.
 // // Panics if max != 0 and the Int cannot be represented in max bytes.

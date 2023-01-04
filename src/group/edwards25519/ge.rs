@@ -26,11 +26,10 @@ pub struct ProjectiveGroupElement {
 }
 
 impl ProjectiveGroupElement {
-
     fn zero(&mut self) {
-    	fe_zero(&mut self.x);
-    	fe_one(&mut self.y);
-    	fe_one(&mut self.z);
+        fe_zero(&mut self.x);
+        fe_one(&mut self.y);
+        fe_one(&mut self.z);
     }
 
     pub fn double(&self, r: &mut CompletedGroupElement) {
@@ -54,11 +53,11 @@ impl ProjectiveGroupElement {
         let mut x = FieldElement::default();
         let mut y = FieldElement::default();
 
-    	fe_invert(&mut recip, &self.z);
-    	fe_mul(&mut x, &self.x, &recip);
-    	fe_mul(&mut y, &self.y, &recip);
-    	fe_to_bytes(s, &y);
-    	s[31] ^= fe_is_negative(&x) << 7
+        fe_invert(&mut recip, &self.z);
+        fe_mul(&mut x, &self.x, &recip);
+        fe_mul(&mut y, &self.y, &recip);
+        fe_to_bytes(s, &y);
+        s[31] ^= fe_is_negative(&x) << 7
     }
 }
 
@@ -178,11 +177,15 @@ impl ExtendedGroupElement {
     }
 
     fn string(&self) -> String {
-    	return "extendedGroupElement{\n\t".to_owned() +
-    		&format!("{:?}", self.x) + ",\n\t" +
-    		&format!("{:?}", self.y) + ",\n\t" +
-    		&format!("{:?}", self.z) + ",\n\t" +
-    		&format!("{:?}", self.t) + ",\n}"
+        return "extendedGroupElement{\n\t".to_owned()
+            + &format!("{:?}", self.x)
+            + ",\n\t"
+            + &format!("{:?}", self.y)
+            + ",\n\t"
+            + &format!("{:?}", self.z)
+            + ",\n\t"
+            + &format!("{:?}", self.t)
+            + ",\n}";
     }
 
     pub fn zero(&mut self) {
@@ -247,21 +250,21 @@ impl CompletedGroupElement {
     }
 
     pub fn mixed_sub(&mut self, p: ExtendedGroupElement, q: PreComputedGroupElement) {
-    	let mut t0 = FieldElement::default();
+        let mut t0 = FieldElement::default();
 
-    	fe_add(&mut self.x, &p.y, &p.x);
-    	fe_sub(&mut self.y, &p.y, &p.x);
-    	fe_mul(&mut self.z, &self.x, &q.y_minus_x);
+        fe_add(&mut self.x, &p.y, &p.x);
+        fe_sub(&mut self.y, &p.y, &p.x);
+        fe_mul(&mut self.z, &self.x, &q.y_minus_x);
         let y_clone = self.y;
-    	fe_mul(&mut self.y, &y_clone, &q.y_plus_x);
-    	fe_mul(&mut self.t, &q.xy2d, &p.t);
-    	fe_add(&mut t0, &p.z, &p.z);
-    	fe_sub(&mut self.x, &self.z, &self.y);
+        fe_mul(&mut self.y, &y_clone, &q.y_plus_x);
+        fe_mul(&mut self.t, &q.xy2d, &p.t);
+        fe_add(&mut t0, &p.z, &p.z);
+        fe_sub(&mut self.x, &self.z, &self.y);
         let y_clone = self.y;
-    	fe_add(&mut self.y, &self.z, &y_clone);
-    	fe_sub(&mut self.z, &t0, &self.t);
+        fe_add(&mut self.y, &self.z, &y_clone);
+        fe_sub(&mut self.z, &t0, &self.t);
         let t_clone = self.t;
-    	fe_add(&mut self.t, &t0, &t_clone);
+        fe_add(&mut self.t, &t0, &t_clone);
     }
 
     pub fn mixed_add(&mut self, p: &mut ExtendedGroupElement, q: &mut PreComputedGroupElement) {
@@ -360,46 +363,45 @@ impl CachedGroupElement {
 /// Assumes the target array r has been preinitialized with zeros
 /// in case the input slice a is less than 32 bytes.
 pub fn slide(r: &mut [i8; 256], a: &[u8; 32]) {
+    // Explode the exponent a into a little-endian array, one bit per byte
+    for (i, _) in a.iter().enumerate() {
+        let mut ai = a[i] as i8;
+        for j in 0..8 {
+            r[i * 8 + j] = ai & 1;
+            ai >>= 1;
+        }
+    }
 
-	// Explode the exponent a into a little-endian array, one bit per byte
-	for (i, _) in a.iter().enumerate() {
-		let mut ai = a[i] as i8;
-		for j  in 0..8 {
-			r[i*8+j] = ai & 1;
-			ai >>= 1;
-		}
-	}
-
-	// Go through and clump sequences of 1-bits together wherever possible,
-	// while keeping r[i] in the range -15 through 15.
-	// Note that each nonzero r[i] in the result will always be odd,
-	// because clumping is triggered by the first, least-significant,
-	// 1-bit encountered in a clump, and that first bit always remains 1.
-	for i in 0..r.len() {
-		if r[i] != 0 {
+    // Go through and clump sequences of 1-bits together wherever possible,
+    // while keeping r[i] in the range -15 through 15.
+    // Note that each nonzero r[i] in the result will always be odd,
+    // because clumping is triggered by the first, least-significant,
+    // 1-bit encountered in a clump, and that first bit always remains 1.
+    for i in 0..r.len() {
+        if r[i] != 0 {
             let mut b = 1;
-            while b <= 6 && i+b < 256 {
-				if r[i+b] != 0 {
-					if r[i]+(r[i+b]<< b) <= 15 {
-						r[i] += r[i+b] << b;
-						r[i+b] = 0;
-					} else if r[i]-(r[i+b]<< b) >= -15 {
-						r[i] -= r[i+b] << b;
-						for k in r.iter_mut().take(256).skip(i + b) {
-							if *k == 0 {
-								*k = 1;
-								break
-							}
-							*k = 0;
-						}
-					} else {
-						break
-					}
-				}
+            while b <= 6 && i + b < 256 {
+                if r[i + b] != 0 {
+                    if r[i] + (r[i + b] << b) <= 15 {
+                        r[i] += r[i + b] << b;
+                        r[i + b] = 0;
+                    } else if r[i] - (r[i + b] << b) >= -15 {
+                        r[i] -= r[i + b] << b;
+                        for k in r.iter_mut().take(256).skip(i + b) {
+                            if *k == 0 {
+                                *k = 1;
+                                break;
+                            }
+                            *k = 0;
+                        }
+                    } else {
+                        break;
+                    }
+                }
                 b += 1;
-			}
-		}
-	}
+            }
+        }
+    }
 }
 
 /// equal returns 1 if b == c and 0 otherwise.

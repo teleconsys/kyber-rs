@@ -1,4 +1,6 @@
-use super::ge::{ExtendedGroupElement, CachedGroupElement, CompletedGroupElement, ProjectiveGroupElement, slide};
+use super::ge::{
+    slide, CachedGroupElement, CompletedGroupElement, ExtendedGroupElement, ProjectiveGroupElement,
+};
 
 /// geScalarMultVartime computes h = a*B, where
 ///   a = a[0]+256*a[1]+...+256^31 a[31]
@@ -30,41 +32,48 @@ pub fn ge_scalar_mult_vartime(
     a_caps.double(&mut t);
     t.to_extended(&mut a2);
     for i in 0..7 {
-    	t.add(&a2, &ai[i]);
-    	t.to_extended(&mut u);
-    	u.to_cached(&mut ai[i+1]);
+        t.add(&a2, &ai[i]);
+        t.to_extended(&mut u);
+        u.to_cached(&mut ai[i + 1]);
     }
 
     // Process the multiplications from most-significant bit downward
     let mut i = 255_usize;
     for j in (0..=256).rev() {
-    	if j == 0 { // no bits set
-    		h.zero();
-    		return
-    	}
-    	if a_slide[j-1] != 0 {
+        if j == 0 {
+            // no bits set
+            h.zero();
+            return;
+        }
+        if a_slide[j - 1] != 0 {
             i = j - 1;
-    		break
-    	}
+            break;
+        }
     }
 
     // first (most-significant) nonzero clump of bits
     u.zero();
     match a_slide[i] {
-        a if a > 0 => t.add(&u, &ai[(a/2) as usize]),
-        a if a < 0 => t.sub(&u, &ai[((-a)/2) as usize]),
-        _ => ()
+        a if a > 0 => t.add(&u, &ai[(a / 2) as usize]),
+        a if a < 0 => t.sub(&u, &ai[((-a) / 2) as usize]),
+        _ => (),
     }
 
     // remaining bits
     for j in (0..i).rev() {
-    	t.to_projective(&mut r);
-    	r.double(&mut t);
+        t.to_projective(&mut r);
+        r.double(&mut t);
 
         match a_slide[j] {
-            a if a > 0 => {t.to_extended(&mut u); t.add(&u, &ai[(a/2) as usize])},
-            a if a < 0 => {t.to_extended(&mut u); t.sub(&u, &ai[((-a)/2) as usize])},
-            _ => ()
+            a if a > 0 => {
+                t.to_extended(&mut u);
+                t.add(&u, &ai[(a / 2) as usize])
+            }
+            a if a < 0 => {
+                t.to_extended(&mut u);
+                t.sub(&u, &ai[((-a) / 2) as usize])
+            }
+            _ => (),
         }
     }
 
