@@ -28,7 +28,7 @@ impl Scalar {
         Int::new_int_bytes(&self.v, &PRIME_ORDER, LittleEndian)
     }
 
-    // string returns the string representation of this scalar (fixed length of 32 bytes, little endian).
+    /// string returns the string representation of this scalar (fixed length of 32 bytes, little endian).
     pub fn string(&self) -> String {
         let mut b = self.to_int().marshal_binary().unwrap().to_vec();
         b.resize(32, 0);
@@ -142,7 +142,7 @@ impl group::Scalar for Scalar {
         self
     }
 
-    // Set to the modular difference a - b
+    /// Set to the modular difference a - b
     fn sub(mut self, a: &Self, b: &Self) -> Self {
         sc_sub(&mut self.v, &a.v, &b.v);
         self
@@ -214,14 +214,14 @@ impl Marshaling for Scalar {
     }
 }
 
-// Input:
-//   a[0]+256*a[1]+...+256^31*a[31] = a
-//   b[0]+256*b[1]+...+256^31*b[31] = b
-//   c[0]+256*c[1]+...+256^31*c[31] = c
-//
-// Output:
-//   s[0]+256*s[1]+...+256^31*s[31] = (ab+c) mod l
-//   where l = 2^252 + 27742317777372353535851937790883648493.
+/// Input:
+///   a[0]+256*a[1]+...+256^31*a[31] = a
+///   b[0]+256*b[1]+...+256^31*b[31] = b
+///   c[0]+256*c[1]+...+256^31*c[31] = c
+///
+/// Output:
+///   s[0]+256*s[1]+...+256^31*s[31] = (ab+c) mod l
+///   where l = 2^252 + 27742317777372353535851937790883648493.
 pub fn sc_mul_add(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32], c: &[u8; 32]) {
     let a0 = 2097151 & load3(&a[..]);
     let a1 = 2097151 & (load4(&a[2..]) >> 5);
@@ -689,15 +689,15 @@ pub fn sc_mul_add(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32], c: &[u8; 32]) {
     s[31] = (s11 >> 17) as u8;
 }
 
-// Hacky sc_add cobbled together rather sub-optimally from scMulAdd.
-//
-// Input:
-//   a[0]+256*a[1]+...+256^31*a[31] = a
-//   c[0]+256*c[1]+...+256^31*c[31] = c
-//
-// Output:
-//   s[0]+256*s[1]+...+256^31*s[31] = (a+c) mod l
-//   where l = 2^252 + 27742317777372353535851937790883648493.
+/// Hacky sc_add cobbled together rather sub-optimally from scMulAdd.
+///
+/// Input:
+///   a[0]+256*a[1]+...+256^31*a[31] = a
+///   c[0]+256*c[1]+...+256^31*c[31] = c
+///
+/// Output:
+///   s[0]+256*s[1]+...+256^31*s[31] = (a+c) mod l
+///   where l = 2^252 + 27742317777372353535851937790883648493.
 fn sc_add(s: &mut [u8; 32], a: &[u8; 32], c: &[u8; 32]) {
     let a0 = 2097151 & load3(&a[..]);
     let a1 = 2097151 & (load4(&a[2..]) >> 5);
@@ -1518,15 +1518,15 @@ fn sc_sub(s: &mut [u8; 32], a: &[u8; 32], c: &[u8; 32]) {
     s[31] = (s11 >> 17) as u8;
 }
 
-// Hacky sc_mul cobbled together rather sub-optimally from scMulAdd.
-//
-// Input:
-//   a[0]+256*a[1]+...+256^31*a[31] = a
-//   b[0]+256*b[1]+...+256^31*b[31] = b
-//
-// Output:
-//   s[0]+256*s[1]+...+256^31*s[31] = (ab) mod l
-//   where l = 2^252 + 27742317777372353535851937790883648493.
+/// Hacky sc_mul cobbled together rather sub-optimally from scMulAdd.
+///
+/// Input:
+///   a[0]+256*a[1]+...+256^31*a[31] = a
+///   b[0]+256*b[1]+...+256^31*b[31] = b
+///
+/// Output:
+///   s[0]+256*s[1]+...+256^31*s[31] = (ab) mod l
+///   where l = 2^252 + 27742317777372353535851937790883648493.
 fn sc_mul(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32]) {
     let a0 = 2097151 & load3(&a[..]);
     let a1 = 2097151 & (load4(&a[2..]) >> 5);

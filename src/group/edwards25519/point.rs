@@ -18,6 +18,8 @@ use super::{
     Scalar,
 };
 
+const MARSHAL_POINT_ID: [u8; 8] = [b'e', b'd', b'.', b'p', b'o', b'i', b'n', b't'];
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Point {
     ge: ExtendedGroupElement,
@@ -307,134 +309,12 @@ impl Point {
         hex::encode(b)
     }
 
-    // func (P *point) MarshalBinary() ([]byte, error) {
-    // 	var b [32]byte
-    // 	P.ge.ToBytes(&b)
-    // 	return b[:], nil
-    // }
-
-    // // MarshalID returns the type tag used in encoding/decoding
-    // func (P *point) MarshalID() [8]byte {
-    // 	return marshalPointID
-    // }
-
-    // func (P *point) UnmarshalBinary(b []byte) error {
-    // 	if !P.ge.FromBytes(b) {
-    // 		return errors.New("invalid Ed25519 curve point")
-    // 	}
-    // 	return nil
-    // }
-
-    // func (P *point) MarshalTo(w io.Writer) (int, error) {
-    // 	return marshalling.PointMarshalTo(P, w)
-    // }
+    /// marshal_id returns the type tag used in encoding/decoding
+    pub fn marshal_id(&self) -> [u8; 8] {
+    	MARSHAL_POINT_ID
+    }
 
     // func (P *point) UnmarshalFrom(r io.Reader) (int, error) {
     // 	return marshalling.PointUnmarshalFrom(P, r)
-    // }
-
-    // // Set point to be equal to P2.
-    // func (P *point) Set(P2 kyber.Point) kyber.Point {
-    // 	P.ge = P2.(*point).ge
-    // 	return P
-    // }
-
-    // // Set point to be equal to P2.
-    // func (P *point) Clone() kyber.Point {
-    // 	return &point{ge: P.ge}
-    // }
-
-    // func (P *point) EmbedLen() int {
-    // 	// Reserve the most-significant 8 bits for pseudo-randomness.
-    // 	// Reserve the least-significant 8 bits for embedded data length.
-    // 	// (Hopefully it's unlikely we'll need >=2048-bit curves soon.)
-    // 	return (255 - 8 - 8) / 8
-    // }
-
-    // func (P *point) Embed(data []byte, rand cipher.Stream) kyber.Point {
-
-    // 	// How many bytes to embed?
-    // 	dl := P.EmbedLen()
-    // 	if dl > len(data) {
-    // 		dl = len(data)
-    // 	}
-
-    // 	for {
-    // 		// Pick a random point, with optional embedded data
-    // 		var b [32]byte
-    // 		rand.XORKeyStream(b[:], b[:])
-    // 		if data != nil {
-    // 			b[0] = byte(dl)       // Encode length in low 8 bits
-    // 			copy(b[1:1+dl], data) // Copy in data to embed
-    // 		}
-    // 		if !P.ge.FromBytes(b[:]) { // Try to decode
-    // 			continue // invalid point, retry
-    // 		}
-
-    // 		// If we're using the full group,
-    // 		// we just need any point on the curve, so we're done.
-    // 		//		if c.full {
-    // 		//			return P,data[dl:]
-    // 		//		}
-
-    // 		// We're using the prime-order subgroup,
-    // 		// so we need to make sure the point is in that subencoding.
-    // 		// If we're not trying to embed data,
-    // 		// we can convert our point into one in the subgroup
-    // 		// simply by multiplying it by the cofactor.
-    // 		if data == nil {
-    // 			P.Mul(cofactorScalar, P) // multiply by cofactor
-    // 			if P.Equal(nullPoint) {
-    // 				continue // unlucky; try again
-    // 			}
-    // 			return P // success
-    // 		}
-
-    // 		// Since we need the point's y-coordinate to hold our data,
-    // 		// we must simply check if the point is in the subgroup
-    // 		// and retry point generation until it is.
-    // 		var Q point
-    // 		Q.Mul(primeOrderScalar, P)
-    // 		if Q.Equal(nullPoint) {
-    // 			return P // success
-    // 		}
-    // 		// Keep trying...
-    // 	}
-    // }
-
-    // func (P *point) Pick(rand cipher.Stream) kyber.Point {
-    // 	return P.Embed(nil, rand)
-    // }
-
-    // // Extract embedded data from a point group element
-    // func (P *point) Data() ([]byte, error) {
-    // 	var b [32]byte
-    // 	P.ge.ToBytes(&b)
-    // 	dl := int(b[0]) // extract length byte
-    // 	if dl > P.EmbedLen() {
-    // 		return nil, errors.New("invalid embedded data length")
-    // 	}
-    // 	return b[1 : 1+dl], nil
-    // }
-
-    // func (P *point) Sub(P1, P2 kyber.Point) kyber.Point {
-    // 	E1 := P1.(*point)
-    // 	E2 := P2.(*point)
-
-    // 	var t2 cachedGroupElement
-    // 	var r completedGroupElement
-
-    // 	E2.ge.ToCached(&t2)
-    // 	r.Sub(&E1.ge, &t2)
-    // 	r.ToExtended(&P.ge)
-
-    // 	return P
-    // }
-
-    // // Neg finds the negative of point A.
-    // // For Edwards curves, the negative of (x,y) is (-x,y).
-    // func (P *point) Neg(A kyber.Point) kyber.Point {
-    // 	P.ge.Neg(&A.(*point).ge)
-    // 	return P
     // }
 }

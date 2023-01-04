@@ -49,20 +49,20 @@ pub fn fe_c_move(f: &mut FieldElement, g: &FieldElement, b: i32) {
     }
 }
 
-// func load3(in []byte) int64 {
-// 	r := int64(in[0])
-// 	r |= int64(in[1]) << 8
-// 	r |= int64(in[2]) << 16
-// 	return r
-// }
+pub fn load3(input: &[u8]) -> i64 {
+    let mut r = input[0] as i64;
+    r |= (input[1] as i64) << 8;
+    r |= (input[2] as i64) << 16;
+    r
+}
 
-// func load4(in []byte) int64 {
-// 	r := int64(in[0])
-// 	r |= int64(in[1]) << 8
-// 	r |= int64(in[2]) << 16
-// 	r |= int64(in[3]) << 24
-// 	return r
-// }
+pub fn load4(input: &[u8]) -> i64 {
+    let mut r = input[0] as i64;
+    r |= (input[1] as i64) << 8;
+    r |= (input[2] as i64) << 16;
+    r |= (input[3] as i64) << 24;
+    r
+}
 
 pub fn fe_from_bytes(dst: &mut FieldElement, src: &[u8]) {
     let mut h0 = load4(src);
@@ -256,13 +256,13 @@ pub fn fe_is_non_zero(f: &FieldElement) -> i32 {
     (x & 1) as i32
 }
 
-// feNeg sets h = -f
-//
-// Preconditions:
-//    |f| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
-//
-// Postconditions:
-//    |h| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
+/// feNeg sets h = -f
+///
+/// Preconditions:
+///    |f| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
+///
+/// Postconditions:
+///    |h| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
 pub fn fe_neg(h: &mut FieldElement, f: &FieldElement) {
     for i in 0..h.len() {
         h[i] = -f[i]
@@ -534,13 +534,13 @@ pub fn fe_mul(h: &mut FieldElement, f: &FieldElement, g: &FieldElement) {
     h[9] = (h9) as i32;
 }
 
-// feSquare calculates h = f*f. Can overlap h with f.
-//
-// Preconditions:
-//    |f| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
-//
-// Postconditions:
-//    |h| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
+/// feSquare calculates h = f*f. Can overlap h with f.
+///
+/// Preconditions:
+///    |f| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
+///
+/// Postconditions:
+///    |h| bounded by 1.1*2^25,1.1*2^24,1.1*2^25,1.1*2^24,etc.
 pub fn fe_square(h: &mut FieldElement, f: &FieldElement) {
     let f0 = f[0];
     let f1 = f[1];
@@ -687,16 +687,16 @@ pub fn fe_square(h: &mut FieldElement, f: &FieldElement) {
     h[9] = (h9) as i32;
 }
 
-// feSquare2 sets h = 2 * f * f
-//
-// Can overlap h with f.
-//
-// Preconditions:
-//    |f| bounded by 1.65*2^26,1.65*2^25,1.65*2^26,1.65*2^25,etc.
-//
-// Postconditions:
-//    |h| bounded by 1.01*2^25,1.01*2^24,1.01*2^25,1.01*2^24,etc.
-// See fe_mul.c for discussion of implementation strategy.
+/// feSquare2 sets h = 2 * f * f
+///
+/// Can overlap h with f.
+///
+/// Preconditions:
+///    |f| bounded by 1.65*2^26,1.65*2^25,1.65*2^26,1.65*2^25,etc.
+///
+/// Postconditions:
+///    |h| bounded by 1.01*2^25,1.01*2^24,1.01*2^25,1.01*2^24,etc.
+/// See fe_mul.c for discussion of implementation strategy.
 pub fn fe_square2(h: &mut FieldElement, f: &FieldElement) {
     let f0 = f[0];
     let f1 = f[1];
@@ -951,9 +951,7 @@ pub fn fe_pow22523(out: &mut FieldElement, z: &FieldElement) {
     let _i = 0;
 
     fe_square(&mut t0, z);
-
     // TODO: Understand this madness
-    // for i = 1; i < 1; i++ {
     // for _i in 1..1 {
     //     let t0_clone = t0.clone();
     //     fe_square(&mut t0, &t0_clone);
@@ -970,7 +968,6 @@ pub fn fe_pow22523(out: &mut FieldElement, z: &FieldElement) {
     let t0_clone = t0;
     fe_square(&mut t0, &t0_clone);
     // TODO: Understand this madness
-    // for i = 1; i < 1; i++ {
     // for _i in 1..1 {
     //     let t0_clone = t0.clone();
     //     fe_square(&mut t0, &t0_clone)
@@ -1037,29 +1034,14 @@ pub fn fe_pow22523(out: &mut FieldElement, z: &FieldElement) {
     fe_mul(out, &t0, z);
 }
 
-// func (fe *fieldElement) String() string {
-// 	s := "fieldElement{"
-// 	for i := range fe {
-// 		if i > 0 {
-// 			s += ", "
-// 		}
-// 		s += fmt.Sprintf("%d", fe[i])
-// 	}
-// 	s += "}"
-// 	return s
-// }
-
-pub fn load3(input: &[u8]) -> i64 {
-    let mut r = input[0] as i64;
-    r |= (input[1] as i64) << 8;
-    r |= (input[2] as i64) << 16;
-    r
-}
-
-pub fn load4(input: &[u8]) -> i64 {
-    let mut r = input[0] as i64;
-    r |= (input[1] as i64) << 8;
-    r |= (input[2] as i64) << 16;
-    r |= (input[3] as i64) << 24;
-    r
+pub fn fe_string(fe: FieldElement) -> String {
+    let mut s = "fieldElement{".to_owned();
+    for (i, _) in fe.iter().enumerate() {
+        if i > 0 {
+            s += ", "
+        }
+        s += &format!("{}", fe[i]);
+    }
+    s += "}";
+    s
 }
