@@ -511,7 +511,7 @@ pub fn ge_scalar_mult(
     // each e[i] is between 0 and 15 and e[63] is between 0 and 7.
 
     let mut carry = 0_i8;
-    (0..64).for_each(|i| {
+    (0..63).for_each(|i| {
         e[i] += carry;
         carry = (e[i] + 8) >> 4;
         e[i] -= carry << 4;

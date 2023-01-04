@@ -208,7 +208,6 @@ impl<DH: Dh> AEAD<DH> {
         plaintext: &[u8],
         additional_data: Option<&[u8]>,
     ) -> Result<Vec<u8>> {
-        println!("{:?}", self.key);
         let encrypted = DH::aes_encrypt(&self.key, nonce, plaintext, additional_data)?;
         if let Some(d) = dst {
             d.copy_from_slice(&encrypted);
@@ -234,7 +233,6 @@ impl<DH: Dh> AEAD<DH> {
         ciphertext: &[u8],
         additional_data: Option<&[u8]>,
     ) -> Result<Vec<u8>> {
-        println!("{:?}", self.key);
         let decrypted = DH::aes_decrypt(&self.key, nonce, ciphertext, additional_data)?;
         if let Some(d) = dst {
             d.copy_from_slice(&decrypted);
