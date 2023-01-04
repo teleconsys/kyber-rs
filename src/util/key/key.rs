@@ -52,9 +52,6 @@ impl<POINT: Point> Pair<POINT> {
             Some(key) => key,
             None => suite.scalar().pick(&mut random),
         };
-        // TODO: see why test_aead_random() fails providing the base point as a 'None' argument
-        // a fix is giving 'Some(&suite.point().base())' instead, but other things break sometimes
-        // (run tests many times to see what)
         self.public = suite.point().mul(&self.private, None);
         Ok(())
     }
