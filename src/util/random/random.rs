@@ -25,6 +25,7 @@ use std::{
 };
 
 use anyhow::{bail, Result};
+use num_bigint_dig as num_bigint;
 use num_bigint::BigInt;
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 use sha2::{Digest, Sha256};
@@ -36,7 +37,7 @@ pub fn random_int(modulus: &BigInt, rand: &mut impl Stream) -> BigInt {
     let bitlen = modulus.bits();
 
     loop {
-        let bits = bits(bitlen, false, rand);
+        let bits = bits(bitlen as u64, false, rand);
         let i = BigInt::from_bytes_be(num_bigint::Sign::Plus, bits.as_ref());
         if i.sign() == num_bigint::Sign::Plus && i.cmp(modulus) == Ordering::Less {
             return i;

@@ -1,10 +1,11 @@
 use lazy_static::lazy_static;
 use std::cmp::Ordering::{self, Equal, Greater};
-use std::ops::{Add, Mul};
+use num_bigint_dig as num_bigint;
 
 use anyhow::{bail, Result};
-use num_bigint::BigInt;
+use num_bigint::{BigInt, Sign, ModInverse};
 use num_bigint::Sign::Plus;
+use num_bigint::algorithms::jacobi;
 use num_traits::{Num, Signed};
 
 use crate::cipher::cipher::Stream;
@@ -114,12 +115,12 @@ impl Int {
     /// little_endian encodes the value of this Int into a little-endian byte-slice
     /// at least min bytes but no more than max bytes long.
     /// Panics if max != 0 and the Int cannot be represented in max bytes.
-    pub fn little_endian(&self, min: u64, max: u64) -> Vec<u8> {
+    pub fn little_endian(&self, min: usize, max: usize) -> Vec<u8> {
         let mut act = self.marshal_size();
         let (_, v_bytes) = self.v.to_bytes_be();
         let v_size = v_bytes.len();
-        if (v_size as u64) < act {
-            act = v_size as u64;
+        if v_size < act {
+            act = v_size;
         }
         let mut pad = act;
         if pad < min {
@@ -129,17 +130,9 @@ impl Int {
             panic!("Int not representable in max bytes")
         }
 
-        let buf = vec![0; pad as usize];
-        let buf2 = &buf[0..act as usize];
+        let buf = vec![0; pad];
+        let buf2 = &buf[0..act];
         reverse(buf2, &v_bytes)
-    }
-
-    /// marshal_size returns the length in bytes of encoded integers with modulus m.
-    /// The length of encoded Ints depends only on the size of the modulus,
-    /// and not on the the value of the encoded integer,
-    /// making the encoding is fixed-length for simplicity and security.
-    pub fn marshal_size(&self) -> u64 {
-        (self.m.bits() + 7) / 8
     }
 
     /// new_int creates a new Int with a given big.Int and a big.Int modulus.
@@ -210,30 +203,6 @@ impl Int {
         Ok(self)
     }
 
-    /// div sets the target to a * b^-1 mod m, where b^-1 is the modular inverse of b.
-    pub fn div(mut self, a: &Self, b: &Self) -> Self {
-        let _t = BigInt::default();
-        self.v = a.v.clone() * b.v.clone();
-        self.v = self.v.clone() % self.m.clone();
-        self
-    }
-
-    /// mul sets the target to a * b mod m.
-    /// Target receives a's modulus.
-    pub fn mul(mut self, a: &Self, b: &Self) -> Self {
-        self.m = a.m.clone();
-        self.v = a.v.clone() * b.v.clone();
-        self.v %= self.m.clone();
-        self
-    }
-
-    /// add sets the target to a + b mod m, where m is a's modulus..
-    pub fn add(mut self, a: &Self, b: &Self) -> Self {
-        self.m = a.m.clone();
-        self.v = (a.v.clone() + b.v.clone()) % self.m.clone();
-        self
-    }
-
 }
 
 impl PartialEq for Int {
@@ -249,15 +218,15 @@ impl BinaryMarshaler for Int {
         let l = self.marshal_size();
         // may be shorter than l
         let (_, mut b) = self.v.to_bytes_be();
-        let offset = l as i64 - b.len() as i64;
+        let offset = l - b.len();
 
         if self.bo == LittleEndian {
             return Ok(self.little_endian(l, l));
         }
 
         if offset != 0 {
-            let mut nb = vec![0; l as usize];
-            nb.splice((offset as usize).., b);
+            let mut nb = vec![0; l];
+            nb.splice((offset).., b);
             b = nb;
         }
         Ok(b)
@@ -270,7 +239,7 @@ impl BinaryUnmarshaler for Int {
     /// or if the contents of the buffer represents an out-of-range integer.
     fn unmarshal_binary(&mut self, data: &[u8]) -> Result<()> {
         let mut buf: Vec<u8> = data.to_vec();
-        if buf.len() != self.marshal_size() as usize {
+        if buf.len() != self.marshal_size() {
             bail!("unmarshal_binary: wrong size buffer");
         }
         // Still needed here because of the comparison with the modulo
@@ -290,8 +259,12 @@ impl Marshaling for Int {
         marshalling::scalar_marshal_to(self, w)
     }
 
+    /// marshal_size returns the length in bytes of encoded integers with modulus m.
+    /// The length of encoded Ints depends only on the size of the modulus,
+    /// and not on the the value of the encoded integer,
+    /// making the encoding is fixed-length for simplicity and security.
     fn marshal_size(&self) -> usize {
-        ((self.m.abs().bits() as usize) + 7) / 8
+        ((self.m.bits()) + 7) / 8
     }
 
     fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> Result<()> {
@@ -314,45 +287,49 @@ impl ToString for Int {
     }
 }
 
-impl Mul for Int {
-    type Output = Self;
+use std::ops::{self, Sub};
+impl_op_ex!(*|a: &Int, b: &Int| -> Int {
+    let m = a.m.clone();
+    let v = (a.v.clone() * b.v.clone()) % m.clone();
+    let bo = a.bo;
+    Int{v, m, bo}
+});
 
-    fn mul(self, _rhs: Self) -> Self {
-        todo!()
-    }
-}
-
-impl Add for Int {
-    type Output = Self;
-
-    fn add(self, _rhs: Self) -> Self::Output {
-        todo!()
-    }
-}
+impl_op_ex!(+|a: &Int, b: &Int| -> Int {
+        let m = a.m.clone();
+        let v = (a.v.clone() + b.v.clone()) % m.clone();
+        let bo = a.bo;
+        Int{v, m, bo}
+});
 
 impl Scalar for Int {
     /// Set both value and modulus to be equal to another Int.
     /// Since this method copies the modulus as well,
-    fn set(self, _a: &Self) -> Self {
-        // ai := a.(*Int)
-        // i.V.Set(&ai.V)
-        // i.M = ai.M
-        // return i
-        todo!()
+    fn set(self, a: &Self) -> Self {
+        let mut ai = self;
+        ai.v = a.v.clone();
+        ai.m = a.m.clone();
+        ai
     }
 
     /// set_int64 sets the Int to an arbitrary 64-bit "small integer" value.
     /// The modulus must already be initialized.
-    fn set_int64(self, _v: i64) -> Self {
-        // i.V.SetInt64(v).Mod(&i.V, i.M)
-        // return i
-        todo!()
+    fn set_int64(self, v: i64) -> Self {
+        let mut i = self;
+        i.v = BigInt::from(v);
+        // specify euclidean modulus for negative number
+        match i.v.sign() {
+            num_bigint::Sign::Minus => i.v = (i.v % i.m.clone()) + i.m.abs(),
+            _ => i.v %= i.m.clone(),
+        }
+        i
     }
 
     /// Zero set the Int to the value 0.  The modulus must already be initialized.
     fn zero(self) -> Self {
-        // i.V.SetInt64(0)
-        todo!()
+        let mut i = self;
+        i.v = BigInt::from(0_i64);
+        i
     }
 
     /// Sub sets the target to a - b mod m.
@@ -390,112 +367,124 @@ impl Scalar for Int {
 
     /// One sets the Int to the value 1.  The modulus must already be initialized.
     fn one(self) -> Self {
-        // i.V.SetInt64(1)
-        todo!()
+        let mut i = self;
+        i.v = BigInt::from(1_i64);
+        i
     }
 
-    fn div(self, _a: &Self, _bb: &Self) -> Self {
-        todo!()
+    /// div sets the target to a * b^-1 mod m, where b^-1 is the modular inverse of b.
+    fn div(mut self, a: &Self, b: &Self) -> Self {
+        let _t = BigInt::default();
+        self.v = a.v.clone() * b.v.clone();
+        self.v = self.v.clone() % self.m.clone();
+        self
     }
-    // // Inv sets the target to the modular inverse of a with respect to modulus m.
+    
     /// Inv sets the target to the modular inverse of a with respect to modulus m.
-    fn inv(self, _a: &Self) -> Self {
-        // ai := a.(*Int)
-        // i.M = ai.M
-        // i.V.ModInverse(&a.(*Int).V, i.M)
-        // return i
-        // }
-        todo!()
+    fn inv(self, a: &Self) -> Self {
+        let mut i = self;
+        i.v = a.clone().v.mod_inverse(&a.m.clone()).unwrap();
+        i.m = a.m.clone();
+        i
     }
 
     /// Neg sets the target to -a mod m.
-    fn neg(self, _a: &Self) -> Self {
-        // ai := a.(*Int)
-        // i.M = ai.M
-        // if ai.V.Sign() > 0 {
-        // i.V.Sub(i.M, &ai.V)
-        // } else {
-        // i.V.SetUint64(0)
-        // }
-        // return i
-        // }
-        todo!()
+    fn neg(self, a: &Self) -> Self {
+        let mut i = self;
+        i.m = a.m.clone();
+        i.v = match a.v.sign() {
+            Plus => a.m.clone().sub(&a.v),
+            _ => BigInt::from(0_u64)
+        };
+        i
     }
 }
 
-// // Nonzero returns true if the integer value is nonzero.
-// func (i *Int) Nonzero() bool {
-// return i.V.Sign() != 0
-// }
-//
+impl Int {
+    /// Nonzero returns true if the integer value is nonzero.
+    pub fn nonzero(&self) -> bool {
+        self.v.sign() != Sign::NoSign
+    }    
 
-// // Int64 returns the int64 representation of the value.
-// // If the value is not representable in an int64 the result is undefined.
-// func (i *Int) Int64() int64 {
-// return i.V.Int64()
-// }
+    /// Int64 returns the int64 representation of the value.
+    /// If the value is not representable in an int64 the result is undefined.
+    pub fn int64(&self) -> i64 {
+        self.uint64() as i64
+    }
 
-// // SetUint64 sets the Int to an arbitrary uint64 value.
-// // The modulus must already be initialized.
-// func (i *Int) SetUint64(v uint64) kyber.scalar {
-// i.V.SetUint64(v).Mod(&i.V, i.M)
-// return i
-// }
+    /// SetUint64 sets the Int to an arbitrary uint64 value.
+    /// The modulus must already be initialized.
+    pub fn set_uint64(&self, v: u64) -> Self {
+        let mut i= self.clone();
+        i.v = BigInt::from(v) % i.m.clone();
+        i
+    }
 
-// // Uint64 returns the uint64 representation of the value.
-// // If the value is not representable in an uint64 the result is undefined.
-// func (i *Int) Uint64() uint64 {
-// return i.V.Uint64()
-// }
+    /// Uint64 returns the uint64 representation of the value.
+    /// If the value is not representable in an uint64 the result is undefined.
+    pub fn uint64(&self) -> u64 {
+        let mut b = self.v.to_bytes_le().1;
+        b.resize(8, 0_u8);
+        let mut  a = [0_u8; 8];
+        for (i, _) in b.iter().enumerate() {
+            a[i] = b[i];
+        }
+        let u = u64::from_le_bytes(a);
+        match self.v.sign() {
+            Sign::Minus => core::u64::MAX - u + 1,
+            _ => u,
+        }
+    }
 
-// // Exp sets the target to a^e mod m,
-// // where e is an arbitrary big.Int exponent (not necessarily 0 <= e < m).
-// func (i *Int) Exp(a kyber.scalar, e *big.Int) kyber.scalar {
-// ai := a.(*Int)
-// i.M = ai.M
-// // to protect against golang/go#22830
-// var tmp big.Int
-// tmp.Exp(&ai.V, e, i.M)
-// i.V = tmp
-// return i
-// }
+    /// Exp sets the target to a^e mod m,
+    /// where e is an arbitrary big.Int exponent (not necessarily 0 <= e < m).
+    pub fn exp(mut self, a: &Self, e: &BigInt) -> Self {
+        self.m = a.m.clone();
+        // to protect against golang/go#22830
+        self.v = self.v.modpow(e, &self.m);
+        self
+    }
 
-// // Jacobi computes the Jacobi symbol of (a/m), which indicates whether a is
-// // zero (0), a positive square in m (1), or a non-square in m (-1).
-// func (i *Int) Jacobi(as kyber.scalar) kyber.scalar {
-// ai := as.(*Int)
-// i.M = ai.M
-// i.V.SetInt64(int64(big.Jacobi(&ai.V, i.M)))
-// return i
-// }
+    /// Jacobi computes the Jacobi symbol of (a/m), which indicates whether a is
+    /// zero (0), a positive square in m (1), or a non-square in m (-1).
+    pub fn jacobi(&self, a_s: &Self) -> Self {
+        let mut i = self.clone();
+        i.m = a_s.m.clone();
+        i.v = BigInt::from(jacobi(&a_s.v, &i.m) as i64);
+        i
+    }
 
-// // Sqrt computes some square root of a mod m of ONE exists.
-// // Assumes the modulus m is an odd prime.
-// // Returns true on success, false if input a is not a square.
-// func (i *Int) Sqrt(as kyber.scalar) bool {
-// ai := as.(*Int)
-// out := i.V.ModSqrt(&ai.V, ai.M)
-// i.M = ai.M
-// return out != nil
-// }
-//
+    /// Sqrt computes some square root of a mod m of ONE exists.
+    /// Assumes the modulus m is an odd prime.
+    /// Returns true on success, false if input a is not a square.
+    pub fn sqrt(&mut self, a_s: &Self) -> Result<()> {
+        if a_s.v.sign() == Sign::Minus {
+            bail!("input is a negative number, square root is imaginary")
+        }
+        self.v = a_s.v.sqrt() % a_s.m.clone();
+        self.m = a_s.m.clone();
+        Ok(())
+    }
+    
 
-// // BigEndian encodes the value of this Int into a big-endian byte-slice
-// // at least min bytes but no more than max bytes long.
-// // Panics if max != 0 and the Int cannot be represented in max bytes.
-// func (i *Int) BigEndian(min, max int) []byte {
-// act := i.marshal_size()
-// pad, ofs := act, 0
-// if pad < min {
-// pad, ofs = min, min-act
-// }
-// if max != 0 && pad > max {
-// panic("Int not representable in max bytes")
-// }
-// buf := make([]byte, pad)
-// copy(buf[ofs:], i.V.Bytes())
-// return buf
-// }
+    /// BigEndian encodes the value of this Int into a big-endian byte-slice
+    /// at least min bytes but no more than max bytes long.
+    /// Panics if max != 0 and the Int cannot be represented in max bytes.
+    pub fn big_endian(&self, min: usize, max: usize) -> Result<Vec<u8>> {
+        let act = self.marshal_size();
+        let (mut pad, mut ofs) = (act, 0);
+        if pad < min {
+            (pad, ofs) = (min, min-act)
+        }
+        if max != 0 && pad > max {
+            bail!("Int not representable in max bytes");
+        }
+        let mut buf = vec![0_u8; pad];
+        let b = self.v.to_bytes_be().1;
+        buf[ofs..].copy_from_slice(&b);
+        Ok(buf)
+    }
+}
 
 /// reverse copies src into dst in byte-reversed order and returns dst,
 /// such that src[0] goes into dst[len-1] and vice versa.

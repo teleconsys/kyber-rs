@@ -1,4 +1,5 @@
 use lazy_static::lazy_static;
+use num_bigint_dig as num_bigint;
 use num_bigint::BigInt;
 use num_traits::Num;
 

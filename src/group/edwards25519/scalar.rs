@@ -3,6 +3,7 @@ use crate::group::internal::marshalling;
 use crate::group::{self, integer_field, ScalarCanCheckCanonical};
 use crate::util::random;
 use anyhow::bail;
+use num_bigint_dig as num_bigint;
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 
@@ -172,8 +173,9 @@ impl group::Scalar for Scalar {
         // The inverse is computed using the exponentation-and-square algorithm.
         // Implementation is constant time regarding the value a, it only depends on
         // the modulo.
+        let bit_vec = get_bits(&L_MINUS2.to_bytes_le().1);
         for i in (0..=255).rev() {
-            let bit_is_set = L_MINUS2.bit(i);
+            let bit_is_set = bit_vec[i];
             // square step
             let res_v_clone = res.v;
             sc_mul(&mut res.v, &res_v_clone, &res_v_clone);
@@ -215,6 +217,17 @@ impl Marshaling for Scalar {
     fn marshal_id(&self) -> [u8; 8] {
         MARSHAL_SCALAR_ID
     }
+}
+
+fn get_bits(bytes: &[u8]) -> Vec<bool> {
+    let mut bit_vec = Vec::new();
+    let masks = vec![0b00000001u8,0b00000010u8,0b00000100u8,0b00001000u8,0b00010000u8,0b00100000u8,0b01000000u8, 0b10000000u8];
+    for byte in bytes {
+        for mask in masks.clone() {
+            bit_vec.push(byte & mask != 0)
+        }
+    }
+    bit_vec
 }
 
 /// Input:

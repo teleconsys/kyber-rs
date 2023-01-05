@@ -1,4 +1,4 @@
-use std::ops::{Add, DerefMut, Mul};
+use std::ops::DerefMut;
 
 use anyhow::Result;
 use lazy_static::lazy_static;
@@ -15,6 +15,7 @@ use super::scalar::{sc_mul_add, Scalar as EdScalar};
 lazy_static! {
     pub static ref ONE: EdScalar = EdScalar::default().set_int64(1);
     pub static ref ZERO: EdScalar = EdScalar::default().zero();
+    pub static ref MINUS_ONE: EdScalar = EdScalar::default().set_bytes(&[0xec, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10]);
 }
 
 /// SimpleCTScalar implements the scalar operations only using `ScMulAdd` by
@@ -24,17 +25,6 @@ pub struct SimpleCTScalar {
     s: EdScalar,
 }
 
-impl Add for SimpleCTScalar {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        // a * b + c = a * 1 + c
-        let mut v = [0u8; 32];
-        sc_mul_add(&mut v, &self.s.v, &ONE.v, &rhs.s.v);
-        SimpleCTScalar { s: EdScalar { v } }
-    }
-}
-
 impl PartialEq for SimpleCTScalar {
     fn eq(&self, other: &Self) -> bool {
         self.s.eq(&other.s)
@@ -42,24 +32,24 @@ impl PartialEq for SimpleCTScalar {
 }
 
 impl Marshaling for SimpleCTScalar {
-    fn marshal_to(&self, _w: &mut impl std::io::Write) -> Result<()> {
-        todo!()
+    fn marshal_to(&self, w: &mut impl std::io::Write) -> Result<()> {
+        self.s.marshal_to(w)
     }
 
     fn marshal_size(&self) -> usize {
-        todo!()
+        self.s.marshal_size()
     }
 
     fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> Result<()> {
-        todo!()
+        self.s.unmarshal_from(r)
     }
 
     fn unmarshal_from_random(&mut self, r: &mut (impl std::io::Read + Stream)) {
-        todo!()
+        self.s.unmarshal_from_random(r)
     }
 
     fn marshal_id(&self) -> [u8; 8] {
-        todo!()
+        self.s.marshal_id()
     }
 }
 
@@ -77,20 +67,24 @@ impl BinaryUnmarshaler for SimpleCTScalar {
 
 impl ToString for SimpleCTScalar {
     fn to_string(&self) -> String {
-        todo!()
+        self.s.to_string()
     }
 }
 
-impl Mul for SimpleCTScalar {
-    type Output = Self;
+use std::ops;
+impl_op_ex!(*|a: &SimpleCTScalar, b: &SimpleCTScalar| -> SimpleCTScalar {
+    // // a * b + c = a * b + 0
+    let mut v = [0u8; 32];
+    sc_mul_add(&mut v, &a.s.v, &b.s.v, &ZERO.v);
+    SimpleCTScalar{s: EdScalar{v}}
+});
 
-    fn mul(self, rhs: Self) -> Self {
-        // // a * b + c = a * b + 0
+impl_op_ex!(+|a: &SimpleCTScalar, b: &SimpleCTScalar| -> SimpleCTScalar {
+        // a * b + c = a * 1 + c
         let mut v = [0u8; 32];
-        sc_mul_add(&mut v, &self.s.v, &rhs.s.v, &ZERO.v);
-        SimpleCTScalar { s: EdScalar { v } }
-    }
-}
+        sc_mul_add(&mut v, &a.s.v, &ONE.v, &b.s.v);
+        SimpleCTScalar{s:EdScalar{v}}
+});
 
 use std::ops::Deref;
 impl Deref for SimpleCTScalar {
@@ -132,29 +126,26 @@ impl Scalar for SimpleCTScalar {
         self.s = self.s.set_bytes(bytes);
         self
     }
-    fn sub(self, _s1: &Self, _s2: &Self) -> Self {
-        // sc1 := s1.(*SimpleCTScalar)
-        // sc2 := s2.(*SimpleCTScalar)
-
-        // // a * b + c = -1 * a + c
-        // scMulAdd(&s.v, &minusOne.v, &sc1.v, &sc2.v)
-        // return s
-        todo!()
+    fn sub(self, s1: &Self, s2: &Self) -> Self {
+        let mut s = self;
+        // a * b + c = -1 * a + c
+        sc_mul_add(&mut s.v, &MINUS_ONE.v, &s1.v, &s2.v);
+        s
     }
 
     fn one(self) -> Self {
-        todo!()
+        Self{s: self.s.one()}
     }
 
-    fn div(self, _a: &Self, _b: &Self) -> Self {
-        todo!()
+    fn div(self, a: &Self, b: &Self) -> Self {
+        Self{s: self.s.div(a, b)}
     }
 
-    fn inv(self, _a: &Self) -> Self {
-        todo!()
+    fn inv(self, a: &Self) -> Self {
+        Self{s: self.s.inv(a)}
     }
 
-    fn neg(self, _a: &Self) -> Self {
-        todo!()
+    fn neg(self, a: &Self) -> Self {
+        Self{s: self.s.neg(a)}
     }
 }

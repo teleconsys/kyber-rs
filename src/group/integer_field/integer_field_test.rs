@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod test {
-    use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler};
+    use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
+    use num_bigint_dig as num_bigint;
     use num_bigint::BigInt;
     use num_bigint::Sign::Plus;
 
@@ -76,7 +77,7 @@ mod test {
 
     #[test]
     fn test_init128bits() {
-        let mut m = BigInt::from(1_i32) << 128_i32;
+        let mut m = BigInt::from(1_i32) << 128;
         m -= BigInt::from(1_i32);
 
         let i1 = Int::new_int(BigInt::from(1_i32), m);
@@ -90,7 +91,7 @@ mod test {
         let base = Int::default().init_bytes(&[0x10], &modulo_i, BigEndian);
         let mut clone = base.clone();
         let tmp = clone.clone();
-        clone = clone.add(&tmp, &tmp);
+        clone = &tmp + &tmp;
         let b1 = clone.marshal_binary().unwrap();
         let b2 = base.marshal_binary().unwrap();
         assert_ne!(b1, b2, "Should not be equal");
