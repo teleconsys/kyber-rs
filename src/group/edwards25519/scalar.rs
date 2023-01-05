@@ -41,10 +41,6 @@ impl Scalar {
         self
     }
 
-    // marshal_id returns the type tag used in encoding/decoding
-    pub fn marshal_id(&self) -> [u8; 8] {
-        MARSHAL_SCALAR_ID
-    }
 }
 
 impl ScalarCanCheckCanonical for Scalar {
@@ -211,6 +207,18 @@ impl Marshaling for Scalar {
 
     fn marshal_size(&self) -> usize {
         32
+    }
+
+    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> anyhow::Result<()> {
+        marshalling::scalar_unmarshal_from(self, r)
+    }
+
+    fn unmarshal_from_random(&mut self, r: &mut (impl std::io::Read + Stream)) {
+        marshalling::scalar_unmarshal_from_random(self, r);
+    }
+
+    fn marshal_id(&self) -> [u8; 8] {
+        MARSHAL_SCALAR_ID
     }
 }
 

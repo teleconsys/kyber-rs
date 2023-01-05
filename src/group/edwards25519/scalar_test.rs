@@ -1,3 +1,4 @@
+use crate::encoding::Marshaling;
 use crate::group::edwards25519::scalar::Scalar as EdScalar;
 use crate::group::edwards25519::test_scalars::ONE;
 use crate::group::Scalar;

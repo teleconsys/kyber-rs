@@ -50,6 +50,18 @@ impl Marshaling for Point {
     fn marshal_size(&self) -> usize {
         32
     }
+
+    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> Result<()> {
+        marshalling::point_unmarshal_from(self, r)
+    }
+
+    fn unmarshal_from_random(&mut self, r: &mut (impl std::io::Read + Stream)){
+        marshalling::point_unmarshal_from_random(self, r);
+    }
+
+    fn marshal_id(&self) -> [u8; 8] {
+        MARSHAL_POINT_ID
+    }    
 }
 
 impl PartialEq for Point {
@@ -308,13 +320,4 @@ impl Point {
         self.ge.to_bytes(&mut b);
         hex::encode(b)
     }
-
-    /// marshal_id returns the type tag used in encoding/decoding
-    pub fn marshal_id(&self) -> [u8; 8] {
-        MARSHAL_POINT_ID
-    }
-
-    // func (P *point) UnmarshalFrom(r io.Reader) (int, error) {
-    // 	return marshalling.PointUnmarshalFrom(P, r)
-    // }
 }

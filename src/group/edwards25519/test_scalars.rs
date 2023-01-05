@@ -49,6 +49,18 @@ impl Marshaling for SimpleCTScalar {
     fn marshal_size(&self) -> usize {
         todo!()
     }
+
+    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> Result<()> {
+        todo!()
+    }
+
+    fn unmarshal_from_random(&mut self, r: &mut (impl std::io::Read + Stream)) {
+        todo!()
+    }
+
+    fn marshal_id(&self) -> [u8; 8] {
+        todo!()
+    }
 }
 
 impl BinaryMarshaler for SimpleCTScalar {

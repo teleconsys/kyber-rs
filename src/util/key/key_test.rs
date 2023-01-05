@@ -28,11 +28,6 @@ struct FixedPrivSuiteEd25519 {
     pub(crate) curve: Curve,
 }
 
-impl FixedPrivSuiteEd25519 {
-    /// This is never called anyway, so it doesn't matter what it returns.
-    fn _random_stream<S: crate::cipher::Stream>() {}
-}
-
 impl Group for FixedPrivSuiteEd25519 {
     type POINT = EdPoint;
 

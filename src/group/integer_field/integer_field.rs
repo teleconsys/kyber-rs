@@ -21,7 +21,7 @@ lazy_static! {
     pub static ref TWO: BigInt = BigInt::from(2_i64);
 }
 
-const MARSHAL_SCALAR_ID: [u8; 8] = [b'm', b'o', b'd', b'.', b'i', b'n', b't', b' '];
+const MARSHAL_INT_ID: [u8; 8] = [b'm', b'o', b'd', b'.', b'i', b'n', b't', b' '];
 
 /// ByteOrder denotes the endianness of the operation.
 #[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
@@ -297,6 +297,19 @@ impl Marshaling for Int {
     fn marshal_size(&self) -> usize {
         ((self.m.abs().bits() as usize) + 7) / 8
     }
+
+    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> Result<()> {
+        marshalling::scalar_unmarshal_from(self, r)
+    }
+
+    fn unmarshal_from_random(&mut self, r: &mut (impl std::io::Read + Stream)) {
+        marshalling::scalar_unmarshal_from_random(self, r);
+    }
+
+    fn marshal_id(&self) -> [u8; 8] {
+        MARSHAL_INT_ID
+    }
+
 }
 
 impl ToString for Int {
@@ -471,16 +484,6 @@ impl Scalar for Int {
 // return out != nil
 // }
 //
-
-// // MarshalID returns a unique identifier for this type
-// func (i *Int) MarshalID() [8]byte {
-// return marshalScalarID
-// }
-
-// // UnmarshalFrom tries to decode an Int from the given Reader.
-// func (i *Int) UnmarshalFrom(r io.Reader) (int, error) {
-// return marshalling.ScalarUnmarshalFrom(i, r)
-// }
 
 // // BigEndian encodes the value of this Int into a big-endian byte-slice
 // // at least min bytes but no more than max bytes long.
