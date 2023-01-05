@@ -70,7 +70,7 @@ mod test {
         let b = i1.marshal_binary().unwrap();
         let i3 = Int::new_int_bytes(b.as_slice(), &i1.m, BigEndian);
         assert_eq!(i1, i3);
-        let i4 = Int::new_int_string(i1.string(), "".to_string(), 16, &i1.m);
+        let i4 = Int::new_int_string(i1.to_string(), "".to_string(), 16, &i1.m);
         assert_eq!(i1, i4);
     }
 

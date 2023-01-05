@@ -28,13 +28,6 @@ impl Scalar {
         Int::new_int_bytes(&self.v, &PRIME_ORDER, LittleEndian)
     }
 
-    /// string returns the string representation of this scalar (fixed length of 32 bytes, little endian).
-    pub fn string(&self) -> String {
-        let mut b = self.to_int().marshal_binary().unwrap().to_vec();
-        b.resize(32, 0);
-        hex::encode(b)
-    }
-
     fn set_int(mut self, i: &mut Int) -> Self {
         let b = i.little_endian(32, 32);
         self.v.as_mut_slice()[0..b.len()].copy_from_slice(b.as_ref());
@@ -104,7 +97,9 @@ impl BinaryUnmarshaler for Scalar {
 
 impl ToString for Scalar {
     fn to_string(&self) -> String {
-        self.string()
+        let mut b = self.to_int().marshal_binary().unwrap().to_vec();
+        b.resize(32, 0);
+        hex::encode(b)
     }
 }
 

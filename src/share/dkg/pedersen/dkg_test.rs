@@ -827,7 +827,7 @@ fn test_dkg_resharing_new_nodes_threshold() {
     let mut selected = HashMap::new();
     while selected.len() < alive {
         let i = rand::thread_rng().gen_range(0..old_dkgs.len());
-        let str = old_dkgs[i].pubb.string();
+        let str = old_dkgs[i].pubb.to_string();
         if selected.contains_key(&str) {
             continue;
         }

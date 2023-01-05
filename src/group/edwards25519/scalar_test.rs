@@ -12,12 +12,12 @@ fn test_string() {
     let mut s = EdScalar::default();
     s = s.set_int64(0x100);
     s = s + ONE.clone();
-    let _z = s.string();
+    let _z = s.to_string();
     assert_eq!(
-        s.string(),
+        s.to_string(),
         "0101000000000000000000000000000000000000000000000000000000000000",
         "unexpected result from string(): {}",
-        s.string()
+        s.to_string()
     );
 }
 
@@ -27,10 +27,10 @@ fn test_negative_big_int() {
     let mut s = EdScalar::default();
     s = s.set_int64(-1);
     assert_eq!(
-        s.string(),
+        s.to_string(),
         "ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010",
         "unexpected result: {}",
-        s.string()
+        s.to_string()
     );
 }
 
@@ -40,10 +40,10 @@ fn test_positive_big_int() {
     let mut s = EdScalar::default();
     s = s.set_int64(1);
     assert_eq!(
-        s.string(),
+        s.to_string(),
         "0100000000000000000000000000000000000000000000000000000000000000",
         "unexpected result: {}",
-        s.string()
+        s.to_string()
     );
 }
 
@@ -59,10 +59,10 @@ fn test_set_bytes_le() {
     let mut s = EdScalar::default();
     s = s.set_bytes(&[0, 1, 2, 3]);
     assert_eq!(
-        s.string(),
+        s.to_string(),
         "0001020300000000000000000000000000000000000000000000000000000000",
         "unexpected result from string(): {}",
-        s.string()
+        s.to_string()
     );
 }
 

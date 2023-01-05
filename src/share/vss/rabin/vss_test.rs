@@ -788,7 +788,7 @@ fn test_vss_dhexchange() {
         .scalar()
         .pick(&mut test_data.suite.random_stream());
     let point = SuiteEd25519::dh_exchange(test_data.suite, privv.clone(), pubb.clone());
-    assert_eq!(pubb.mul(&privv, None).string(), point.string());
+    assert_eq!(pubb.mul(&privv, None).to_string(), point.to_string());
 }
 
 #[test]

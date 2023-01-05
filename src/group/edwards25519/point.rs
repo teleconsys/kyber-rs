@@ -247,7 +247,9 @@ impl group::Point for Point {
 
 impl ToString for Point {
     fn to_string(&self) -> String {
-        self.string()
+        let mut b = [0u8; 32];
+        self.ge.to_bytes(&mut b);
+        hex::encode(b)
     }
 }
 
@@ -314,10 +316,3 @@ impl PointCanCheckCanonicalAndSmallOrder for Point {
     }
 }
 
-impl Point {
-    pub fn string(&self) -> String {
-        let mut b = [0u8; 32];
-        self.ge.to_bytes(&mut b);
-        hex::encode(b)
-    }
-}

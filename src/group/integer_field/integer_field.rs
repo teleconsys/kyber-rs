@@ -234,10 +234,6 @@ impl Int {
         self
     }
 
-    // Return the Int's integer value in hexadecimal string representation.
-    pub fn string(&self) -> String {
-        hex::encode(self.v.to_bytes_be().1)
-    }
 }
 
 impl PartialEq for Int {
@@ -314,8 +310,7 @@ impl Marshaling for Int {
 
 impl ToString for Int {
     fn to_string(&self) -> String {
-        let (_, data) = self.v.to_bytes_be();
-        hex::encode(data)
+        hex::encode(self.v.to_bytes_be().1)
     }
 }
 
