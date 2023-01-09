@@ -7,7 +7,7 @@ use kyber_rs::{
 #[test]
 fn test_curve_new_key() {
     let group = Curve::default();
-    let t_suite = SuiteEd25519::new_blake_sha256ed25519();
+    let t_suite = SuiteEd25519::new_blake3_sha256_ed25519();
     let mut stream = t_suite.random_stream();
 
     for _ in 0..10u32.pow(6u32) {

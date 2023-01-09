@@ -63,7 +63,7 @@ one of several possible receivers forming an explicit anonymity set.
 */
 #[test]
 fn example_el_gamal_encryption() {
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let suite = SuiteEd25519::new_blake3_sha256_ed25519();
 
     // Create a public/private keypair
     let a = suite.scalar().pick(&mut suite.random_stream()); // Alice's private key

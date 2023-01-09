@@ -1,71 +1,89 @@
-use crate::group::edwards25519::scalar::Scalar as EdScalar;
-use crate::group::edwards25519::test_scalars::ONE;
-use crate::group::Scalar;
-use crate::util::random;
+use std::ops::Add;
 
-use super::test_scalars::SimpleCTScalar;
+use num_bigint_dig::BigInt;
+
+use super::{constants::PRIME_ORDER, FactoredScalar, SimpleCTScalar};
+use crate::Scalar as ScalarTrait;
+use crate::{
+    encoding::Marshaling,
+    group::{
+        edwards25519::{scalar_test_types::ONE, Scalar},
+        ScalarCanCheckCanonical,
+    },
+    util::random::random,
+};
+
+#[test]
+fn test_factored_scalar() {
+    test_simple(FactoredScalar::default)
+}
+
+#[test]
+fn test_simple_ct_scalar() {
+    test_simple(SimpleCTScalar::default)
+}
 
 #[test]
 fn test_string() {
     // Create a scalar that would trigger #262.
-    let mut s = EdScalar::default();
+    let mut s = Scalar::default();
     s = s.set_int64(0x100);
     s = s + ONE.clone();
-    let _z = s.string();
+    let _z = s.to_string();
     assert_eq!(
-        s.string(),
+        s.to_string(),
         "0101000000000000000000000000000000000000000000000000000000000000",
         "unexpected result from string(): {}",
-        s.string()
+        s.to_string()
     );
 }
 
 #[test]
 fn test_negative_big_int() {
     // Create a scalar that would trigger #262.
-    let mut s = EdScalar::default();
+    let mut s = Scalar::default();
     s = s.set_int64(-1);
     assert_eq!(
-        s.string(),
+        s.to_string(),
         "ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010",
         "unexpected result: {}",
-        s.string()
+        s.to_string()
     );
 }
 
 #[test]
 fn test_positive_big_int() {
     // Create a scalar that would trigger #262.
-    let mut s = EdScalar::default();
+    let mut s = Scalar::default();
     s = s.set_int64(1);
     assert_eq!(
-        s.string(),
+        s.to_string(),
         "0100000000000000000000000000000000000000000000000000000000000000",
         "unexpected result: {}",
-        s.string()
+        s.to_string()
     );
 }
 
 #[test]
 fn test_scalar_marshal() {
-    let s = EdScalar::default();
+    let s = Scalar::default();
 
     assert_eq!("ed.scala", std::str::from_utf8(&s.marshal_id()).unwrap());
 }
 
 #[test]
 fn test_set_bytes_le() {
-    let mut s = EdScalar::default();
+    let mut s = Scalar::default();
     s = s.set_bytes(&[0, 1, 2, 3]);
     assert_eq!(
-        s.string(),
+        s.to_string(),
         "0001020300000000000000000000000000000000000000000000000000000000",
         "unexpected result from string(): {}",
-        s.string()
+        s.to_string()
     );
 }
 
-fn test_simple<T: Scalar>(new: fn() -> T) {
+fn test_simple<T: ScalarTrait>(new: fn() -> T) {
     let mut s1 = new();
     let mut s2 = new();
     s1 = s1.set_int64(2);
@@ -76,12 +94,24 @@ fn test_simple<T: Scalar>(new: fn() -> T) {
     assert_eq!(s1 * s2, s22);
 }
 
+/// Test_ScalarIsCanonical ensures that scalars >= primeOrder are
+/// considered non canonical.
 #[test]
-fn test_factored_scalar() {
-    // testSimple(newFactoredScalar)
-}
+fn test_scalar_is_canonical() {
+    let mut candidate = BigInt::from(-2_i64);
+    candidate = candidate.add(PRIME_ORDER.clone());
+    let mut candidate_buf = candidate.to_bytes_le().1;
 
-#[test]
-fn test_simple_ct_scalar() {
-    test_simple(SimpleCTScalar::default)
+    let expected = [true, true, false, false];
+
+    // We check in range [L-2, L+4)
+    (0..4).for_each(|i| {
+        assert_eq!(
+            expected[i],
+            Scalar::default().is_canonical(&candidate_buf),
+            "`lMinus2 + {}` does not pass canonicality test",
+            i
+        );
+        candidate_buf[0] += 1;
+    });
 }

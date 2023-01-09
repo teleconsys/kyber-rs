@@ -1,11 +1,11 @@
 use sha2::Sha256;
 
-use crate::Random;
-use crate::dh::{NONCE_SIZE, AEAD};
+use crate::dh::{AEAD, NONCE_SIZE};
 use crate::encoding::BinaryUnmarshaler;
 use crate::group::edwards25519::{Point, SuiteEd25519};
 use crate::util::key;
 use crate::util::random::random;
+use crate::Random;
 
 use super::Dh;
 
@@ -149,7 +149,7 @@ fn test_aead_whole() {
 #[test]
 fn test_aead_random() {
     for i in 0..1000 {
-        let suite = SuiteEd25519::new_blake_sha256ed25519();
+        let suite = SuiteEd25519::new_blake3_sha256_ed25519();
 
         let keypair1 = key::new_key_pair(&suite).unwrap();
         let keypair2 = key::new_key_pair(&suite).unwrap();

@@ -38,7 +38,7 @@ struct Node<SUITE: Suite> {
 
 #[test]
 fn test_example_dkg() {
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let suite = SuiteEd25519::new_blake3_sha256_ed25519();
 
     // DKG scales exponentially, the following command prints the duration [ns]
     // of this test case with an increasing number of nodes. The resulting plot

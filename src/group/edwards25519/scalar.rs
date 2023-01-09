@@ -4,6 +4,7 @@ use crate::group::{self, integer_field, ScalarCanCheckCanonical};
 use crate::util::random;
 use anyhow::bail;
 use num_bigint::BigInt;
+use num_bigint_dig as num_bigint;
 use serde::{Deserialize, Serialize};
 
 use crate::cipher::cipher::Stream;
@@ -28,22 +29,10 @@ impl Scalar {
         Int::new_int_bytes(&self.v, &PRIME_ORDER, LittleEndian)
     }
 
-    // string returns the string representation of this scalar (fixed length of 32 bytes, little endian).
-    pub fn string(&self) -> String {
-        let mut b = self.to_int().marshal_binary().unwrap().to_vec();
-        b.resize(32, 0);
-        hex::encode(b)
-    }
-
     fn set_int(mut self, i: &mut Int) -> Self {
         let b = i.little_endian(32, 32);
         self.v.as_mut_slice()[0..b.len()].copy_from_slice(b.as_ref());
         self
-    }
-
-    // marshal_id returns the type tag used in encoding/decoding
-    pub fn marshal_id(&self) -> [u8; 8] {
-        MARSHAL_SCALAR_ID
     }
 }
 
@@ -60,12 +49,11 @@ impl ScalarCanCheckCanonical for Scalar {
             return false;
         }
 
-        if sb[31] & 0xf0 == 0 {
+        if (sb[31] & 0xf0) == 0 {
             return true;
         }
 
-        let (_, mut l) = PRIME_ORDER.to_bytes_be();
-        l.reverse();
+        let l = PRIME_ORDER.to_bytes_le().1;
 
         let mut c = 0u8;
         let mut n = 1u8;
@@ -73,7 +61,7 @@ impl ScalarCanCheckCanonical for Scalar {
             // subtraction might lead to an underflow which needs
             // to be accounted for in the right shift
             c |= (((sb[i] as u16) - (l[i] as u16)) >> 8) as u8 & n;
-            n &= (((sb[i] as u16) ^ ((l[i] as u16) - 1)) >> 8) as u8;
+            n &= ((((sb[i] as u16) ^ (l[i] as u16)) - 1) >> 8) as u8;
         }
 
         c != 0
@@ -108,7 +96,9 @@ impl BinaryUnmarshaler for Scalar {
 
 impl ToString for Scalar {
     fn to_string(&self) -> String {
-        self.string()
+        let mut b = self.to_int().marshal_binary().unwrap().to_vec();
+        b.resize(32, 0);
+        hex::encode(b)
     }
 }
 
@@ -142,7 +132,7 @@ impl group::Scalar for Scalar {
         self
     }
 
-    // Set to the modular difference a - b
+    /// Set to the modular difference a - b
     fn sub(mut self, a: &Self, b: &Self) -> Self {
         sc_sub(&mut self.v, &a.v, &b.v);
         self
@@ -181,8 +171,9 @@ impl group::Scalar for Scalar {
         // The inverse is computed using the exponentation-and-square algorithm.
         // Implementation is constant time regarding the value a, it only depends on
         // the modulo.
+        let bit_vec = get_bits(&L_MINUS2.to_bytes_le().1);
         for i in (0..=255).rev() {
-            let bit_is_set = L_MINUS2.bit(i);
+            let bit_is_set = bit_vec[i];
             // square step
             let res_v_clone = res.v;
             sc_mul(&mut res.v, &res_v_clone, &res_v_clone);
@@ -212,16 +203,48 @@ impl Marshaling for Scalar {
     fn marshal_size(&self) -> usize {
         32
     }
+
+    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> anyhow::Result<()> {
+        marshalling::scalar_unmarshal_from(self, r)
+    }
+
+    fn unmarshal_from_random(&mut self, r: &mut (impl std::io::Read + Stream)) {
+        marshalling::scalar_unmarshal_from_random(self, r);
+    }
+
+    fn marshal_id(&self) -> [u8; 8] {
+        MARSHAL_SCALAR_ID
+    }
 }
 
-// Input:
-//   a[0]+256*a[1]+...+256^31*a[31] = a
-//   b[0]+256*b[1]+...+256^31*b[31] = b
-//   c[0]+256*c[1]+...+256^31*c[31] = c
-//
-// Output:
-//   s[0]+256*s[1]+...+256^31*s[31] = (ab+c) mod l
-//   where l = 2^252 + 27742317777372353535851937790883648493.
+fn get_bits(bytes: &[u8]) -> Vec<bool> {
+    let mut bit_vec = Vec::new();
+    let masks = vec![
+        0b00000001u8,
+        0b00000010u8,
+        0b00000100u8,
+        0b00001000u8,
+        0b00010000u8,
+        0b00100000u8,
+        0b01000000u8,
+        0b10000000u8,
+    ];
+    for byte in bytes {
+        for mask in masks.clone() {
+            bit_vec.push(byte & mask != 0)
+        }
+    }
+    bit_vec
+}
+
+/// Input:
+///   a[0]+256*a[1]+...+256^31*a[31] = a
+///   b[0]+256*b[1]+...+256^31*b[31] = b
+///   c[0]+256*c[1]+...+256^31*c[31] = c
+///
+/// Output:
+///   s[0]+256*s[1]+...+256^31*s[31] = (ab+c) mod l
+///   where l = 2^252 + 27742317777372353535851937790883648493.
 pub fn sc_mul_add(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32], c: &[u8; 32]) {
     let a0 = 2097151 & load3(&a[..]);
     let a1 = 2097151 & (load4(&a[2..]) >> 5);
@@ -689,15 +712,15 @@ pub fn sc_mul_add(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32], c: &[u8; 32]) {
     s[31] = (s11 >> 17) as u8;
 }
 
-// Hacky sc_add cobbled together rather sub-optimally from scMulAdd.
-//
-// Input:
-//   a[0]+256*a[1]+...+256^31*a[31] = a
-//   c[0]+256*c[1]+...+256^31*c[31] = c
-//
-// Output:
-//   s[0]+256*s[1]+...+256^31*s[31] = (a+c) mod l
-//   where l = 2^252 + 27742317777372353535851937790883648493.
+/// Hacky sc_add cobbled together rather sub-optimally from scMulAdd.
+///
+/// Input:
+///   a[0]+256*a[1]+...+256^31*a[31] = a
+///   c[0]+256*c[1]+...+256^31*c[31] = c
+///
+/// Output:
+///   s[0]+256*s[1]+...+256^31*s[31] = (a+c) mod l
+///   where l = 2^252 + 27742317777372353535851937790883648493.
 fn sc_add(s: &mut [u8; 32], a: &[u8; 32], c: &[u8; 32]) {
     let a0 = 2097151 & load3(&a[..]);
     let a1 = 2097151 & (load4(&a[2..]) >> 5);
@@ -1518,15 +1541,15 @@ fn sc_sub(s: &mut [u8; 32], a: &[u8; 32], c: &[u8; 32]) {
     s[31] = (s11 >> 17) as u8;
 }
 
-// Hacky sc_mul cobbled together rather sub-optimally from scMulAdd.
-//
-// Input:
-//   a[0]+256*a[1]+...+256^31*a[31] = a
-//   b[0]+256*b[1]+...+256^31*b[31] = b
-//
-// Output:
-//   s[0]+256*s[1]+...+256^31*s[31] = (ab) mod l
-//   where l = 2^252 + 27742317777372353535851937790883648493.
+/// Hacky sc_mul cobbled together rather sub-optimally from scMulAdd.
+///
+/// Input:
+///   a[0]+256*a[1]+...+256^31*a[31] = a
+///   b[0]+256*b[1]+...+256^31*b[31] = b
+///
+/// Output:
+///   s[0]+256*s[1]+...+256^31*s[31] = (ab) mod l
+///   where l = 2^252 + 27742317777372353535851937790883648493.
 fn sc_mul(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32]) {
     let a0 = 2097151 & load3(&a[..]);
     let a1 = 2097151 & (load4(&a[2..]) >> 5);

@@ -15,7 +15,7 @@ use super::{new_key_pair, Generator, Suite as KeySuite};
 
 #[test]
 fn test_new_key_pair() {
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let suite = SuiteEd25519::new_blake3_sha256_ed25519();
     let keypair = new_key_pair(&suite).unwrap();
     let public = suite.point().mul(&keypair.private, None);
 
@@ -26,11 +26,6 @@ fn test_new_key_pair() {
 /// A type to test interface Generator by intentionally creating a fixed private key.
 struct FixedPrivSuiteEd25519 {
     pub(crate) curve: Curve,
-}
-
-impl FixedPrivSuiteEd25519 {
-    /// This is never called anyway, so it doesn't matter what it returns.
-    fn _random_stream<S: crate::cipher::Stream>() {}
 }
 
 impl Group for FixedPrivSuiteEd25519 {
