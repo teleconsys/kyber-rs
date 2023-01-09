@@ -2,8 +2,8 @@
 extern crate bencher;
 
 use bencher::Bencher;
-use kyber_rs::group::edwards25519::test_scalars::SimpleCTScalar;
-use kyber_rs::group::edwards25519::SuiteEd25519;
+use kyber_rs::group::edwards25519::scalar_test_types::SimpleCTScalar;
+use kyber_rs::group::edwards25519::{SuiteEd25519, FactoredScalar};
 use kyber_rs::group::{Group, Scalar};
 use kyber_rs::XOFFactory;
 
@@ -14,6 +14,20 @@ use kyber_rs::XOFFactory;
 fn t_suite() -> SuiteEd25519 {
     SuiteEd25519::new_blake_sha256ed25519()
 }
+
+benchmark_group!(
+    benches,
+    benchmark_ct_scalar_add,
+    benchmark_ct_scalar_simple_add,
+    benchmark_ct_scalar_factored_add,
+    benchmark_ct_scalar_mul,
+    benchmark_ct_scalar_simple_mul,
+    benchmark_ct_scalar_factored_mul,
+    benchmark_ct_scalar_sub,
+    benchmark_ct_scalar_simple_sub,
+    benchmark_ct_scalar_factored_sub
+);
+benchmark_main!(benches);
 
 fn bench_scalar_add<T: Scalar>(bench: &mut Bencher, new: fn() -> T) {
     let mut seed = t_suite().xof(Some("hello world".as_ref()));
@@ -26,15 +40,6 @@ fn bench_scalar_add<T: Scalar>(bench: &mut Bencher, new: fn() -> T) {
         let _ = s1.clone() + s2.clone();
     });
 }
-
-benchmark_group!(
-    benches,
-    benchmark_ct_scalar_add,
-    benchmark_ct_scalar_simple_add,
-    benchmark_ct_scalar_sub,
-    benchmark_ct_scalar_mul
-);
-benchmark_main!(benches);
 
 fn bench_scalar_mul<T: Scalar>(bench: &mut Bencher, new: fn() -> T) {
     let mut seed = t_suite().xof(Some("hello world".as_bytes()));
@@ -71,8 +76,9 @@ fn benchmark_ct_scalar_simple_add(bench: &mut Bencher) {
     bench_scalar_add(bench, SimpleCTScalar::default);
 }
 
-// func BenchmarkCTScalarFactoredAdd(b *testing.B) { benchScalarAdd(b, newFactoredScalar) }
-//
+fn benchmark_ct_scalar_factored_add(bench: &mut Bencher) {
+    bench_scalar_add(bench, FactoredScalar::default);
+}
 
 // multiplication
 
@@ -80,16 +86,24 @@ fn benchmark_ct_scalar_mul(bench: &mut Bencher) {
     bench_scalar_mul(bench, || t_suite().scalar());
 }
 
-// func BenchmarkCTScalarSimpleMul(b *testing.B) { benchScalarMul(b, newSimpleCTScalar) }
-//
-// func BenchmarkCTScalarFactoredMul(b *testing.B) { benchScalarMul(b, newFactoredScalar) }
+fn benchmark_ct_scalar_simple_mul(bench: &mut Bencher) {
+    bench_scalar_mul(bench, SimpleCTScalar::default);
+}
 
-// substraction
+fn benchmark_ct_scalar_factored_mul(bench: &mut Bencher) {
+    bench_scalar_mul(bench, FactoredScalar::default);
+}
+
+// subtraction
 
 fn benchmark_ct_scalar_sub(bench: &mut Bencher) {
     bench_scalar_sub(bench, || t_suite().scalar());
 }
 
-// func BenchmarkCTScalarSimpleSub(b *testing.B) { benchScalarSub(b, newSimpleCTScalar) }
-//
-// func BenchmarkCTScalarFactoredSub(b *testing.B) { benchScalarSub(b, newFactoredScalar) }
+fn benchmark_ct_scalar_simple_sub(bench: &mut Bencher) {
+    bench_scalar_sub(bench, SimpleCTScalar::default);
+}
+
+fn benchmark_ct_scalar_factored_sub(bench: &mut Bencher) {
+    bench_scalar_sub(bench, FactoredScalar::default);
+}

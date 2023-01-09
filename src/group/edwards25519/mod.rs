@@ -7,12 +7,13 @@ mod ge;
 mod ge_mult_vartime;
 mod point;
 pub mod scalar;
+pub mod scalar_test_types;
 #[cfg(test)]
-pub mod scalar_test;
+mod scalar_test;
 mod suite;
-pub mod test_scalars;
 
 pub use curve::Curve;
 pub use point::Point;
 pub use scalar::Scalar;
 pub use suite::SuiteEd25519;
+pub use scalar_test_types::{SimpleCTScalar, FactoredScalar};

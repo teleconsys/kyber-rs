@@ -176,7 +176,7 @@ impl ExtendedGroupElement {
         true
     }
 
-    fn string(&self) -> String {
+    pub fn string(&self) -> String {
         return "extendedGroupElement{\n\t".to_owned()
             + &format!("{:?}", self.x)
             + ",\n\t"

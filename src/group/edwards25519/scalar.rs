@@ -50,12 +50,11 @@ impl ScalarCanCheckCanonical for Scalar {
             return false;
         }
 
-        if sb[31] & 0xf0 == 0 {
+        if (sb[31] & 0xf0) == 0 {
             return true;
         }
 
-        let (_, mut l) = PRIME_ORDER.to_bytes_be();
-        l.reverse();
+        let l = PRIME_ORDER.to_bytes_le().1;
 
         let mut c = 0u8;
         let mut n = 1u8;
@@ -63,7 +62,7 @@ impl ScalarCanCheckCanonical for Scalar {
             // subtraction might lead to an underflow which needs
             // to be accounted for in the right shift
             c |= (((sb[i] as u16) - (l[i] as u16)) >> 8) as u8 & n;
-            n &= (((sb[i] as u16) ^ ((l[i] as u16) - 1)) >> 8) as u8;
+            n &= ((((sb[i] as u16) ^ (l[i] as u16)) - 1) >> 8) as u8;
         }
 
         c != 0
