@@ -1,4 +1,4 @@
-use criterion::{measurement::Measurement, BenchmarkGroup, Criterion};
+use criterion::{measurement::Measurement, BatchSize, BenchmarkGroup, Criterion};
 
 use crate::{Group, Scalar, XOFFactory};
 
@@ -19,8 +19,12 @@ fn bench_scalar_add<T: Scalar, M: Measurement>(
     s1 = s1.pick(&mut seed);
     s2 = s2.pick(&mut seed);
 
-    c.bench_function(&(scalar_name + "_add"), |b| {
-        b.iter(|| s1.clone() + s2.clone())
+    c.bench_function(&(scalar_name + "_add"), move |b| {
+        b.iter_batched(
+            || (s1.clone(), s2.clone()),
+            |s| s.0 + s.1,
+            BatchSize::SmallInput,
+        )
     });
 }
 
@@ -36,7 +40,11 @@ fn bench_scalar_mul<T: Scalar, M: Measurement>(
     s2 = s2.pick(&mut seed);
 
     c.bench_function(&(scalar_name + "_mul"), |b| {
-        b.iter(|| s1.clone() * s2.clone())
+        b.iter_batched(
+            || (s1.clone(), s2.clone()),
+            |s| s.0 * s.1,
+            BatchSize::SmallInput,
+        )
     });
 }
 
@@ -53,7 +61,7 @@ fn bench_scalar_sub<T: Scalar, M: Measurement>(
     s2 = s2.pick(&mut seed);
 
     c.bench_function(&(scalar_name + "_sub"), |b| {
-        b.iter(|| s3.clone().sub(&s1, &s2))
+        b.iter_batched(|| (s3.clone()), |s| s.sub(&s1, &s2), BatchSize::SmallInput)
     });
 }
 

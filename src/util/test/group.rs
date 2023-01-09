@@ -1,4 +1,4 @@
-use criterion::{measurement::Measurement, BenchmarkGroup};
+use criterion::{measurement::Measurement, BatchSize, BenchmarkGroup};
 
 use crate::{
     encoding::{BinaryMarshaler, BinaryUnmarshaler},
@@ -42,42 +42,68 @@ pub fn new_group_bench<GROUP: Group>(g: GROUP) -> GroupBench<GROUP> {
 impl<GROUP: Group> GroupBench<GROUP> {
     /// ScalarAdd benchmarks the addition operation for scalars
     pub fn scalar_add<M: Measurement>(&self, c: &mut BenchmarkGroup<M>) {
-        c.bench_function("scalar_add", |b| b.iter(|| self.x.clone() + self.y.clone()));
+        c.bench_function("scalar_add", |b| {
+            b.iter_batched(
+                || (self.x.clone(), self.y.clone()),
+                |s| s.0 + s.1,
+                BatchSize::SmallInput,
+            )
+        });
     }
 
     /// ScalarSub benchmarks the substraction operation for scalars
     pub fn scalar_sub<M: Measurement>(&self, c: &mut BenchmarkGroup<M>) {
         c.bench_function("scalar_sub", |b| {
-            b.iter(|| self.x.clone().sub(&self.x, &self.y))
+            b.iter_batched(
+                || self.x.clone(),
+                |s| s.sub(&self.x, &self.y),
+                BatchSize::SmallInput,
+            )
         });
     }
 
     /// ScalarNeg benchmarks the negation operation for scalars
     pub fn scalar_neg<M: Measurement>(&self, c: &mut BenchmarkGroup<M>) {
-        c.bench_function("scalar_neg", |b| b.iter(|| self.x.clone().neg(&self.x)));
+        c.bench_function("scalar_neg", |b| {
+            b.iter_batched(|| self.x.clone(), |s| s.neg(&self.x), BatchSize::SmallInput)
+        });
     }
 
     /// ScalarMul benchmarks the multiplication operation for scalars
     pub fn scalar_mul<M: Measurement>(&self, c: &mut BenchmarkGroup<M>) {
-        c.bench_function("scalar_mul", |b| b.iter(|| self.x.clone() * self.y.clone()));
+        c.bench_function("scalar_mul", |b| {
+            b.iter_batched(
+                || (self.x.clone(), self.y.clone()),
+                |s| s.0 * s.1,
+                BatchSize::SmallInput,
+            )
+        });
     }
 
     /// ScalarDiv benchmarks the division operation for scalars
     pub fn scalar_div<M: Measurement>(&self, c: &mut BenchmarkGroup<M>) {
         c.bench_function("scalar_div", |b| {
-            b.iter(|| self.x.clone().div(&self.x, &self.y))
+            b.iter_batched(
+                || self.x.clone(),
+                |s| s.div(&self.x, &self.y),
+                BatchSize::SmallInput,
+            )
         });
     }
 
     /// ScalarInv benchmarks the inverse operation for scalars
     pub fn scalar_inv<M: Measurement>(&self, c: &mut BenchmarkGroup<M>) {
-        c.bench_function("scalar_inv", |b| b.iter(|| self.x.clone().inv(&self.x)));
+        c.bench_function("scalar_inv", |b| {
+            b.iter_batched(|| self.x.clone(), |s| s.inv(&self.x), BatchSize::SmallInput)
+        });
     }
 
     /// ScalarPick benchmarks the Pick operation for scalars
     pub fn scalar_pick<M: Measurement>(&self, c: &mut BenchmarkGroup<M>) {
         let rng = &mut Randstream::default();
-        c.bench_function("scalar_pick", |b| b.iter(|| self.x.clone().pick(rng)));
+        c.bench_function("scalar_pick", |b| {
+            b.iter_batched(|| self.x.clone(), |s| s.pick(rng), BatchSize::SmallInput)
+        });
     }
 
     /// ScalarEncode benchmarks the marshalling operation for scalars
@@ -97,42 +123,68 @@ impl<GROUP: Group> GroupBench<GROUP> {
     /// PointAdd benchmarks the addition operation for points
     pub fn point_add<M: Measurement>(&self, c: &mut BenchmarkGroup<M>) {
         c.bench_function("point_add", |b| {
-            b.iter(|| self.x_caps.clone().add(&self.x_caps, &self.y_caps))
+            b.iter_batched(
+                || self.x_caps.clone(),
+                |s| s.add(&self.x_caps, &self.y_caps),
+                BatchSize::SmallInput,
+            )
         });
     }
 
     /// PointSub benchmarks the substraction operation for points
     pub fn point_sub<M: Measurement>(&self, c: &mut BenchmarkGroup<M>) {
         c.bench_function("point_sub", |b| {
-            b.iter(|| self.x_caps.clone().sub(&self.x_caps, &self.y_caps))
+            b.iter_batched(
+                || self.x_caps.clone(),
+                |s| s.sub(&self.x_caps, &self.y_caps),
+                BatchSize::SmallInput,
+            )
         });
     }
 
     /// PointNeg benchmarks the negation operation for points
     pub fn point_neg<M: Measurement>(&self, c: &mut BenchmarkGroup<M>) {
         c.bench_function("point_neg", |b| {
-            b.iter(|| self.x_caps.clone().neg(&self.x_caps.clone()))
+            b.iter_batched(
+                || self.x_caps.clone(),
+                |mut s| s.neg(&self.x_caps),
+                BatchSize::SmallInput,
+            )
         });
     }
 
     /// PointMul benchmarks the multiplication operation for points
     pub fn point_mul<M: Measurement>(&self, c: &mut BenchmarkGroup<M>) {
         c.bench_function("point_mul", |b| {
-            b.iter(|| self.x_caps.clone().mul(&self.y, Some(&self.x_caps)))
+            b.iter_batched(
+                || self.x_caps.clone(),
+                |s| s.mul(&self.y, Some(&self.x_caps)),
+                BatchSize::SmallInput,
+            )
         });
     }
 
     /// PointBaseMul benchmarks the base multiplication operation for points
     pub fn point_base_mul<M: Measurement>(&self, c: &mut BenchmarkGroup<M>) {
         c.bench_function("point_base_mul", |b| {
-            b.iter(|| self.x_caps.clone().mul(&self.y, None))
+            b.iter_batched(
+                || self.x_caps.clone(),
+                |s| s.mul(&self.y, None),
+                BatchSize::SmallInput,
+            )
         });
     }
 
     /// PointPick benchmarks the pick-ing operation for points
     pub fn point_pick<M: Measurement>(&self, c: &mut BenchmarkGroup<M>) {
         let rng = &mut Randstream::default();
-        c.bench_function("point_pick", |b| b.iter(|| self.x_caps.clone().pick(rng)));
+        c.bench_function("point_pick", |b| {
+            b.iter_batched(
+                || self.x_caps.clone(),
+                |s| s.pick(rng),
+                BatchSize::SmallInput,
+            )
+        });
     }
 
     /// PointEncode benchmarks the encoding operation for points
