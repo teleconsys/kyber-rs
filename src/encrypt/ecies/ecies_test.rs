@@ -8,8 +8,8 @@ fn test_ecies() {
     let suite = SuiteEd25519::new_blake_sha256ed25519();
     let private = suite.scalar().pick(&mut Randstream::default());
     let public = suite.point().mul(&private, None);
-    let ciphertext = encrypt(suite, public, message).unwrap(); 
-    let plaintext = decrypt(suite, private, &ciphertext).unwrap(); 
+    let ciphertext = encrypt(suite, public, message).unwrap();
+    let plaintext = decrypt(suite, private, &ciphertext).unwrap();
     assert_eq!(message, plaintext);
 }
 

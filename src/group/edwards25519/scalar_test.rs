@@ -2,13 +2,16 @@ use std::ops::Add;
 
 use num_bigint_dig::BigInt;
 
+use super::{constants::PRIME_ORDER, FactoredScalar, SimpleCTScalar};
+use crate::Scalar as ScalarTrait;
 use crate::{
     encoding::Marshaling,
-    group::{ScalarCanCheckCanonical, edwards25519::{scalar_test_types::ONE, Scalar}}, util::random::random,
+    group::{
+        edwards25519::{scalar_test_types::ONE, Scalar},
+        ScalarCanCheckCanonical,
+    },
+    util::random::random,
 };
-use crate::Scalar as ScalarTrait;
-use super::{FactoredScalar, SimpleCTScalar, constants::PRIME_ORDER};
-
 
 #[test]
 fn test_factored_scalar() {
@@ -95,15 +98,20 @@ fn test_simple<T: ScalarTrait>(new: fn() -> T) {
 /// considered non canonical.
 #[test]
 fn test_scalar_is_canonical() {
-	let mut candidate = BigInt::from(-2_i64);
+    let mut candidate = BigInt::from(-2_i64);
     candidate = candidate.add(PRIME_ORDER.clone());
-	let mut candidate_buf = candidate.to_bytes_le().1;
-    
-	let expected = [true, true, false, false];
+    let mut candidate_buf = candidate.to_bytes_le().1;
 
-	// We check in range [L-2, L+4)
-	(0..4).for_each(|i| {
-		assert_eq!(expected[i], Scalar::default().is_canonical(&candidate_buf), "`lMinus2 + {}` does not pass canonicality test", i);
-		candidate_buf[0] += 1;
-	});
+    let expected = [true, true, false, false];
+
+    // We check in range [L-2, L+4)
+    (0..4).for_each(|i| {
+        assert_eq!(
+            expected[i],
+            Scalar::default().is_canonical(&candidate_buf),
+            "`lMinus2 + {}` does not pass canonicality test",
+            i
+        );
+        candidate_buf[0] += 1;
+    });
 }

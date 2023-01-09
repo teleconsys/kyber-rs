@@ -55,13 +55,13 @@ impl Marshaling for Point {
         marshalling::point_unmarshal_from(self, r)
     }
 
-    fn unmarshal_from_random(&mut self, r: &mut (impl std::io::Read + Stream)){
+    fn unmarshal_from_random(&mut self, r: &mut (impl std::io::Read + Stream)) {
         marshalling::point_unmarshal_from_random(self, r);
     }
 
     fn marshal_id(&self) -> [u8; 8] {
         MARSHAL_POINT_ID
-    }    
+    }
 }
 
 impl PartialEq for Point {
@@ -315,4 +315,3 @@ impl PointCanCheckCanonicalAndSmallOrder for Point {
         1 - (c & d & 1) == 1
     }
 }
-

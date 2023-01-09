@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod test {
     use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
-    use num_bigint_dig as num_bigint;
     use num_bigint::BigInt;
     use num_bigint::Sign::Plus;
+    use num_bigint_dig as num_bigint;
 
     use crate::group::integer_field::integer_field::ByteOrder::{BigEndian, LittleEndian};
     use crate::group::integer_field::integer_field::Int;

@@ -1,11 +1,11 @@
 use lazy_static::lazy_static;
-use std::cmp::Ordering::{self, Equal, Greater};
 use num_bigint_dig as num_bigint;
+use std::cmp::Ordering::{self, Equal, Greater};
 
 use anyhow::{bail, Result};
-use num_bigint::{BigInt, Sign, ModInverse};
-use num_bigint::Sign::Plus;
 use num_bigint::algorithms::jacobi;
+use num_bigint::Sign::Plus;
+use num_bigint::{BigInt, ModInverse, Sign};
 use num_traits::{Num, Signed};
 
 use crate::cipher::cipher::Stream;
@@ -202,7 +202,6 @@ impl Int {
         }
         Ok(self)
     }
-
 }
 
 impl PartialEq for Int {
@@ -278,7 +277,6 @@ impl Marshaling for Int {
     fn marshal_id(&self) -> [u8; 8] {
         MARSHAL_INT_ID
     }
-
 }
 
 impl ToString for Int {
@@ -292,7 +290,7 @@ impl_op_ex!(*|a: &Int, b: &Int| -> Int {
     let m = a.m.clone();
     let v = (a.v.clone() * b.v.clone()) % m.clone();
     let bo = a.bo;
-    Int{v, m, bo}
+    Int { v, m, bo }
 });
 
 impl_op_ex!(+|a: &Int, b: &Int| -> Int {
@@ -379,7 +377,7 @@ impl Scalar for Int {
         self.v = self.v.clone() % self.m.clone();
         self
     }
-    
+
     /// Inv sets the target to the modular inverse of a with respect to modulus m.
     fn inv(self, a: &Self) -> Self {
         let mut i = self;
@@ -394,7 +392,7 @@ impl Scalar for Int {
         i.m = a.m.clone();
         i.v = match a.v.sign() {
             Plus => a.m.clone().sub(&a.v),
-            _ => BigInt::from(0_u64)
+            _ => BigInt::from(0_u64),
         };
         i
     }
@@ -404,7 +402,7 @@ impl Int {
     /// Nonzero returns true if the integer value is nonzero.
     pub fn nonzero(&self) -> bool {
         self.v.sign() != Sign::NoSign
-    }    
+    }
 
     /// Int64 returns the int64 representation of the value.
     /// If the value is not representable in an int64 the result is undefined.
@@ -415,7 +413,7 @@ impl Int {
     /// SetUint64 sets the Int to an arbitrary uint64 value.
     /// The modulus must already be initialized.
     pub fn set_uint64(&self, v: u64) -> Self {
-        let mut i= self.clone();
+        let mut i = self.clone();
         i.v = BigInt::from(v) % i.m.clone();
         i
     }
@@ -425,7 +423,7 @@ impl Int {
     pub fn uint64(&self) -> u64 {
         let mut b = self.v.to_bytes_le().1;
         b.resize(8, 0_u8);
-        let mut  a = [0_u8; 8];
+        let mut a = [0_u8; 8];
         for (i, _) in b.iter().enumerate() {
             a[i] = b[i];
         }
@@ -465,7 +463,6 @@ impl Int {
         self.m = a_s.m.clone();
         Ok(())
     }
-    
 
     /// BigEndian encodes the value of this Int into a big-endian byte-slice
     /// at least min bytes but no more than max bytes long.
@@ -474,7 +471,7 @@ impl Int {
         let act = self.marshal_size();
         let (mut pad, mut ofs) = (act, 0);
         if pad < min {
-            (pad, ofs) = (min, min-act)
+            (pad, ofs) = (min, min - act)
         }
         if max != 0 && pad > max {
             bail!("Int not representable in max bytes");

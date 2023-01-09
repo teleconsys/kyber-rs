@@ -1,11 +1,11 @@
 use sha2::Sha256;
 
-use crate::Random;
-use crate::dh::{NONCE_SIZE, AEAD};
+use crate::dh::{AEAD, NONCE_SIZE};
 use crate::encoding::BinaryUnmarshaler;
 use crate::group::edwards25519::{Point, SuiteEd25519};
 use crate::util::key;
 use crate::util::random::random;
+use crate::Random;
 
 use super::Dh;
 

@@ -25,8 +25,8 @@ use std::{
 };
 
 use anyhow::{bail, Result};
-use num_bigint_dig as num_bigint;
 use num_bigint::BigInt;
+use num_bigint_dig as num_bigint;
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 use sha2::{Digest, Sha256};
 

@@ -3,8 +3,8 @@ use crate::group::internal::marshalling;
 use crate::group::{self, integer_field, ScalarCanCheckCanonical};
 use crate::util::random;
 use anyhow::bail;
-use num_bigint_dig as num_bigint;
 use num_bigint::BigInt;
+use num_bigint_dig as num_bigint;
 use serde::{Deserialize, Serialize};
 
 use crate::cipher::cipher::Stream;
@@ -34,7 +34,6 @@ impl Scalar {
         self.v.as_mut_slice()[0..b.len()].copy_from_slice(b.as_ref());
         self
     }
-
 }
 
 impl ScalarCanCheckCanonical for Scalar {
@@ -220,7 +219,16 @@ impl Marshaling for Scalar {
 
 fn get_bits(bytes: &[u8]) -> Vec<bool> {
     let mut bit_vec = Vec::new();
-    let masks = vec![0b00000001u8,0b00000010u8,0b00000100u8,0b00001000u8,0b00010000u8,0b00100000u8,0b01000000u8, 0b10000000u8];
+    let masks = vec![
+        0b00000001u8,
+        0b00000010u8,
+        0b00000100u8,
+        0b00001000u8,
+        0b00010000u8,
+        0b00100000u8,
+        0b01000000u8,
+        0b10000000u8,
+    ];
     for byte in bytes {
         for mask in masks.clone() {
             bit_vec.push(byte & mask != 0)
