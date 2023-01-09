@@ -5,7 +5,7 @@ use crate::{Group, Scalar, XOFFactory};
 use super::{FactoredScalar, SimpleCTScalar, SuiteEd25519};
 
 fn t_suite() -> SuiteEd25519 {
-    SuiteEd25519::new_blake_sha256ed25519()
+    SuiteEd25519::new_blake3_sha256_ed25519()
 }
 
 fn bench_scalar_add<T: Scalar, M: Measurement>(

@@ -16,7 +16,7 @@ use anyhow::Result;
 /// Test the property of a EdDSA signature
 #[test]
 pub fn test_eddsa_signing_random() {
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let suite = SuiteEd25519::new_blake3_sha256_ed25519();
 
     for _ in 0..10000 {
         let ed = EdDSA::new(&mut suite.random_stream()).unwrap();

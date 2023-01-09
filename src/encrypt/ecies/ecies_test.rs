@@ -5,7 +5,7 @@ use super::{decrypt, encrypt};
 #[test]
 fn test_ecies() {
     let message = "Hello ECIES".as_bytes();
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let suite = SuiteEd25519::new_blake3_sha256_ed25519();
     let private = suite.scalar().pick(&mut Randstream::default());
     let public = suite.point().mul(&private, None);
     let ciphertext = encrypt(suite, public, message).unwrap();
@@ -16,7 +16,7 @@ fn test_ecies() {
 #[test]
 fn test_ecies_fail_point() {
     let message = "Hello ECIES".as_bytes();
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let suite = SuiteEd25519::new_blake3_sha256_ed25519();
     let private = suite.scalar().pick(&mut Randstream::default());
     let public = suite.point().mul(&private, None);
     let mut ciphertext = encrypt(suite, public, message).unwrap();
@@ -28,7 +28,7 @@ fn test_ecies_fail_point() {
 #[test]
 fn test_ecies_fail_ciphertext() {
     let message = "Hello ECIES".as_bytes();
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let suite = SuiteEd25519::new_blake3_sha256_ed25519();
     let private = suite.scalar().pick(&mut Randstream::default());
     let public = suite.point().mul(&private, None);
     let mut ciphertext = encrypt(suite, public, message).unwrap();

@@ -16,7 +16,7 @@ use crate::{
 use super::vss::{minimum_t, new_dealer, Dealer, Verifier};
 
 fn suite() -> SuiteEd25519 {
-    SuiteEd25519::new_blake_sha256ed25519()
+    SuiteEd25519::new_blake3_sha256_ed25519()
 }
 
 #[derive(Clone)]

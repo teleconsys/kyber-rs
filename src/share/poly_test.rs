@@ -10,7 +10,7 @@ use super::poly::{
 
 #[test]
 fn test_secret_recovery() {
-    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let g = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
     let poly = new_pri_poly(g, t, None, g.random_stream());
@@ -37,7 +37,7 @@ fn test_secret_recovery() {
 /// See TestPublicRecoveryOutIndex for testing with the commitment.
 #[test]
 fn test_secret_recovery_out_index() {
-    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let g = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
     let poly = new_pri_poly(g, t, None, g.random_stream());
@@ -58,7 +58,7 @@ fn test_secret_recovery_out_index() {
 
 #[test]
 fn test_secret_recovery_delete() {
-    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let g = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
     let poly = new_pri_poly(g, t, None, g.random_stream());
@@ -81,7 +81,7 @@ fn test_secret_recovery_delete() {
 
 #[test]
 fn test_secret_recovery_delete_fail() {
-    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let g = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
 
@@ -100,7 +100,7 @@ fn test_secret_recovery_delete_fail() {
 
 #[test]
 fn test_secret_poly_equal() {
-    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let g = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
 
@@ -119,7 +119,7 @@ fn test_secret_poly_equal() {
 
 #[test]
 fn test_public_check() {
-    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let g = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
 
@@ -141,7 +141,7 @@ fn test_public_check() {
 
 #[test]
 fn test_public_recovery() {
-    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let g = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
 
@@ -160,7 +160,7 @@ fn test_public_recovery() {
 
 #[test]
 fn test_public_recovery_out_index() {
-    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let g = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
 
@@ -184,7 +184,7 @@ fn test_public_recovery_out_index() {
 
 #[test]
 fn test_public_recovery_delete() {
-    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let g = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
 
@@ -209,7 +209,7 @@ fn test_public_recovery_delete() {
 
 #[test]
 fn test_public_recovery_delete_fail() {
-    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let g = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
 
@@ -229,7 +229,7 @@ fn test_public_recovery_delete_fail() {
 
 #[test]
 fn test_private_add() {
-    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let g = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
 
@@ -251,7 +251,7 @@ fn test_private_add() {
 
 #[test]
 fn test_public_add() {
-    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let g = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
 
@@ -281,7 +281,7 @@ fn test_public_add() {
 
 #[test]
 fn test_public_poly_equal() {
-    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let g = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
 
@@ -306,7 +306,7 @@ fn test_public_poly_equal() {
 
 #[test]
 fn test_pri_poly_mul() {
-    let suite = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let suite = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
     let a = new_pri_poly(suite, t, None, suite.random_stream());
@@ -335,7 +335,7 @@ fn test_pri_poly_mul() {
 
 #[test]
 fn test_recover_pri_poly() {
-    let suite = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let suite = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
     let a = new_pri_poly(suite, t, None, suite.random_stream());
@@ -359,7 +359,7 @@ fn test_recover_pri_poly() {
 
 #[test]
 fn test_pri_poly_coefficients() {
-    let suite = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let suite = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
     let a = new_pri_poly(suite, t, None, suite.random_stream());
@@ -373,7 +373,7 @@ fn test_pri_poly_coefficients() {
 
 #[test]
 fn test_refresh_dkg() {
-    let g = edwards25519::SuiteEd25519::new_blake_sha256ed25519();
+    let g = edwards25519::SuiteEd25519::new_blake3_sha256_ed25519();
     let n = 10;
     let t = n / 2 + 1;
 

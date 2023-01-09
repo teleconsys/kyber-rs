@@ -118,7 +118,7 @@ fn test_eddsa_verify_malleability() {
     ];
     let mut c = 0u16;
 
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let suite = SuiteEd25519::new_blake3_sha256_ed25519();
     let mut random_stream = suite.random_stream();
     let ed = EdDSA::new(&mut random_stream).unwrap();
 
@@ -173,7 +173,7 @@ fn test_eddsa_verify_non_canonical_r() {
         0xff, 0xff,
     ];
 
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let suite = SuiteEd25519::new_blake3_sha256_ed25519();
     let mut random_stream = suite.random_stream();
     let ed = EdDSA::new(&mut random_stream).unwrap();
 
@@ -201,7 +201,7 @@ fn eddsa_verify_non_canonical_pk() {
         0xff, 0xff,
     ];
 
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let suite = SuiteEd25519::new_blake3_sha256_ed25519();
     let mut random_stream = suite.random_stream();
     let ed = EdDSA::new(&mut random_stream).unwrap();
 
@@ -227,7 +227,7 @@ fn test_eddsa_verify_small_order_r() {
         0x03, 0x7a,
     ];
 
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let suite = SuiteEd25519::new_blake3_sha256_ed25519();
     let mut random_stream = suite.random_stream();
     let ed = EdDSA::new(&mut random_stream).unwrap();
 
@@ -255,7 +255,7 @@ fn test_eddsa_verify_small_order_pk() {
         0x03, 0x7a,
     ];
 
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let suite = SuiteEd25519::new_blake3_sha256_ed25519();
     let mut random_stream = suite.random_stream();
     let mut ed = EdDSA::new(&mut random_stream).unwrap();
 

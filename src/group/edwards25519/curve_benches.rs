@@ -6,7 +6,7 @@ use super::SuiteEd25519;
 
 pub fn benchmark_group(c: &mut Criterion) {
     let mut b_group = c.benchmark_group("ed25519_curve_group");
-    let mut t = new_group_bench(SuiteEd25519::new_blake_sha256ed25519());
+    let mut t = new_group_bench(SuiteEd25519::new_blake3_sha256_ed25519());
 
     // scalar
     t.scalar_add(&mut b_group);

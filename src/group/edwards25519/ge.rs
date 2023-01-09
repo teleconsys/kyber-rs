@@ -48,7 +48,7 @@ impl ProjectiveGroupElement {
         fe_sub(&mut r.t, &r_t, &r.z);
     }
 
-    fn to_bytes(&self, s: &mut [u8; 32]) {
+    pub fn to_bytes(&self, s: &mut [u8; 32]) {
         let mut recip = FieldElement::default();
         let mut x = FieldElement::default();
         let mut y = FieldElement::default();
