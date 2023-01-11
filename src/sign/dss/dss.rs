@@ -15,6 +15,7 @@
 
 use anyhow::{bail, Ok, Result};
 use digest::Digest;
+use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 use std::collections::HashMap;
 
@@ -59,7 +60,7 @@ pub struct DSS<SUITE: Suite, DKS: DistKeyShare<SUITE>> {
 
 /// PartialSig is partial representation of the final distributed signature. It
 /// must be sent to each of the other participants.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct PartialSig<SUITE: Suite> {
     pub partial: PriShare<<SUITE::POINT as Point>::SCALAR>,
     pub session_id: Vec<u8>,

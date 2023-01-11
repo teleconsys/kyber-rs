@@ -1,5 +1,7 @@
 use std::ops::DerefMut;
 
+use serde::Deserialize;
+use serde::Serialize;
 use sha2::Sha256;
 use std::ops::Deref;
 
@@ -19,7 +21,7 @@ use super::Point;
 
 /// SuiteEd25519 implements some basic functionalities such as Group, HashFactory,
 /// and XOFFactory.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
 pub struct SuiteEd25519 {
     // Curve
     // r: Box<dyn Stream>,

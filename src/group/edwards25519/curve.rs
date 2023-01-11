@@ -6,13 +6,15 @@ use crate::util::key::Generator;
 use crate::util::random;
 use anyhow::Result;
 
+use serde::Deserialize;
+use serde::Serialize;
 use sha2::Sha256;
 use sha2::{Digest, Sha512};
 
 /// Curve represents the Ed25519 group.
 /// There are no parameters and no initialization is required
 /// because it supports only this one specific curve.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Curve {}
 
 impl Dh for Curve {

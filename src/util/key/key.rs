@@ -22,7 +22,7 @@ pub trait Suite: Group + Random {}
 
 /// Pair represents a public/private keypair together with the
 /// ciphersuite the key was generated from.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Pair<POINT: Point> {
     pub public: POINT,          // Public key
     pub private: POINT::SCALAR, // Private key
