@@ -37,6 +37,7 @@ use std::collections::HashMap;
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use digest::Digest;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     encoding::{BinaryMarshaler, Marshaling},
@@ -85,17 +86,18 @@ impl<SUITE: Suite> dss::DistKeyShare<SUITE> for DistKeyShare<SUITE> {
 /// Dealer.
 ///  NOTE: Doing that in vss.go would be possible but then the Dealer is always
 ///  assumed to be a member of the participants. It's only the case here.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Deal<POINT: Point> {
     /// Index of the Dealer in the list of participants
     pub index: u32,
     /// Deal issued for another participant
+    #[serde(deserialize_with = "EncryptedDeal::deserialize")]
     pub deal: EncryptedDeal<POINT>,
 }
 
 /// Response holds the Response from another participant as well as the index of
 /// the target Dealer.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Response {
     /// Index of the Dealer for which this response is for
     pub index: u32,
@@ -105,7 +107,7 @@ pub struct Response {
 
 /// Justification holds the Justification from a Dealer as well as the index of
 /// the Dealer in question.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Justification<SUITE: Suite> {
     /// Index of the Dealer who answered with this Justification
     pub index: u32,
@@ -115,7 +117,7 @@ pub struct Justification<SUITE: Suite> {
 
 /// SecretCommits is sent during the distributed public key reconstruction phase,
 /// basically a Feldman VSS scheme.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SecretCommits<SUITE: Suite> {
     /// Index of the Dealer in the list of participants
     pub index: u32,
@@ -142,7 +144,7 @@ impl<SUITE: Suite> SecretCommits<SUITE> {
 
 /// ComplaintCommits is sent if the secret commitments revealed by a peer are not
 /// valid.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ComplaintCommits<SUITE: Suite> {
     /// Index of the Verifier _issuing_ the ComplaintCommit
     pub index: u32,
@@ -170,7 +172,7 @@ impl<SUITE: Suite> ComplaintCommits<SUITE> {
 
 /// ReconstructCommits holds the information given by a participant who reveals
 /// the deal received from a peer that has received a ComplaintCommits.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ReconstructCommits<SUITE: Suite> {
     /// Id of the session
     pub session_id: Vec<u8>,
@@ -200,7 +202,7 @@ impl<SUITE: Suite> ReconstructCommits<SUITE> {
 /// DistKeyGenerator is the struct that runs the DKG protocol.
 #[derive(Clone)]
 pub struct DistKeyGenerator<SUITE: Suite> {
-    suite: SUITE,
+    pub suite: SUITE,
 
     pub index: u32,
     pub long: <SUITE::POINT as Point>::SCALAR,
@@ -208,7 +210,7 @@ pub struct DistKeyGenerator<SUITE: Suite> {
 
     pub participants: Vec<SUITE::POINT>,
 
-    t: usize,
+    pub t: usize,
 
     pub dealer: vss::rabin::vss::Dealer<SUITE>,
     pub verifiers: HashMap<u32, vss::rabin::vss::Verifier<SUITE>>,

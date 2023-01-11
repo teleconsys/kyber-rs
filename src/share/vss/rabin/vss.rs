@@ -42,6 +42,7 @@ use crate::Scalar;
 use anyhow::{bail, Error, Ok, Result};
 use byteorder::{LittleEndian, WriteBytesExt};
 use digest::Digest;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
@@ -144,9 +145,10 @@ impl<SUITE: Suite> BinaryMarshaler for Deal<SUITE> {
 /// correct recipient. The encryption is performed in a similar manner as what is
 /// done in TLS. The dealer generates a temporary key pair, signs it with its
 /// longterm secret key.
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct EncryptedDeal<POINT: Point + Serialize> {
     /// Ephemeral Diffie Hellman key
+    #[serde(deserialize_with = "POINT::deserialize")]
     pub(crate) dhkey: POINT,
     /// Signature of the DH key by the longterm key of the dealer
     pub(crate) signature: Vec<u8>,
@@ -156,7 +158,7 @@ pub struct EncryptedDeal<POINT: Point + Serialize> {
     pub(crate) cipher: Vec<u8>,
 }
 
-impl<POINT: Point + Serialize> BinaryMarshaler for EncryptedDeal<POINT> {
+impl<POINT: Point + Serialize + DeserializeOwned> BinaryMarshaler for EncryptedDeal<POINT> {
     fn marshal_binary(&self) -> Result<Vec<u8>> {
         encoding::marshal_binary(self)
     }
@@ -164,7 +166,7 @@ impl<POINT: Point + Serialize> BinaryMarshaler for EncryptedDeal<POINT> {
 
 /// Response is sent by the verifiers to all participants and holds each
 /// individual validation or refusal of a Deal.
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct Response {
     /// SessionID related to this run of the protocol
     pub session_id: Vec<u8>,
@@ -191,7 +193,7 @@ impl Response {
 /// Justification is a message that is broadcasted by the Dealer in response to
 /// a Complaint. It contains the original Complaint as well as the shares
 /// distributed to the complainer.
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Justification<SUITE: Suite> {
     /// SessionID related to the current run of the protocol
     session_id: Vec<u8>,
