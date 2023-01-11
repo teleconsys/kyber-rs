@@ -27,11 +27,6 @@ pub struct SuiteEd25519 {
 }
 
 impl SuiteEd25519 {
-    // /// Hash returns a newly instanciated sha256 hash function.
-    // fn  Hash(&self) -> hash.Hash {
-    //     return sha256.New()
-    // }
-
     //     func (s *SuiteEd25519) Read(r io.Reader, objs ...interface{}) error {
     // return fixbuf.Read(r, s, objs...)
     // }
@@ -48,7 +43,7 @@ impl SuiteEd25519 {
     /// new_blake_sha256ed25519 returns a cipher suite based on package
     /// go.dedis.ch/kyber/v3/xof/blake2xb, SHA-256, and the Ed25519 curve.
     /// It produces cryptographically random numbers via package crypto/rand.
-    pub fn new_blake_sha256ed25519() -> SuiteEd25519 {
+    pub fn new_blake3_sha256_ed25519() -> SuiteEd25519 {
         SuiteEd25519::default()
         // suite := new(SuiteEd25519)
         // return suite

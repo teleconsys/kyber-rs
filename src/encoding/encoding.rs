@@ -3,25 +3,29 @@ use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, io};
 use thiserror::Error;
 
+use crate::cipher::Stream;
+
 /// Marshaling is a basic interface representing fixed-length (or known-length)
 /// cryptographic objects or structures having a built-in binary encoding.
 /// Implementors must ensure that calls to these methods do not modify
 /// the underlying object so that other users of the object can access
 /// it concurrently.
-pub trait Marshaling: BinaryMarshaler + BinaryUnmarshaler {
-    // String returns the human readable string representation of the object.
-    // String() string
-
+pub trait Marshaling: BinaryMarshaler + BinaryUnmarshaler + ToString {
     /// Encoded length of this object in bytes.
     fn marshal_size(&self) -> usize;
 
     /// Encode the contents of this object and write it to an io.Writer.
     fn marshal_to(&self, w: &mut impl io::Write) -> Result<()>;
 
-    // Decode the content of this object by reading from an io.Reader.
-    // If r is an XOF, it uses r to pick a valid object pseudo-randomly,
-    // which may entail reading more than Len bytes due to retries.
-    // UnmarshalFrom(r io.Reader) (int, error)
+    /// Decode the content of this object by reading from an io.Reader.
+    /// If r is an XOF, it uses r to pick a valid object pseudo-randomly,
+    /// which may entail reading more than Len bytes due to retries.
+    /// UnmarshalFrom(r io.Reader) (int, error)
+    fn unmarshal_from(&mut self, r: &mut impl io::Read) -> Result<()>;
+    fn unmarshal_from_random(&mut self, r: &mut (impl io::Read + Stream));
+
+    /// marshal_id returns the type tag used in encoding/decoding
+    fn marshal_id(&self) -> [u8; 8];
 }
 
 // // Encoding represents an abstract interface to an encoding/decoding that can be

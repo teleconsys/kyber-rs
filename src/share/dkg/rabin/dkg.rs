@@ -198,6 +198,7 @@ impl<SUITE: Suite> ReconstructCommits<SUITE> {
 }
 
 /// DistKeyGenerator is the struct that runs the DKG protocol.
+#[derive(Clone)]
 pub struct DistKeyGenerator<SUITE: Suite> {
     suite: SUITE,
 

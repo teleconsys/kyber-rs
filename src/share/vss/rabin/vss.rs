@@ -47,6 +47,7 @@ use std::ops::{Deref, DerefMut};
 
 /// Dealer encapsulates for creating and distributing the shares and for
 /// replying to any Responses.
+#[derive(Clone)]
 pub struct Dealer<SUITE: Suite> {
     suite: SUITE,
     // reader: STREAM,
@@ -415,6 +416,7 @@ where
 
 /// Verifier receives a Deal from a Dealer, can reply with a Complaint, and can
 /// collaborate with other Verifiers to reconstruct a secret.
+#[derive(Clone)]
 pub struct Verifier<SUITE: Suite> {
     suite: SUITE,
     pub(crate) longterm: <SUITE::POINT as Point>::SCALAR,

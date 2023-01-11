@@ -1,8 +1,9 @@
 #[cfg(test)]
 mod test {
-    use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler};
+    use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
     use num_bigint::BigInt;
     use num_bigint::Sign::Plus;
+    use num_bigint_dig as num_bigint;
 
     use crate::group::integer_field::integer_field::ByteOrder::{BigEndian, LittleEndian};
     use crate::group::integer_field::integer_field::Int;
@@ -70,13 +71,13 @@ mod test {
         let b = i1.marshal_binary().unwrap();
         let i3 = Int::new_int_bytes(b.as_slice(), &i1.m, BigEndian);
         assert_eq!(i1, i3);
-        let i4 = Int::new_int_string(i1.string(), "".to_string(), 16, &i1.m);
+        let i4 = Int::new_int_string(i1.to_string(), "".to_string(), 16, &i1.m);
         assert_eq!(i1, i4);
     }
 
     #[test]
     fn test_init128bits() {
-        let mut m = BigInt::from(1_i32) << 128_i32;
+        let mut m = BigInt::from(1_i32) << 128;
         m -= BigInt::from(1_i32);
 
         let i1 = Int::new_int(BigInt::from(1_i32), m);
@@ -90,7 +91,7 @@ mod test {
         let base = Int::default().init_bytes(&[0x10], &modulo_i, BigEndian);
         let mut clone = base.clone();
         let tmp = clone.clone();
-        clone = clone.add(&tmp, &tmp);
+        clone = &tmp + &tmp;
         let b1 = clone.marshal_binary().unwrap();
         let b2 = base.marshal_binary().unwrap();
         assert_ne!(b1, b2, "Should not be equal");

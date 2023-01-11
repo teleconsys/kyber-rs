@@ -16,7 +16,7 @@ use crate::{
 use super::vss::{minimum_t, new_dealer, Dealer, Verifier};
 
 fn suite() -> SuiteEd25519 {
-    SuiteEd25519::new_blake_sha256ed25519()
+    SuiteEd25519::new_blake3_sha256_ed25519()
 }
 
 #[derive(Clone)]
@@ -788,7 +788,7 @@ fn test_vss_dhexchange() {
         .scalar()
         .pick(&mut test_data.suite.random_stream());
     let point = SuiteEd25519::dh_exchange(test_data.suite, privv.clone(), pubb.clone());
-    assert_eq!(pubb.mul(&privv, None).string(), point.string());
+    assert_eq!(pubb.mul(&privv, None).to_string(), point.to_string());
 }
 
 #[test]

@@ -5,7 +5,7 @@ use super::{sign, verify};
 #[test]
 fn test_schnorr_signature() {
     let msg = "Hello Schnorr".as_bytes();
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let suite = SuiteEd25519::new_blake3_sha256_ed25519();
     let kp = key::new_key_pair(&suite).unwrap();
 
     let s = sign(&suite, &kp.private, msg).unwrap();
@@ -42,7 +42,7 @@ fn test_schnorr_signature() {
 #[test]
 fn test_eddsa_compatibility() {
     let msg = "Hello Schnorr".as_bytes();
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let suite = SuiteEd25519::new_blake3_sha256_ed25519();
     let kp = key::new_key_pair(&suite).unwrap();
 
     let s = sign(&suite, &kp.private, msg).unwrap();
@@ -92,7 +92,7 @@ fn test_schnorr_malleability() {
     let mut c = 0u16;
 
     let msg = "Hello Schnorr".as_bytes();
-    let suite = SuiteEd25519::new_blake_sha256ed25519();
+    let suite = SuiteEd25519::new_blake3_sha256_ed25519();
     let kp = key::new_key_pair(&suite).unwrap();
 
     let mut s = sign(&suite, &kp.private, msg).unwrap();

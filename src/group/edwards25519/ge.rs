@@ -26,13 +26,13 @@ pub struct ProjectiveGroupElement {
 }
 
 impl ProjectiveGroupElement {
-    // func (p *projectiveGroupElement) Zero() {
-    // 	feZero(&p.X)
-    // 	feOne(&p.Y)
-    // 	feOne(&p.Z)
-    // }
+    fn zero(&mut self) {
+        fe_zero(&mut self.x);
+        fe_one(&mut self.y);
+        fe_one(&mut self.z);
+    }
 
-    fn double(&self, r: &mut CompletedGroupElement) {
+    pub fn double(&self, r: &mut CompletedGroupElement) {
         let mut t0 = FieldElement::default();
 
         fe_square(&mut r.x, &self.x);
@@ -48,15 +48,17 @@ impl ProjectiveGroupElement {
         fe_sub(&mut r.t, &r_t, &r.z);
     }
 
-    // func (p *projectiveGroupElement) ToBytes(s *[32]byte) {
-    // 	var recip, x, y fieldElement
+    pub fn to_bytes(&self, s: &mut [u8; 32]) {
+        let mut recip = FieldElement::default();
+        let mut x = FieldElement::default();
+        let mut y = FieldElement::default();
 
-    // 	feInvert(&recip, &p.Z)
-    // 	feMul(&x, &p.X, &recip)
-    // 	feMul(&y, &p.Y, &recip)
-    // 	feToBytes(s, &y)
-    // 	s[31] ^= feIsNegative(&x) << 7
-    // }
+        fe_invert(&mut recip, &self.z);
+        fe_mul(&mut x, &self.x, &recip);
+        fe_mul(&mut y, &self.y, &recip);
+        fe_to_bytes(s, &y);
+        s[31] ^= fe_is_negative(&x) << 7
+    }
 }
 
 #[test]
@@ -85,7 +87,7 @@ impl ExtendedGroupElement {
         fe_neg(&mut self.t, &s.t);
     }
 
-    fn double(&mut self, r: &mut CompletedGroupElement) {
+    pub fn double(&mut self, r: &mut CompletedGroupElement) {
         let mut q = ProjectiveGroupElement::default();
         self.to_projective(&mut q);
         q.double(r);
@@ -174,13 +176,17 @@ impl ExtendedGroupElement {
         true
     }
 
-    // func (p *extendedGroupElement) String() string {
-    // 	return "extendedGroupElement{\n\t" +
-    // 		p.X.String() + ",\n\t" +
-    // 		p.Y.String() + ",\n\t" +
-    // 		p.Z.String() + ",\n\t" +
-    // 		p.T.String() + ",\n}"
-    // }
+    pub fn string(&self) -> String {
+        return "extendedGroupElement{\n\t".to_owned()
+            + &format!("{:?}", self.x)
+            + ",\n\t"
+            + &format!("{:?}", self.y)
+            + ",\n\t"
+            + &format!("{:?}", self.z)
+            + ",\n\t"
+            + &format!("{:?}", self.t)
+            + ",\n}";
+    }
 
     pub fn zero(&mut self) {
         fe_zero(&mut self.x);
@@ -243,20 +249,23 @@ impl CompletedGroupElement {
         fe_add(&mut self.t, &t0, &self_t);
     }
 
-    // func (c *completedGroupElement) MixedSub(p *extendedGroupElement, q *preComputedGroupElement) {
-    // 	var t0 fieldElement
+    pub fn mixed_sub(&mut self, p: ExtendedGroupElement, q: PreComputedGroupElement) {
+        let mut t0 = FieldElement::default();
 
-    // 	feAdd(&c.X, &p.Y, &p.X)
-    // 	feSub(&c.Y, &p.Y, &p.X)
-    // 	feMul(&c.Z, &c.X, &q.yMinusX)
-    // 	feMul(&c.Y, &c.Y, &q.yPlusX)
-    // 	feMul(&c.T, &q.xy2d, &p.T)
-    // 	feAdd(&t0, &p.Z, &p.Z)
-    // 	feSub(&c.X, &c.Z, &c.Y)
-    // 	feAdd(&c.Y, &c.Z, &c.Y)
-    // 	feSub(&c.Z, &t0, &c.T)
-    // 	feAdd(&c.T, &t0, &c.T)
-    // }
+        fe_add(&mut self.x, &p.y, &p.x);
+        fe_sub(&mut self.y, &p.y, &p.x);
+        fe_mul(&mut self.z, &self.x, &q.y_minus_x);
+        let y_clone = self.y;
+        fe_mul(&mut self.y, &y_clone, &q.y_plus_x);
+        fe_mul(&mut self.t, &q.xy2d, &p.t);
+        fe_add(&mut t0, &p.z, &p.z);
+        fe_sub(&mut self.x, &self.z, &self.y);
+        let y_clone = self.y;
+        fe_add(&mut self.y, &self.z, &y_clone);
+        fe_sub(&mut self.z, &t0, &self.t);
+        let t_clone = self.t;
+        fe_add(&mut self.t, &t0, &t_clone);
+    }
 
     pub fn mixed_add(&mut self, p: &mut ExtendedGroupElement, q: &mut PreComputedGroupElement) {
         let mut t0 = FieldElement::default();
@@ -329,7 +338,7 @@ impl CachedGroupElement {
         fe_zero(&mut self.t2d);
     }
 
-    // Set to u conditionally based on b
+    /// Set to u conditionally based on b
     fn cmove(&mut self, u: &CachedGroupElement, b: i32) {
         fe_c_move(&mut self.y_plus_x, &u.y_plus_x, b);
         fe_c_move(&mut self.y_minus_x, &u.y_minus_x, b);
@@ -337,7 +346,7 @@ impl CachedGroupElement {
         fe_c_move(&mut self.t2d, &u.t2d, b);
     }
 
-    // Set to negative of t
+    /// Set to negative of t
     fn neg(&mut self, t: &CachedGroupElement) {
         fe_copy(&mut self.y_plus_x, &t.y_minus_x);
         fe_copy(&mut self.y_minus_x, &t.y_plus_x);
@@ -346,53 +355,54 @@ impl CachedGroupElement {
     }
 }
 
-// // Expand the 32-byte (256-bit) exponent in slice a into
-// // a sequence of 256 multipliers, one per exponent bit position.
-// // Clumps nearby 1 bits into multi-bit multipliers to reduce
-// // the total number of add/sub operations in a point multiply;
-// // each multiplier is either zero or an odd number between -15 and 15.
-// // Assumes the target array r has been preinitialized with zeros
-// // in case the input slice a is less than 32 bytes.
-// func slide(r *[256]int8, a *[32]byte) {
+/// Expand the 32-byte (256-bit) exponent in slice a into
+/// a sequence of 256 multipliers, one per exponent bit position.
+/// Clumps nearby 1 bits into multi-bit multipliers to reduce
+/// the total number of add/sub operations in a point multiply;
+/// each multiplier is either zero or an odd number between -15 and 15.
+/// Assumes the target array r has been preinitialized with zeros
+/// in case the input slice a is less than 32 bytes.
+pub fn slide(r: &mut [i8; 256], a: &[u8; 32]) {
+    // Explode the exponent a into a little-endian array, one bit per byte
+    for (i, _) in a.iter().enumerate() {
+        let mut ai = a[i] as i8;
+        for j in 0..8 {
+            r[i * 8 + j] = ai & 1;
+            ai >>= 1;
+        }
+    }
 
-// 	// Explode the exponent a into a little-endian array, one bit per byte
-// 	for i := range a {
-// 		ai := int8(a[i])
-// 		for j := 0; j < 8; j++ {
-// 			r[i*8+j] = ai & 1
-// 			ai >>= 1
-// 		}
-// 	}
-
-// 	// Go through and clump sequences of 1-bits together wherever possible,
-// 	// while keeping r[i] in the range -15 through 15.
-// 	// Note that each nonzero r[i] in the result will always be odd,
-// 	// because clumping is triggered by the first, least-significant,
-// 	// 1-bit encountered in a clump, and that first bit always remains 1.
-// 	for i := range r {
-// 		if r[i] != 0 {
-// 			for b := 1; b <= 6 && i+b < 256; b++ {
-// 				if r[i+b] != 0 {
-// 					if r[i]+(r[i+b]<<uint(b)) <= 15 {
-// 						r[i] += r[i+b] << uint(b)
-// 						r[i+b] = 0
-// 					} else if r[i]-(r[i+b]<<uint(b)) >= -15 {
-// 						r[i] -= r[i+b] << uint(b)
-// 						for k := i + b; k < 256; k++ {
-// 							if r[k] == 0 {
-// 								r[k] = 1
-// 								break
-// 							}
-// 							r[k] = 0
-// 						}
-// 					} else {
-// 						break
-// 					}
-// 				}
-// 			}
-// 		}
-// 	}
-// }
+    // Go through and clump sequences of 1-bits together wherever possible,
+    // while keeping r[i] in the range -15 through 15.
+    // Note that each nonzero r[i] in the result will always be odd,
+    // because clumping is triggered by the first, least-significant,
+    // 1-bit encountered in a clump, and that first bit always remains 1.
+    for i in 0..r.len() {
+        if r[i] != 0 {
+            let mut b = 1;
+            while b <= 6 && i + b < 256 {
+                if r[i + b] != 0 {
+                    if r[i] + (r[i + b] << b) <= 15 {
+                        r[i] += r[i + b] << b;
+                        r[i + b] = 0;
+                    } else if r[i] - (r[i + b] << b) >= -15 {
+                        r[i] -= r[i + b] << b;
+                        for k in r.iter_mut().take(256).skip(i + b) {
+                            if *k == 0 {
+                                *k = 1;
+                                break;
+                            }
+                            *k = 0;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                b += 1;
+            }
+        }
+    }
+}
 
 /// equal returns 1 if b == c and 0 otherwise.
 fn equal(b: i32, c: i32) -> i32 {

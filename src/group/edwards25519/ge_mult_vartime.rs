@@ -1,75 +1,81 @@
-use super::ge::ExtendedGroupElement;
+use super::ge::{
+    slide, CachedGroupElement, CompletedGroupElement, ExtendedGroupElement, ProjectiveGroupElement,
+};
 
-// geScalarMultVartime computes h = a*B, where
-//   a = a[0]+256*a[1]+...+256^31 a[31]
-//   B is the Ed25519 base point (x,4/5) with x positive.
-//
-// Preconditions:
-//   a[31] <= 127
+/// geScalarMultVartime computes h = a*B, where
+///   a = a[0]+256*a[1]+...+256^31 a[31]
+///   B is the Ed25519 base point (x,4/5) with x positive.
+///
+/// Preconditions:
+///   a[31] <= 127
 pub fn ge_scalar_mult_vartime(
-    _h: &mut ExtendedGroupElement,
-    _a: &mut [u8; 32],
-    _a_caps: &mut ExtendedGroupElement,
+    h: &mut ExtendedGroupElement,
+    a: &mut [u8; 32],
+    a_caps: &mut ExtendedGroupElement,
 ) {
-    // var aSlide [256]int8
-    // var Ai [8]cachedGroupElement // A,3A,5A,7A,9A,11A,13A,15A
-    // var t completedGroupElement
-    // var u, A2 extendedGroupElement
-    // var r projectiveGroupElement
-    // var i int
+    let mut a_slide = [0_i8; 256];
+    let mut ai = [CachedGroupElement::default(); 8]; // A,3A,5A,7A,9A,11A,13A,15A
+    let mut t = CompletedGroupElement::default();
+    let mut u = ExtendedGroupElement::default();
+    let mut a2 = ExtendedGroupElement::default();
+    let mut r = ProjectiveGroupElement::default();
 
-    // // Slide through the scalar exponent clumping sequences of bits,
-    // // resulting in only zero or odd multipliers between -15 and 15.
-    // slide(&aSlide, a)
+    // Slide through the scalar exponent clumping sequences of bits,
+    // resulting in only zero or odd multipliers between -15 and 15.
+    slide(&mut a_slide, a);
 
-    // // Form an array of odd multiples of A from 1A through 15A,
-    // // in addition-ready cached group element form.
-    // // We only need odd multiples of A because slide()
-    // // produces only odd-multiple clumps of bits.
-    // A.ToCached(&Ai[0])
-    // A.Double(&t)
-    // t.ToExtended(&A2)
-    // for i := 0; i < 7; i++ {
-    // 	t.Add(&A2, &Ai[i])
-    // 	t.ToExtended(&u)
-    // 	u.ToCached(&Ai[i+1])
-    // }
+    // Form an array of odd multiples of A from 1A through 15A,
+    // in addition-ready cached group element form.
+    // We only need odd multiples of A because slide()
+    // produces only odd-multiple clumps of bits.
+    a_caps.to_cached(&mut ai[0]);
+    a_caps.double(&mut t);
+    t.to_extended(&mut a2);
+    for i in 0..7 {
+        t.add(&a2, &ai[i]);
+        t.to_extended(&mut u);
+        u.to_cached(&mut ai[i + 1]);
+    }
 
-    // // Process the multiplications from most-significant bit downward
-    // for i = 255; ; i-- {
-    // 	if i < 0 { // no bits set
-    // 		h.Zero()
-    // 		return
-    // 	}
-    // 	if aSlide[i] != 0 {
-    // 		break
-    // 	}
-    // }
+    // Process the multiplications from most-significant bit downward
+    let mut i = 255_usize;
+    for j in (0..=256).rev() {
+        if j == 0 {
+            // no bits set
+            h.zero();
+            return;
+        }
+        if a_slide[j - 1] != 0 {
+            i = j - 1;
+            break;
+        }
+    }
 
-    // // first (most-significant) nonzero clump of bits
-    // u.Zero()
-    // if aSlide[i] > 0 {
-    // 	t.Add(&u, &Ai[aSlide[i]/2])
-    // } else if aSlide[i] < 0 {
-    // 	t.Sub(&u, &Ai[(-aSlide[i])/2])
-    // }
-    // i--
+    // first (most-significant) nonzero clump of bits
+    u.zero();
+    match a_slide[i] {
+        a if a > 0 => t.add(&u, &ai[(a / 2) as usize]),
+        a if a < 0 => t.sub(&u, &ai[((-a) / 2) as usize]),
+        _ => (),
+    }
 
-    // // remaining bits
-    // for ; i >= 0; i-- {
-    // 	t.ToProjective(&r)
-    // 	r.Double(&t)
+    // remaining bits
+    for j in (0..i).rev() {
+        t.to_projective(&mut r);
+        r.double(&mut t);
 
-    // 	if aSlide[i] > 0 {
-    // 		t.ToExtended(&u)
-    // 		t.Add(&u, &Ai[aSlide[i]/2])
-    // 	} else if aSlide[i] < 0 {
-    // 		t.ToExtended(&u)
-    // 		t.Sub(&u, &Ai[(-aSlide[i])/2])
-    // 	}
-    // }
+        match a_slide[j] {
+            a if a > 0 => {
+                t.to_extended(&mut u);
+                t.add(&u, &ai[(a / 2) as usize])
+            }
+            a if a < 0 => {
+                t.to_extended(&mut u);
+                t.sub(&u, &ai[((-a) / 2) as usize])
+            }
+            _ => (),
+        }
+    }
 
-    // t.ToExtended(h)
-
-    todo!()
+    t.to_extended(h);
 }
