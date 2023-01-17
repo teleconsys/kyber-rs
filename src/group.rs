@@ -97,7 +97,7 @@ pub trait Point:
     fn pick<S: Stream>(self, rand: &mut S) -> Self;
 
     /// Set sets the receiver equal to another Point p.
-    fn set(&mut self, p: Self) -> Self;
+    fn set(&mut self, p: &Self) -> Self;
 
     /// Maximum number of bytes that can be embedded in a single
     /// group element via Pick().

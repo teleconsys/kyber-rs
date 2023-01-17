@@ -113,7 +113,7 @@ impl group::Point for Point {
         self.embed(None, rand)
     }
 
-    fn set(&mut self, p: Self) -> Self {
+    fn set(&mut self, p: &Self) -> Self {
         self.ge = p.ge;
         self.clone()
     }

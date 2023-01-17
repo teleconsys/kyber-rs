@@ -124,7 +124,7 @@ fn test_point_set<GROUP: Group, S: Stream>(g: &GROUP, rand: &mut S) -> Result<()
     for _ in 0..n {
         let mut p1 = g.point().pick(rand);
         let mut p2 = g.point();
-        p2.set(p1.clone());
+        p2.set(&p1);
         if !p1.equal(&p2) {
             bail!(
                 "Set() set to a different point: {} != {}",

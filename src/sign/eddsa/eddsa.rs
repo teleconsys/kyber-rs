@@ -10,6 +10,7 @@ use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler};
 
 use crate::group::edwards25519::{Curve, Point as EdPoint, Scalar as EdScalar};
 use crate::group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical};
+use crate::util::key::Pair;
 use crate::{Group, Point, Scalar};
 
 /// EdDSA is a structure holding the data necessary to make a series of
@@ -98,6 +99,18 @@ impl BinaryMarshaler for EdDSA<Curve> {
         eddsa[..32].copy_from_slice(&self.seed);
         eddsa[32..].copy_from_slice(&p_buff);
         Ok(eddsa.to_vec())
+    }
+}
+
+impl From<Pair<EdPoint>> for EdDSA<Curve> {
+    fn from(pair: Pair<EdPoint>) -> Self {
+        let g = Curve::default();
+        Self {
+            secret: g.scalar().set(&pair.private),
+            public: g.point().set(&pair.public),
+            seed: vec![],
+            prefix: vec![],
+        }
     }
 }
 

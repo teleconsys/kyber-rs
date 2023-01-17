@@ -177,7 +177,7 @@ impl ExtendedGroupElement {
     }
 
     pub fn string(&self) -> String {
-        return "extendedGroupElement{\n\t".to_owned()
+        "extendedGroupElement{\n\t".to_owned()
             + &format!("{:?}", self.x)
             + ",\n\t"
             + &format!("{:?}", self.y)
@@ -185,7 +185,7 @@ impl ExtendedGroupElement {
             + &format!("{:?}", self.z)
             + ",\n\t"
             + &format!("{:?}", self.t)
-            + ",\n}";
+            + ",\n}"
     }
 
     pub fn zero(&mut self) {
