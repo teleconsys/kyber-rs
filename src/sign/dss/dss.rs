@@ -45,7 +45,7 @@ pub struct DSS<SUITE: Suite, DKS: DistKeyShare<SUITE>> {
     pub(crate) secret: <SUITE::POINT as Point>::SCALAR,
     pub public: SUITE::POINT,
     index: usize,
-    participants: Vec<SUITE::POINT>,
+    pub participants: Vec<SUITE::POINT>,
     t: usize,
     long: DKS,
     random: DKS,
