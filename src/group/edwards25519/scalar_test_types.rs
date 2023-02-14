@@ -1,6 +1,5 @@
 use super::{Scalar, SuiteEd25519};
-use crate::{Group, Scalar as ScalarTrait, XOFFactory};
-use anyhow::Result;
+use crate::{Group, Scalar as ScalarTrait, XOFFactory, encoding::MarshallingError};
 use criterion::{measurement::WallTime, BenchmarkGroup, Criterion};
 use lazy_static::lazy_static;
 use std::ops::Deref;
@@ -39,7 +38,7 @@ impl PartialEq for SimpleCTScalar {
 }
 
 impl Marshaling for SimpleCTScalar {
-    fn marshal_to(&self, w: &mut impl std::io::Write) -> Result<()> {
+    fn marshal_to(&self, w: &mut impl std::io::Write) -> Result<(), MarshallingError> {
         self.s.marshal_to(w)
     }
 
@@ -47,7 +46,7 @@ impl Marshaling for SimpleCTScalar {
         self.s.marshal_size()
     }
 
-    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> Result<()> {
+    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> Result<(), MarshallingError> {
         self.s.unmarshal_from(r)
     }
 
@@ -61,13 +60,13 @@ impl Marshaling for SimpleCTScalar {
 }
 
 impl BinaryMarshaler for SimpleCTScalar {
-    fn marshal_binary(&self) -> Result<Vec<u8>> {
+    fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
         encoding::marshal_binary(self)
     }
 }
 
 impl BinaryUnmarshaler for SimpleCTScalar {
-    fn unmarshal_binary(&mut self, data: &[u8]) -> anyhow::Result<()> {
+    fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError> {
         encoding::unmarshal_binary(self, data)
     }
 }
@@ -174,7 +173,7 @@ impl PartialEq for FactoredScalar {
 }
 
 impl Marshaling for FactoredScalar {
-    fn marshal_to(&self, w: &mut impl std::io::Write) -> Result<()> {
+    fn marshal_to(&self, w: &mut impl std::io::Write) -> Result<(), MarshallingError> {
         self.s.marshal_to(w)
     }
 
@@ -182,7 +181,7 @@ impl Marshaling for FactoredScalar {
         self.s.marshal_size()
     }
 
-    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> Result<()> {
+    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> Result<(), MarshallingError> {
         self.s.unmarshal_from(r)
     }
 
@@ -196,13 +195,13 @@ impl Marshaling for FactoredScalar {
 }
 
 impl BinaryMarshaler for FactoredScalar {
-    fn marshal_binary(&self) -> Result<Vec<u8>> {
+    fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
         encoding::marshal_binary(self)
     }
 }
 
 impl BinaryUnmarshaler for FactoredScalar {
-    fn unmarshal_binary(&mut self, data: &[u8]) -> anyhow::Result<()> {
+    fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError> {
         encoding::unmarshal_binary(self, data)
     }
 }

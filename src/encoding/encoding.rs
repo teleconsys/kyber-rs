@@ -1,4 +1,3 @@
-use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, io};
 use thiserror::Error;
@@ -15,13 +14,13 @@ pub trait Marshaling: BinaryMarshaler + BinaryUnmarshaler + ToString {
     fn marshal_size(&self) -> usize;
 
     /// Encode the contents of this object and write it to an io.Writer.
-    fn marshal_to(&self, w: &mut impl io::Write) -> Result<()>;
+    fn marshal_to(&self, w: &mut impl io::Write) -> Result<(), MarshallingError>;
 
     /// Decode the content of this object by reading from an io.Reader.
     /// If r is an XOF, it uses r to pick a valid object pseudo-randomly,
     /// which may entail reading more than Len bytes due to retries.
     /// UnmarshalFrom(r io.Reader) (int, error)
-    fn unmarshal_from(&mut self, r: &mut impl io::Read) -> Result<()>;
+    fn unmarshal_from(&mut self, r: &mut impl io::Read) -> Result<(), MarshallingError>;
     fn unmarshal_from_random(&mut self, r: &mut (impl io::Read + Stream));
 
     /// marshal_id returns the type tag used in encoding/decoding
@@ -48,27 +47,28 @@ pub trait Marshaling: BinaryMarshaler + BinaryUnmarshaler + ToString {
 #[derive(Error, Debug)]
 pub enum MarshallingError {
     #[error("could not serialize data")]
-    Serialization(#[from] bincode::Error),
+    Serialization(bincode::Error),
+    #[error("could not deserialize data")]
+    Deserialization(bincode::Error),
+    #[error("input data is not valid")]
+    InvalidInput(String),
+    #[error("io error")]
+    IoError(#[from] std::io::Error)
 }
 
 pub trait BinaryMarshaler {
-    fn marshal_binary(&self) -> Result<Vec<u8>>;
+    fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError>;
 }
 
 pub trait BinaryUnmarshaler {
-    fn unmarshal_binary(&mut self, data: &[u8]) -> Result<()>;
+    fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError>;
 }
 
-pub fn marshal_binary<T: Serialize>(x: &T) -> Result<Vec<u8>> {
-    match bincode::serialize(x) {
-        Ok(v) => Ok(v),
-        Err(e) => {
-            bail!(MarshallingError::Serialization(e))
-        }
-    }
+pub fn marshal_binary<T: Serialize>(x: &T) -> Result<Vec<u8>, MarshallingError> {
+    bincode::serialize(x).map_err(MarshallingError::Serialization)
 }
 
-pub fn unmarshal_binary<'de, T: Deserialize<'de>>(x: &mut T, data: &'de [u8]) -> Result<()> {
-    *x = bincode::deserialize(data)?;
+pub fn unmarshal_binary<'de, T: Deserialize<'de>>(x: &mut T, data: &'de [u8]) -> Result<(), MarshallingError> {
+    *x = bincode::deserialize(data).map_err(MarshallingError::Deserialization)?;
     Ok(())
 }

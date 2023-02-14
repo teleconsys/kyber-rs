@@ -1,11 +1,10 @@
-use anyhow::Result;
 use std::io::{Read, Write};
 
-use crate::{cipher::Stream, Point, Scalar};
+use crate::{cipher::Stream, Point, Scalar, encoding::MarshallingError};
 
 /// PointMarshalTo provides a generic implementation of Point.EncodeTo
 /// based on Point.Encode.
-pub fn point_marshal_to(p: &impl Point, w: &mut impl Write) -> Result<()> {
+pub fn point_marshal_to(p: &impl Point, w: &mut impl Write) -> Result<(), MarshallingError> {
     let buf = p.marshal_binary()?;
     w.write_all(&buf)?;
     Ok(())
@@ -15,7 +14,7 @@ pub fn point_marshal_to(p: &impl Point, w: &mut impl Write) -> Result<()> {
 /// based on Point.Decode, or Point.Pick if r is a Cipher or cipher.Stream.
 /// The returned byte-count is valid only when decoding from a normal Reader,
 /// not when picking from a pseudorandom source.
-pub fn point_unmarshal_from(p: &mut impl Point, r: &mut impl Read) -> Result<()> {
+pub fn point_unmarshal_from(p: &mut impl Point, r: &mut impl Read) -> Result<(), MarshallingError> {
     let mut buf = vec![0_u8; p.marshal_size()];
     r.read_exact(&mut buf)?;
     p.unmarshal_binary(&buf)
@@ -31,7 +30,7 @@ pub fn point_unmarshal_from_random(p: &mut impl Point, r: &mut (impl Read + Stre
 
 // ScalarMarshalTo provides a generic implementation of Scalar.EncodeTo
 // based on Scalar.Encode.
-pub fn scalar_marshal_to(s: &impl Scalar, w: &mut impl Write) -> Result<()> {
+pub fn scalar_marshal_to(s: &impl Scalar, w: &mut impl Write) -> Result<(), MarshallingError> {
     let buf = s.marshal_binary()?;
     w.write_all(buf.as_slice())?;
     Ok(())
@@ -41,7 +40,7 @@ pub fn scalar_marshal_to(s: &impl Scalar, w: &mut impl Write) -> Result<()> {
 /// based on Scalar.Decode, or Scalar.Pick if r is a Cipher or cipher.Stream.
 /// The returned byte-count is valid only when decoding from a normal Reader,
 /// not when picking from a pseudorandom source.
-pub fn scalar_unmarshal_from(s: &mut impl Scalar, r: &mut impl Read) -> Result<()> {
+pub fn scalar_unmarshal_from(s: &mut impl Scalar, r: &mut impl Read) -> Result<(), MarshallingError> {
     let mut buf = vec![0_u8; s.marshal_size()];
     r.read_exact(&mut buf)?;
     s.unmarshal_binary(&buf)

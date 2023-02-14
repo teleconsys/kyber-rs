@@ -2,14 +2,14 @@ use lazy_static::lazy_static;
 use num_bigint_dig as num_bigint;
 use std::cmp::Ordering::{self, Equal, Greater};
 
-use anyhow::{bail, Result};
+use anyhow::bail;
 use num_bigint::algorithms::jacobi;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, ModInverse, Sign};
 use num_traits::{Num, Signed};
 
 use crate::cipher::cipher::Stream;
-use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
+use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling, MarshallingError};
 use crate::group::internal::marshalling;
 use crate::group::Scalar;
 use crate::util::random::random_int;
@@ -190,7 +190,7 @@ impl Int {
     /// If d == "", then the denominator is taken to be 1.
     /// Returns (i,true) on success, or
     /// (nil,false) if either string fails to parse.
-    pub fn set_string(mut self, n: String, d: String, base: i32) -> Result<Self> {
+    pub fn set_string(mut self, n: String, d: String, base: i32) -> anyhow::Result<Self> {
         self.v = BigInt::from_str_radix(n.as_str(), base as u32)?;
         if !d.is_empty() {
             let mut di = Int {
@@ -213,7 +213,7 @@ impl PartialEq for Int {
 impl BinaryMarshaler for Int {
     /// MarshalBinary encodes the value of this Int into a byte-slice exactly Len() bytes long.
     /// It uses i's ByteOrder to determine which byte order to output.
-    fn marshal_binary(&self) -> Result<Vec<u8>> {
+    fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
         let l = self.marshal_size();
         // may be shorter than l
         let (_, mut b) = self.v.to_bytes_be();
@@ -236,10 +236,10 @@ impl BinaryUnmarshaler for Int {
     /// unmarshal_binary tries to decode a Int from a byte-slice buffer.
     /// Returns an error if the buffer is not exactly Len() bytes long
     /// or if the contents of the buffer represents an out-of-range integer.
-    fn unmarshal_binary(&mut self, data: &[u8]) -> Result<()> {
+    fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError> {
         let mut buf: Vec<u8> = data.to_vec();
         if buf.len() != self.marshal_size() {
-            bail!("unmarshal_binary: wrong size buffer");
+            return Err(MarshallingError::InvalidInput("unmarshal_binary: wrong size buffer".to_owned()));
         }
         // Still needed here because of the comparison with the modulo
         if self.bo == LittleEndian {
@@ -247,14 +247,14 @@ impl BinaryUnmarshaler for Int {
         }
         self.v = BigInt::from_bytes_be(Plus, buf.as_slice());
         if matches!(self.v.cmp(&self.m), Greater | Equal) {
-            bail!("unmarshal_binary: value out of range");
+            return Err(MarshallingError::InvalidInput("unmarshal_binary: value out of range".to_owned()));
         }
         Ok(())
     }
 }
 
 impl Marshaling for Int {
-    fn marshal_to(&self, w: &mut impl std::io::Write) -> anyhow::Result<()> {
+    fn marshal_to(&self, w: &mut impl std::io::Write) -> Result<(), MarshallingError> {
         marshalling::scalar_marshal_to(self, w)
     }
 
@@ -266,7 +266,7 @@ impl Marshaling for Int {
         ((self.m.bits()) + 7) / 8
     }
 
-    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> Result<()> {
+    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> Result<(), MarshallingError> {
         marshalling::scalar_unmarshal_from(self, r)
     }
 
@@ -455,7 +455,7 @@ impl Int {
     /// Sqrt computes some square root of a mod m of ONE exists.
     /// Assumes the modulus m is an odd prime.
     /// Returns true on success, false if input a is not a square.
-    pub fn sqrt(&mut self, a_s: &Self) -> Result<()> {
+    pub fn sqrt(&mut self, a_s: &Self) -> anyhow::Result<()> {
         if a_s.v.sign() == Sign::Minus {
             bail!("input is a negative number, square root is imaginary")
         }
@@ -467,7 +467,7 @@ impl Int {
     /// BigEndian encodes the value of this Int into a big-endian byte-slice
     /// at least min bytes but no more than max bytes long.
     /// Panics if max != 0 and the Int cannot be represented in max bytes.
-    pub fn big_endian(&self, min: usize, max: usize) -> Result<Vec<u8>> {
+    pub fn big_endian(&self, min: usize, max: usize) -> anyhow::Result<Vec<u8>> {
         let act = self.marshal_size();
         let (mut pad, mut ofs) = (act, 0);
         if pad < min {
