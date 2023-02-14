@@ -349,7 +349,10 @@ where
     /// it returns a Justification. This Justification must be broadcasted to every
     /// participants. If it's an invalid complaint, it returns an error about the
     /// complaint. The verifiers will also ignore an invalid Complaint.
-    pub fn process_response(&mut self, r: &Response) -> anyhow::Result<Option<Justification<SUITE>>> {
+    pub fn process_response(
+        &mut self,
+        r: &Response,
+    ) -> anyhow::Result<Option<Justification<SUITE>>> {
         self.aggregator.verify_response(r)?;
 
         if r.approved {
@@ -497,7 +500,10 @@ where
     /// broadcasted to every other participants including the dealer.
     /// If the deal has already been received, or the signature generation of the
     /// response failed, it returns an error without any responses.
-    pub fn process_encrypted_deal(&mut self, e: &EncryptedDeal<SUITE::POINT>) -> anyhow::Result<Response> {
+    pub fn process_encrypted_deal(
+        &mut self,
+        e: &EncryptedDeal<SUITE::POINT>,
+    ) -> anyhow::Result<Response> {
         let d = self.decrypt_deal(e)?;
         if d.sec_share.i != self.index {
             anyhow::bail!("vss: verifier got wrong index from deal");

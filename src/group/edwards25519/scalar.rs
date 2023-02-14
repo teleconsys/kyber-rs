@@ -86,7 +86,9 @@ impl BinaryMarshaler for Scalar {
 impl BinaryUnmarshaler for Scalar {
     fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError> {
         if data.len() != 32 {
-            return Err(MarshallingError::InvalidInput("wrong size buffer".to_owned()))
+            return Err(MarshallingError::InvalidInput(
+                "wrong size buffer".to_owned(),
+            ));
         }
         self.v.copy_from_slice(data);
         Ok(())

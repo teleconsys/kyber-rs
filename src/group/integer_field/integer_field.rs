@@ -239,7 +239,9 @@ impl BinaryUnmarshaler for Int {
     fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError> {
         let mut buf: Vec<u8> = data.to_vec();
         if buf.len() != self.marshal_size() {
-            return Err(MarshallingError::InvalidInput("unmarshal_binary: wrong size buffer".to_owned()));
+            return Err(MarshallingError::InvalidInput(
+                "unmarshal_binary: wrong size buffer".to_owned(),
+            ));
         }
         // Still needed here because of the comparison with the modulo
         if self.bo == LittleEndian {
@@ -247,7 +249,9 @@ impl BinaryUnmarshaler for Int {
         }
         self.v = BigInt::from_bytes_be(Plus, buf.as_slice());
         if matches!(self.v.cmp(&self.m), Greater | Equal) {
-            return Err(MarshallingError::InvalidInput("unmarshal_binary: value out of range".to_owned()));
+            return Err(MarshallingError::InvalidInput(
+                "unmarshal_binary: value out of range".to_owned(),
+            ));
         }
         Ok(())
     }

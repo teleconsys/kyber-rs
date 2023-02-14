@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 
-use crate::{cipher::Stream, Point, Scalar, encoding::MarshallingError};
+use crate::{cipher::Stream, encoding::MarshallingError, Point, Scalar};
 
 /// PointMarshalTo provides a generic implementation of Point.EncodeTo
 /// based on Point.Encode.
@@ -40,7 +40,10 @@ pub fn scalar_marshal_to(s: &impl Scalar, w: &mut impl Write) -> Result<(), Mars
 /// based on Scalar.Decode, or Scalar.Pick if r is a Cipher or cipher.Stream.
 /// The returned byte-count is valid only when decoding from a normal Reader,
 /// not when picking from a pseudorandom source.
-pub fn scalar_unmarshal_from(s: &mut impl Scalar, r: &mut impl Read) -> Result<(), MarshallingError> {
+pub fn scalar_unmarshal_from(
+    s: &mut impl Scalar,
+    r: &mut impl Read,
+) -> Result<(), MarshallingError> {
     let mut buf = vec![0_u8; s.marshal_size()];
     r.read_exact(&mut buf)?;
     s.unmarshal_binary(&buf)

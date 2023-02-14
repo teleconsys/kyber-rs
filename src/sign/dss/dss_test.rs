@@ -1,3 +1,5 @@
+use core::panic;
+
 use rand::Rng;
 
 use crate::{
@@ -5,7 +7,7 @@ use crate::{
         edwards25519::SuiteEd25519, PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical,
     },
     share::dkg,
-    sign::{eddsa, schnorr},
+    sign::{dss::DSSError, eddsa, schnorr},
     Group, Point, Random, Scalar,
 };
 
@@ -102,8 +104,11 @@ fn test_dss_partial_sigs() {
     let good_v = ps0.partial.v;
     ps0.partial.v = t.suite.scalar().zero();
     ps0.signature = schnorr::sign(&t.suite, &dss0.secret, &ps0.hash(t.suite).unwrap()).unwrap();
-    let err = dss1.process_partial_sig(ps0.clone()).unwrap_err();
-    assert_eq!(err.to_string(), "dss: partial signature not valid");
+    if let Err(DSSError::InvalidPartialSignature) = dss1.process_partial_sig(ps0.clone()) {
+    } else {
+        panic!("partial signature should be invalid")
+    };
+
     ps0.partial.v = good_v;
     ps0.signature = good_sig;
 
@@ -114,11 +119,10 @@ fn test_dss_partial_sigs() {
     dss1.process_partial_sig(ps0).unwrap_err();
 
     // if not enough partial signatures, can't generate signature
-    let err = dss1.signature().unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "dss: not enough partial signatures to sign"
-    );
+    if let Err(DSSError::NotEnoughPartials) = dss1.signature() {
+    } else {
+        panic!("should not have enough partial signatures")
+    };
 
     // enough partial sigs ?
     for i in 2..t.nb_participants {

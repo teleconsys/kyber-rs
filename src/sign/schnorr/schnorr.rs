@@ -3,9 +3,10 @@ use std::io::Write;
 use crate::{
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling},
     group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
+    sign::error::SignatureError,
     Group, Point, Random, Scalar,
 };
-use anyhow::{bail, Context, Error, Result};
+
 use sha2::{Digest, Sha512};
 
 /// Suite represents the set of functionalities needed by the package schnorr.
@@ -25,7 +26,7 @@ pub fn sign<SUITE: Suite>(
     s: &SUITE,
     private: &<SUITE::POINT as Point>::SCALAR,
     msg: &[u8],
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>, SignatureError> {
     // create random secret k and public point commitment R
     let k = s.scalar().pick(&mut s.random_stream());
     let r = s.point().mul(&k, None);
@@ -50,7 +51,12 @@ pub fn sign<SUITE: Suite>(
 /// key public, or an error otherwise. Compared to `Verify`, it performs
 /// additional checks around the canonicality and ensures the public key
 /// does not have a small order when using `edwards25519` group.
-fn verify_with_checks<GROUP: Group>(g: GROUP, pubb: &[u8], msg: &[u8], sig: &[u8]) -> Result<()>
+fn verify_with_checks<GROUP: Group>(
+    g: GROUP,
+    pubb: &[u8],
+    msg: &[u8],
+    sig: &[u8],
+) -> Result<(), SignatureError>
 where
     <GROUP::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
     GROUP::POINT: PointCanCheckCanonicalAndSmallOrder,
@@ -60,34 +66,31 @@ where
     let point_size = r.marshal_size();
     let scalar_size = s.marshal_size();
     let sig_size = scalar_size + point_size;
-    if sig.len() != sig_size {
-        bail!(
-            "schnorr: signature of invalid length {} instead of {}",
-            sig.len(),
-            sig_size
-        );
+    let sig_len = sig.len();
+    if sig_len != sig_size {
+        return Err(SignatureError::InvalidSignatureLength(format!(
+            "schnorr: signature of invalid length {sig_len} instead of {sig_size}"
+        )));
     }
     r.unmarshal_binary(&sig[..point_size])?;
     if !r.is_canonical(&sig[..point_size]) {
-        bail!("R is not canonical");
+        return Err(SignatureError::RNotCanonical);
     }
     if r.has_small_order() {
-        bail!("R has small order");
+        return Err(SignatureError::RSmallOrder);
     }
     if !g.scalar().is_canonical(&sig[point_size..]) {
-        bail!("signature is not canonical");
+        return Err(SignatureError::SignatureNotCanonical);
     }
     s.unmarshal_binary(&sig[point_size..])?;
 
     let mut public = g.point();
-    public
-        .unmarshal_binary(pubb)
-        .context("schnorr: error unmarshalling public key")?;
+    public.unmarshal_binary(pubb)?;
     if !public.is_canonical(pubb) {
-        bail!("public key is not canonical");
+        return Err(SignatureError::PublicKeyNotCanonical);
     }
     if public.has_small_order() {
-        bail!("public key has small order");
+        return Err(SignatureError::PublicKeySmallOrder);
     }
     // recompute hash(public || R || msg)
     let h = hash(&g, &public, &r, msg)?;
@@ -99,7 +102,9 @@ where
     let ras = g.point().add(&r, &ah);
 
     if !s_caps.equal(&ras) {
-        bail!("schnorr: invalid signature");
+        return Err(SignatureError::InvalidSignature(
+            "reconstructed S is not equal to signature".to_owned(),
+        ));
     }
 
     Ok(())
@@ -107,14 +112,17 @@ where
 
 /// Verify verifies a given Schnorr signature. It returns nil iff the
 /// given signature is valid.
-pub fn verify<GROUP: Group>(g: GROUP, public: &GROUP::POINT, msg: &[u8], sig: &[u8]) -> Result<()>
+pub fn verify<GROUP: Group>(
+    g: GROUP,
+    public: &GROUP::POINT,
+    msg: &[u8],
+    sig: &[u8],
+) -> Result<(), SignatureError>
 where
     <GROUP::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
     GROUP::POINT: PointCanCheckCanonicalAndSmallOrder,
 {
-    let p_buf = public
-        .marshal_binary()
-        .map_err(|op| Error::msg(format!("error unmarshalling public key: {}", op)))?;
+    let p_buf = public.marshal_binary()?;
     verify_with_checks(g, &p_buf, msg, sig)
 }
 
@@ -123,7 +131,7 @@ fn hash<GROUP: Group>(
     public: &GROUP::POINT,
     r: &GROUP::POINT,
     msg: &[u8],
-) -> Result<<GROUP::POINT as Point>::SCALAR> {
+) -> Result<<GROUP::POINT as Point>::SCALAR, SignatureError> {
     // h := sha512.New()
     let mut h = Sha512::new();
     r.marshal_to(&mut h)?;

@@ -1,5 +1,5 @@
 use super::{Scalar, SuiteEd25519};
-use crate::{Group, Scalar as ScalarTrait, XOFFactory, encoding::MarshallingError};
+use crate::{encoding::MarshallingError, Group, Scalar as ScalarTrait, XOFFactory};
 use criterion::{measurement::WallTime, BenchmarkGroup, Criterion};
 use lazy_static::lazy_static;
 use std::ops::Deref;

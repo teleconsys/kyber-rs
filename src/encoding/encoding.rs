@@ -53,7 +53,7 @@ pub enum MarshallingError {
     #[error("input data is not valid")]
     InvalidInput(String),
     #[error("io error")]
-    IoError(#[from] std::io::Error)
+    IoError(#[from] std::io::Error),
 }
 
 pub trait BinaryMarshaler {
@@ -68,7 +68,10 @@ pub fn marshal_binary<T: Serialize>(x: &T) -> Result<Vec<u8>, MarshallingError> 
     bincode::serialize(x).map_err(MarshallingError::Serialization)
 }
 
-pub fn unmarshal_binary<'de, T: Deserialize<'de>>(x: &mut T, data: &'de [u8]) -> Result<(), MarshallingError> {
+pub fn unmarshal_binary<'de, T: Deserialize<'de>>(
+    x: &mut T,
+    data: &'de [u8],
+) -> Result<(), MarshallingError> {
     *x = bincode::deserialize(data).map_err(MarshallingError::Deserialization)?;
     Ok(())
 }

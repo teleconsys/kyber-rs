@@ -35,7 +35,9 @@ impl BinaryMarshaler for Point {
 impl BinaryUnmarshaler for Point {
     fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError> {
         if !self.ge.from_bytes(data) {
-            return Err(MarshallingError::InvalidInput("invalid Ed25519 curve point".to_owned()));
+            return Err(MarshallingError::InvalidInput(
+                "invalid Ed25519 curve point".to_owned(),
+            ));
         }
         Ok(())
     }
