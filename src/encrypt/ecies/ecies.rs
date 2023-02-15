@@ -1,12 +1,12 @@
 /// Package ecies implements the Elliptic Curve Integrated Encryption Scheme (ECIES).
 // package ecies
 use crate::{
-    dh::{AEAD, NONCE_SIZE},
-    encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling},
+    dh::{AEAD, NONCE_SIZE, DhError},
+    encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling, MarshallingError},
     util::random::Randstream,
     Group, Point, Scalar,
 };
-use anyhow::{bail, Result};
+use thiserror::Error;
 
 /// Encrypt first computes a shared DH key using the given public key, then
 /// HKDF-derives a symmetric key (and nonce) from that, and finally uses these
@@ -18,7 +18,7 @@ pub fn encrypt<GROUP: Group>(
     group: GROUP,
     public: GROUP::POINT,
     message: &[u8],
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>, EciesError> {
     // Generate an ephemeral elliptic curve scalar and point
     let r = group.scalar().pick(&mut Randstream::default());
     let r_caps = group.point().mul(&r, None);
@@ -60,7 +60,7 @@ pub fn decrypt<GROUP: Group>(
     group: GROUP,
     private: <GROUP::POINT as Point>::SCALAR,
     ctx: &[u8],
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>, EciesError> {
     // Reconstruct the ephemeral elliptic curve point
     let mut r_caps = group.point();
     let l = group.point_len();
@@ -76,15 +76,25 @@ pub fn decrypt<GROUP: Group>(
 
     // Decrypt message using AES-GCM
     let gcm = AEAD::<GROUP>::new(r_caps.clone(), &buf)?;
-    gcm.open(None, &nonce, &ctx[l..], None)
+    Ok(gcm.open(None, &nonce, &ctx[l..], None)?)
 }
 
-fn derive_key<GROUP: Group>(dh: &GROUP::POINT, len: usize) -> Result<Vec<u8>> {
+fn derive_key<GROUP: Group>(dh: &GROUP::POINT, len: usize) -> Result<Vec<u8>, EciesError> {
     let dhb = dh.marshal_binary()?;
     let key = GROUP::hkdf(&dhb, &Vec::new(), Some(len))?;
 
     if key.len() < len {
-        bail!("ecies: hkdf-derived key too short")
+        return Err(EciesError::KeyTooShort);
     }
     Ok(key)
+}
+
+#[derive(Debug, Error)]
+pub enum EciesError {
+    #[error("marshalling error")]
+    MarshalingError(#[from] MarshallingError),
+    #[error("dh error")]
+    DhError(#[from] DhError),
+    #[error("hkdf-derived key too short")]
+    KeyTooShort,
 }

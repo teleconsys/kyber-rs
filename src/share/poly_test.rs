@@ -131,10 +131,7 @@ fn test_public_check() {
         assert!(
             pub_poly.check(share.as_ref().unwrap()),
             "{}",
-            format!(
-                "private share {} not valid with respect to the public commitment polynomial",
-                i
-            )
+            format!("private share {i} not valid with respect to the public commitment polynomial")
         )
     }
 }

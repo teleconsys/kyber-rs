@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     cipher::Stream,
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling, MarshallingError},
-    group::{self, internal::marshalling, PointCanCheckCanonicalAndSmallOrder},
+    group::{self, internal::marshalling, PointCanCheckCanonicalAndSmallOrder, PointError},
 };
 
 use super::{
@@ -188,12 +188,12 @@ impl group::Point for Point {
         }
     }
 
-    fn data(&self) -> anyhow::Result<Vec<u8>> {
+    fn data(&self) -> Result<Vec<u8>, PointError> {
         let mut b = [0u8; 32];
         self.ge.to_bytes(&mut b);
         let dl = b[0] as usize; // extract length byte
         if dl > self.embed_len() {
-            anyhow::bail!("invalid embedded data length");
+            return Err(PointError::EmbedDataLength);
         }
         Ok(b[1..1 + dl].to_vec())
     }

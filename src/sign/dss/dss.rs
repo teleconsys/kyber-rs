@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use crate::{
     encoding::Marshaling,
     group::{HashFactory, PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
-    share::poly::{self, PriShare, PubPoly, PolyError},
+    share::poly::{self, PolyError, PriShare, PubPoly},
     sign::{eddsa, error::SignatureError, schnorr},
     Group, Point, Random, Scalar,
 };

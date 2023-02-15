@@ -2,10 +2,10 @@ pub mod edwards25519;
 pub mod integer_field;
 mod internal;
 
-use anyhow::Result;
 use digest::{Digest, FixedOutputReset, Reset, Update};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use thiserror::Error;
 
 use crate::cipher::cipher::Stream;
 use crate::dh::{Dh, HmacCompatible};
@@ -111,7 +111,7 @@ pub trait Point:
 
     /// Extract data embedded in a point chosen via Embed().
     /// Returns an error if doesn't represent valid embedded data.
-    fn data(&self) -> Result<Vec<u8>>;
+    fn data(&self) -> Result<Vec<u8>, PointError>;
 
     /// Add points so that their scalars add homomorphically.
     fn add(self, a: &Self, b: &Self) -> Self;
@@ -205,4 +205,10 @@ where
     T: Digest,
     T: Write,
 {
+}
+
+#[derive(Error, Debug)]
+pub enum PointError {
+    #[error("invalid embedded data length")]
+    EmbedDataLength,
 }

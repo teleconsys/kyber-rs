@@ -122,7 +122,7 @@ fn test_random(s: &(impl XOFFactory + ?Sized)) {
         xof1.read_exact(&mut dst2).unwrap();
         let d = bit_diff(&dst1, &dst2);
 
-        assert!((d - 0.50).abs() < 0.1, "bitDiff {}", d);
+        assert!((d - 0.50).abs() < 0.1, "bitDiff {d}");
     }
 
     // Check that two seeds give expected mean bitdiff on first block
@@ -133,7 +133,7 @@ fn test_random(s: &(impl XOFFactory + ?Sized)) {
     let mut dst2 = [0_u8; 1024];
     xof2.read_exact(&mut dst2).unwrap();
     let d = bit_diff(&dst1, &dst2);
-    assert!((d - 0.50).abs() < 0.1, "two seed bitDiff {}", d);
+    assert!((d - 0.50).abs() < 0.1, "two seed bitDiff {d}");
 }
 
 /// bit_diff compares the bits between two arrays returning the fraction
@@ -197,7 +197,7 @@ fn test_reseed(s: &(impl XOFFactory + ?Sized)) {
     xof2.read_exact(&mut dst2).unwrap();
 
     let d = bit_diff(&dst1, &dst2);
-    assert!((d - 0.50).abs() < 0.1, "reseed bitDiff {}", d)
+    assert!((d - 0.50).abs() < 0.1, "reseed bitDiff {d}")
 }
 
 #[test]

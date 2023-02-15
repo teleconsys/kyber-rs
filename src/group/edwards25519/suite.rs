@@ -14,6 +14,7 @@ use crate::share::vss::suite::Suite;
 use crate::sign::dss;
 use crate::util;
 use crate::util::key::Generator;
+use crate::util::key::KeyError;
 use crate::util::key::Suite as KeySuite;
 use crate::{xof, Random, XOFFactory};
 
@@ -76,7 +77,10 @@ impl DerefMut for SuiteEd25519 {
 }
 
 impl Generator<Scalar> for SuiteEd25519 {
-    fn new_key<S: crate::cipher::Stream>(&self, stream: &mut S) -> anyhow::Result<Option<Scalar>> {
+    fn new_key<S: crate::cipher::Stream>(
+        &self,
+        stream: &mut S,
+    ) -> Result<Option<Scalar>, KeyError> {
         self.curve.new_key(stream)
     }
 }

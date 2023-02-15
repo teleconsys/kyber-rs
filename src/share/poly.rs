@@ -8,12 +8,12 @@
 // Both schemes of this package are core building blocks for more advanced
 // secret sharing techniques.
 
-use thiserror::Error;
 use byteorder::LittleEndian;
 use byteorder::WriteBytesExt;
 use digest::Digest;
 use serde::Deserialize;
 use serde::Serialize;
+use thiserror::Error;
 
 use std::collections::HashMap;
 use std::vec;
@@ -23,7 +23,6 @@ use crate::encoding::BinaryMarshaler;
 use crate::encoding::MarshallingError;
 use crate::group::HashFactory;
 use crate::{cipher::Stream, Group, Point, Scalar};
-
 
 /// PriShare represents a private share.
 #[derive(Clone, Serialize, Deserialize)]
@@ -241,7 +240,7 @@ pub fn recover_secret<GROUP: Group>(
 ) -> Result<<GROUP::POINT as Point>::SCALAR, PolyError> {
     let (x, y) = xy_scalar(&g, shares, t, n);
     if x.len() < t {
-        return Err(PolyError::NotEnoughSharesForSecret)
+        return Err(PolyError::NotEnoughSharesForSecret);
     }
 
     let mut acc = g.scalar().zero();
@@ -326,7 +325,7 @@ pub fn recover_pri_poly<GROUP: Group>(
 ) -> Result<PriPoly<GROUP>, PolyError> {
     let (x, y) = xy_scalar(g, shares, t, n);
     if x.len() != t {
-        return Err(PolyError::NotEnoughSharesForPublic)
+        return Err(PolyError::NotEnoughSharesForPublic);
     }
 
     let mut acc_poly = PriPoly {
@@ -461,11 +460,11 @@ impl<GROUP: Group> PubPoly<GROUP> {
     /// base point and thus should not be used in further computations.
     pub fn add(&self, q: &Self) -> Result<Self, PolyError> {
         if self.g.string() != q.g.string() {
-            return Err(PolyError::NoGroupsMatch)
+            return Err(PolyError::NoGroupsMatch);
         }
 
         if self.threshold() != q.threshold() {
-            return Err(PolyError::WrongCoefficientsNumber)
+            return Err(PolyError::WrongCoefficientsNumber);
         }
 
         let mut commits = vec![];
@@ -557,7 +556,7 @@ pub fn recover_commit<GROUP: Group>(
     let (x, y) = xy_commit(&g, shares, t, n);
 
     if x.len() < t {
-        return Err(PolyError::NotEnoughtGoodPublics)
+        return Err(PolyError::NotEnoughtGoodPublics);
     }
 
     let mut num = g.scalar();
@@ -668,6 +667,4 @@ pub enum PolyError {
     NotEnoughSharesForPublic,
     #[error("not enough shares to recover secret")]
     NotEnoughSharesForSecret,
-
-
 }

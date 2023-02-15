@@ -1,3 +1,4 @@
+use crate::util::key::KeyError;
 use anyhow::{bail, Result};
 use digest::{Digest, DynDigest};
 
@@ -48,7 +49,7 @@ impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>>
     fn new_key<S: Stream>(
         &self,
         _stream: &mut S,
-    ) -> Result<Option<<SUITE::POINT as Point>::SCALAR>> {
+    ) -> Result<Option<<SUITE::POINT as Point>::SCALAR>, KeyError> {
         self.suite.new_key(&mut self.random_stream())
     }
 }
@@ -645,7 +646,7 @@ pub fn suite_test<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>>(
 
     Digest::update(&mut h, "abc".as_bytes());
     let hb = h.clone().finalize().to_vec();
-    print!("\nHash: {:?}", hb);
+    print!("\nHash: {hb:?}");
     if h.output_size() != l || hb.len() != l {
         bail!(
             "inconsistent hash output length: {} vs {} vs {}",
@@ -659,7 +660,7 @@ pub fn suite_test<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>>(
     let mut x = suite.xof(Some(&hb));
     let mut sb = [0u8; 128];
     x.read_exact(&mut sb).unwrap();
-    print!("\nStream: {:?}", sb);
+    print!("\nStream: {sb:?}");
 
     // Test if it generates two fresh keys
     let mut p1 = key::new_key_pair(&suite).unwrap();

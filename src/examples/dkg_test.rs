@@ -158,7 +158,7 @@ fn test_example_dkg() {
         public_key = distr_key.public();
         node.secret_share = distr_key.pri_share();
         node.distributed_public_key = public_key.clone();
-        println!("new distributed public key {:?}", public_key);
+        println!("new distributed public key {public_key:?}");
     }
 
     // 8. Variant A - Encrypt a secret with the public key and decrypt it with

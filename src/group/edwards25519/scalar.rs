@@ -29,7 +29,9 @@ impl Scalar {
     }
 
     fn set_int(mut self, i: &mut Int) -> Self {
-        let b = i.little_endian(32, 32);
+        let b = i
+            .little_endian(32, 32)
+            .unwrap_or(Self::default().v.to_vec());
         self.v.as_mut_slice()[0..b.len()].copy_from_slice(b.as_ref());
         self
     }

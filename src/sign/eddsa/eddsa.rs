@@ -10,7 +10,7 @@ use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, MarshallingError};
 use crate::group::edwards25519::{Curve, Point as EdPoint, Scalar as EdScalar};
 use crate::group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical};
 use crate::sign::error::SignatureError;
-use crate::util::key::Pair;
+use crate::util::key::{Pair, KeyError};
 use crate::{Group, Point, Scalar};
 
 /// EdDSA is a structure holding the data necessary to make a series of
@@ -27,11 +27,10 @@ pub struct EdDSA<GROUP: Group> {
 
 const GROUP: Curve = Curve::new();
 
-//TODO ERROR
 impl EdDSA<Curve> {
     /// NewEdDSA will return a freshly generated key pair to use for generating
     /// EdDSA signatures.
-    pub fn new<S: crate::cipher::Stream>(stream: &mut S) -> anyhow::Result<EdDSA<Curve>> {
+    pub fn new<S: crate::cipher::Stream>(stream: &mut S) -> Result<EdDSA<Curve>, KeyError> {
         let (secret, buffer, prefix) = GROUP.new_key_and_seed(stream)?;
         let public = GROUP.point().mul(&secret, None);
 

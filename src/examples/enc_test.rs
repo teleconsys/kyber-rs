@@ -35,7 +35,7 @@ pub fn el_gamal_decrypt<GROUP: Group>(
     let s = group.point().mul(prikey, Some(&k)); // regenerate shared secret
     let p = group.point();
     let m = p.sub(&c, &s); // use to un-blind the message
-    m.data()
+    Ok(m.data()?)
 }
 
 /*

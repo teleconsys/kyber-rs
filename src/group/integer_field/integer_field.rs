@@ -1,11 +1,11 @@
 use lazy_static::lazy_static;
 use num_bigint_dig as num_bigint;
 use std::cmp::Ordering::{self, Equal, Greater};
+use thiserror::Error;
 
-use anyhow::bail;
 use num_bigint::algorithms::jacobi;
 use num_bigint::Sign::Plus;
-use num_bigint::{BigInt, ModInverse, Sign};
+use num_bigint::{BigInt, ModInverse, ParseBigIntError, Sign};
 use num_traits::{Num, Signed};
 
 use crate::cipher::cipher::Stream;
@@ -115,7 +115,7 @@ impl Int {
     /// little_endian encodes the value of this Int into a little-endian byte-slice
     /// at least min bytes but no more than max bytes long.
     /// Panics if max != 0 and the Int cannot be represented in max bytes.
-    pub fn little_endian(&self, min: usize, max: usize) -> Vec<u8> {
+    pub fn little_endian(&self, min: usize, max: usize) -> Result<Vec<u8>, BigIntError> {
         let mut act = self.marshal_size();
         let (_, v_bytes) = self.v.to_bytes_be();
         let v_size = v_bytes.len();
@@ -127,12 +127,12 @@ impl Int {
             pad = min
         }
         if max != 0 && pad > max {
-            panic!("Int not representable in max bytes")
+            return Err(BigIntError::NotRepresentable);
         }
 
         let buf = vec![0; pad];
         let buf2 = &buf[0..act];
-        reverse(buf2, &v_bytes)
+        Ok(reverse(buf2, &v_bytes))
     }
 
     /// new_int creates a new Int with a given big.Int and a big.Int modulus.
@@ -190,7 +190,7 @@ impl Int {
     /// If d == "", then the denominator is taken to be 1.
     /// Returns (i,true) on success, or
     /// (nil,false) if either string fails to parse.
-    pub fn set_string(mut self, n: String, d: String, base: i32) -> anyhow::Result<Self> {
+    pub fn set_string(mut self, n: String, d: String, base: i32) -> Result<Self, BigIntError> {
         self.v = BigInt::from_str_radix(n.as_str(), base as u32)?;
         if !d.is_empty() {
             let mut di = Int {
@@ -220,7 +220,9 @@ impl BinaryMarshaler for Int {
         let offset = l - b.len();
 
         if self.bo == LittleEndian {
-            return Ok(self.little_endian(l, l));
+            return self
+                .little_endian(l, l)
+                .map_err(|e| MarshallingError::InvalidInput(e.to_string()));
         }
 
         if offset != 0 {
@@ -459,9 +461,9 @@ impl Int {
     /// Sqrt computes some square root of a mod m of ONE exists.
     /// Assumes the modulus m is an odd prime.
     /// Returns true on success, false if input a is not a square.
-    pub fn sqrt(&mut self, a_s: &Self) -> anyhow::Result<()> {
+    pub fn sqrt(&mut self, a_s: &Self) -> Result<(), BigIntError> {
         if a_s.v.sign() == Sign::Minus {
-            bail!("input is a negative number, square root is imaginary")
+            return Err(BigIntError::ImaginaryRoot);
         }
         self.v = a_s.v.sqrt() % a_s.m.clone();
         self.m = a_s.m.clone();
@@ -471,14 +473,14 @@ impl Int {
     /// BigEndian encodes the value of this Int into a big-endian byte-slice
     /// at least min bytes but no more than max bytes long.
     /// Panics if max != 0 and the Int cannot be represented in max bytes.
-    pub fn big_endian(&self, min: usize, max: usize) -> anyhow::Result<Vec<u8>> {
+    pub fn big_endian(&self, min: usize, max: usize) -> Result<Vec<u8>, BigIntError> {
         let act = self.marshal_size();
         let (mut pad, mut ofs) = (act, 0);
         if pad < min {
             (pad, ofs) = (min, min - act)
         }
         if max != 0 && pad > max {
-            bail!("Int not representable in max bytes");
+            return Err(BigIntError::NotRepresentable);
         }
         let mut buf = vec![0_u8; pad];
         let b = self.v.to_bytes_be().1;
@@ -498,4 +500,16 @@ fn reverse(dst: &[u8], src: &[u8]) -> Vec<u8> {
         (dst[i], dst[j]) = (src[j], src[i]);
     }
     dst.to_vec()
+}
+
+#[derive(Debug, Error)]
+pub enum BigIntError {
+    #[error("marshalling error")]
+    MarshallingError(#[from] MarshallingError),
+    #[error("parse big int error")]
+    ParseBigIntError(#[from] ParseBigIntError),
+    #[error("Int not representable in max bytes")]
+    NotRepresentable,
+    #[error("input is a negative number, square root is imaginary")]
+    ImaginaryRoot,
 }
