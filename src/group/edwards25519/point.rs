@@ -1,11 +1,10 @@
 // var marshalPointID = [8]byte{'e', 'd', '.', 'p', 'o', 'i', 'n', 't'}
-use anyhow::{bail, Error, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     cipher::Stream,
-    encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling},
-    group::{self, internal::marshalling, PointCanCheckCanonicalAndSmallOrder},
+    encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling, MarshallingError},
+    group::{self, internal::marshalling, PointCanCheckCanonicalAndSmallOrder, PointError},
 };
 
 use super::{
@@ -27,23 +26,25 @@ pub struct Point {
 }
 
 impl BinaryMarshaler for Point {
-    fn marshal_binary(&self) -> Result<Vec<u8>> {
+    fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
         let mut b = [0_u8; 32];
         self.ge.to_bytes(&mut b);
         Ok(b.to_vec())
     }
 }
 impl BinaryUnmarshaler for Point {
-    fn unmarshal_binary(&mut self, data: &[u8]) -> Result<()> {
+    fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError> {
         if !self.ge.from_bytes(data) {
-            return Err(Error::msg("invalid Ed25519 curve point"));
+            return Err(MarshallingError::InvalidInput(
+                "invalid Ed25519 curve point".to_owned(),
+            ));
         }
         Ok(())
     }
 }
 
 impl Marshaling for Point {
-    fn marshal_to(&self, w: &mut impl std::io::Write) -> Result<()> {
+    fn marshal_to(&self, w: &mut impl std::io::Write) -> Result<(), MarshallingError> {
         marshalling::point_marshal_to(self, w)
     }
 
@@ -51,7 +52,7 @@ impl Marshaling for Point {
         32
     }
 
-    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> Result<()> {
+    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> Result<(), MarshallingError> {
         marshalling::point_unmarshal_from(self, r)
     }
 
@@ -187,12 +188,12 @@ impl group::Point for Point {
         }
     }
 
-    fn data(&self) -> anyhow::Result<Vec<u8>> {
+    fn data(&self) -> Result<Vec<u8>, PointError> {
         let mut b = [0u8; 32];
         self.ge.to_bytes(&mut b);
         let dl = b[0] as usize; // extract length byte
         if dl > self.embed_len() {
-            bail!("invalid embedded data length");
+            return Err(PointError::EmbedDataLength);
         }
         Ok(b[1..1 + dl].to_vec())
     }

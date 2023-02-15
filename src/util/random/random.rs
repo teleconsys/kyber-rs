@@ -1,3 +1,18 @@
+use std::{
+    cmp::Ordering,
+    io::{Read, Write},
+};
+
+use num_bigint::BigInt;
+use num_bigint_dig as num_bigint;
+use rand::{rngs::StdRng, RngCore, SeedableRng};
+use sha2::{Digest, Sha256};
+
+use crate::{
+    cipher::{cipher::Stream, StreamError},
+    xof::blake3::Xof,
+};
+
 /// bits chooses a uniform random BigInt with a given maximum BitLen.
 /// If 'exact' is true, choose a BigInt with _exactly_ that BitLen, not less
 pub fn bits(bitlen: u64, exact: bool, rand: &mut impl Stream) -> Vec<u8> {
@@ -19,19 +34,6 @@ pub fn bits(bitlen: u64, exact: bool, rand: &mut impl Stream) -> Vec<u8> {
     b
 }
 
-use std::{
-    cmp::Ordering,
-    io::{Read, Write},
-};
-
-use anyhow::{bail, Result};
-use num_bigint::BigInt;
-use num_bigint_dig as num_bigint;
-use rand::{rngs::StdRng, RngCore, SeedableRng};
-use sha2::{Digest, Sha256};
-
-use crate::{cipher::cipher::Stream, xof::blake::Xof};
-
 /// random_int chooses a uniform random big.Int less than a given modulus
 pub fn random_int(modulus: &BigInt, rand: &mut impl Stream) -> BigInt {
     let bitlen = modulus.bits();
@@ -46,7 +48,7 @@ pub fn random_int(modulus: &BigInt, rand: &mut impl Stream) -> BigInt {
 }
 
 // Bytes fills a slice with random bytes from rand.
-pub fn bytes(b: &mut [u8], rand: &mut impl Stream) -> Result<()> {
+pub fn bytes(b: &mut [u8], rand: &mut impl Stream) -> Result<(), StreamError> {
     let src_buff = vec![0u8; b.len()];
     rand.xor_key_stream(b, &src_buff)?;
     Ok(())
@@ -86,10 +88,10 @@ impl Randstream {
 }
 
 impl Stream for Randstream {
-    fn xor_key_stream(&mut self, dst: &mut [u8], src: &[u8]) -> Result<()> {
+    fn xor_key_stream(&mut self, dst: &mut [u8], src: &[u8]) -> Result<(), StreamError> {
         let l = dst.len();
         if src.len() != l {
-            bail!("XORKeyStream: mismatched buffer lengths")
+            return Err(StreamError::WrongBufferLengths);
         }
 
         // readerBytes is how many bytes we expect from each source
@@ -107,13 +109,13 @@ impl Stream for Randstream {
                 nerr += 1;
                 continue;
             }
-            b.write_all(&buff[..buff.len()]).unwrap();
+            b.write_all(&buff[..buff.len()])?;
         }
 
         // we are ok with few sources being insecure (i.e., providing less than
         // readerBytes bytes), but not all of them
         if nerr == self.readers.len() {
-            bail!("all readers failed")
+            return Err(StreamError::ReadersFailure);
         }
 
         // create the XOF output, with hash of collected data as seed

@@ -1,8 +1,7 @@
-use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
+use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling, MarshallingError};
 use crate::group::internal::marshalling;
 use crate::group::{self, integer_field, ScalarCanCheckCanonical};
 use crate::util::random;
-use anyhow::bail;
 use num_bigint::BigInt;
 use num_bigint_dig as num_bigint;
 use serde::{Deserialize, Serialize};
@@ -30,7 +29,9 @@ impl Scalar {
     }
 
     fn set_int(mut self, i: &mut Int) -> Self {
-        let b = i.little_endian(32, 32);
+        let b = i
+            .little_endian(32, 32)
+            .unwrap_or(Self::default().v.to_vec());
         self.v.as_mut_slice()[0..b.len()].copy_from_slice(b.as_ref());
         self
     }
@@ -76,7 +77,7 @@ impl PartialEq for Scalar {
 }
 
 impl BinaryMarshaler for Scalar {
-    fn marshal_binary(&self) -> anyhow::Result<Vec<u8>> {
+    fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
         let mut b = self.to_int().marshal_binary()?;
         b.resize(32, 0);
 
@@ -85,9 +86,11 @@ impl BinaryMarshaler for Scalar {
 }
 
 impl BinaryUnmarshaler for Scalar {
-    fn unmarshal_binary(&mut self, data: &[u8]) -> anyhow::Result<()> {
+    fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError> {
         if data.len() != 32 {
-            bail!("wrong size buffer")
+            return Err(MarshallingError::InvalidInput(
+                "wrong size buffer".to_owned(),
+            ));
         }
         self.v.copy_from_slice(data);
         Ok(())
@@ -196,7 +199,7 @@ impl group::Scalar for Scalar {
 }
 
 impl Marshaling for Scalar {
-    fn marshal_to(&self, w: &mut impl std::io::Write) -> anyhow::Result<()> {
+    fn marshal_to(&self, w: &mut impl std::io::Write) -> Result<(), MarshallingError> {
         marshalling::scalar_marshal_to(self, w)
     }
 
@@ -204,7 +207,7 @@ impl Marshaling for Scalar {
         32
     }
 
-    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> anyhow::Result<()> {
+    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> Result<(), MarshallingError> {
         marshalling::scalar_unmarshal_from(self, r)
     }
 

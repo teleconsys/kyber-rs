@@ -1,4 +1,4 @@
-pub mod blake;
+pub mod blake3;
 mod xof;
 #[cfg(test)]
 mod xof_test;

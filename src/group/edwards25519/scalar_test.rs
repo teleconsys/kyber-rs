@@ -109,8 +109,7 @@ fn test_scalar_is_canonical() {
         assert_eq!(
             expected[i],
             Scalar::default().is_canonical(&candidate_buf),
-            "`lMinus2 + {}` does not pass canonicality test",
-            i
+            "`lMinus2 + {i}` does not pass canonicality test"
         );
         candidate_buf[0] += 1;
     });

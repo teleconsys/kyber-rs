@@ -15,6 +15,7 @@ pub mod scalar_test_types;
 mod suite;
 
 pub use curve::Curve;
+pub use curve::CurveError;
 pub use curve_benches::benchmark_group;
 pub use point::Point;
 pub use scalar::Scalar;

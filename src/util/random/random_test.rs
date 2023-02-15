@@ -2,7 +2,10 @@ use std::io::{Read, Write};
 
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 
-use crate::{cipher::cipher::Stream, util::random::random::Randstream};
+use crate::{
+    cipher::{cipher::Stream, StreamError},
+    util::random::random::Randstream,
+};
 
 const SIZE: usize = 32;
 
@@ -38,8 +41,10 @@ fn test_empty_reader() {
     src[..b.len()].copy_from_slice(b);
     let dst = [0_u8; SIZE];
     let result = cipher.xor_key_stream(&mut dst.clone(), &src);
-    assert!(result.is_err());
-    assert_eq!(result.unwrap_err().to_string(), "all readers failed");
+    if let Err(StreamError::ReadersFailure) = result {
+    } else {
+        panic!("expected all readers failed error")
+    };
 }
 
 #[test]
@@ -76,9 +81,8 @@ fn test_incorrect_size() {
     src.as_mut().write_all("hello".as_bytes()).unwrap();
     let mut dst = [0_u8; SIZE + 1];
     let result = cipher.xor_key_stream(&mut dst, &src);
-    assert!(result.is_err());
-    assert_eq!(
-        result.unwrap_err().to_string(),
-        "XORKeyStream: mismatched buffer lengths"
-    );
+    if let Err(StreamError::WrongBufferLengths) = result {
+    } else {
+        panic!("expected wrong buffer lengths error")
+    };
 }

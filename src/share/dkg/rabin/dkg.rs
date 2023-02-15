@@ -43,14 +43,13 @@ use crate::{
     encoding::{BinaryMarshaler, Marshaling},
     group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
     share::{
+        dkg::DKGError,
         poly::{recover_pri_poly, PriShare, PubPoly},
         vss::{self, rabin::vss::EncryptedDeal, suite::Suite},
     },
     sign::{dss, schnorr},
     Point, Scalar,
 };
-
-use anyhow::{bail, Result};
 
 /// DistKeyShare holds the share of a distributed key for a participant.
 #[derive(Clone)]
@@ -131,7 +130,7 @@ pub struct SecretCommits<SUITE: Suite> {
 
 impl<SUITE: Suite> SecretCommits<SUITE> {
     /// Hash returns the hash value of this struct used in the signature process.
-    pub fn hash(&self, s: &SUITE) -> Result<Vec<u8>> {
+    pub fn hash(&self, s: &SUITE) -> Result<Vec<u8>, DKGError> {
         let mut h = s.hash();
         h.update("secretcommits".as_bytes());
         h.write_u32::<LittleEndian>(self.index)?;
@@ -159,7 +158,7 @@ pub struct ComplaintCommits<SUITE: Suite> {
 
 impl<SUITE: Suite> ComplaintCommits<SUITE> {
     /// Hash returns the hash value of this struct used in the signature process.
-    pub fn hash(&self, s: &SUITE) -> Result<Vec<u8>> {
+    pub fn hash(&self, s: &SUITE) -> Result<Vec<u8>, DKGError> {
         let mut h = s.hash();
         h.update("commitcomplaint".as_bytes());
         h.write_u32::<LittleEndian>(self.index)?;
@@ -188,7 +187,7 @@ pub struct ReconstructCommits<SUITE: Suite> {
 
 impl<SUITE: Suite> ReconstructCommits<SUITE> {
     /// Hash returns the hash value of this struct used in the signature process.
-    pub fn hash(&self, s: &SUITE) -> Result<Vec<u8>> {
+    pub fn hash(&self, s: &SUITE) -> Result<Vec<u8>, DKGError> {
         let mut h = s.hash();
         h.update("reconstructcommits".as_bytes());
         h.write_u32::<LittleEndian>(self.index)?;
@@ -253,7 +252,7 @@ pub fn new_dist_key_generator<SUITE: Suite>(
     longterm: &<SUITE::POINT as Point>::SCALAR,
     participants: &[SUITE::POINT],
     t: usize,
-) -> Result<DistKeyGenerator<SUITE>> {
+) -> Result<DistKeyGenerator<SUITE>, DKGError> {
     let pubb = suite.point().mul(longterm, None);
     // find our index
     let mut found = false;
@@ -266,7 +265,7 @@ pub fn new_dist_key_generator<SUITE: Suite>(
         }
     }
     if !found {
-        bail!("dkg: own public key not found in list of participants")
+        return Err(DKGError::MissingOwnPublicKey);
     }
     // generate our dealer / deal
     let own_sec = suite.scalar().pick(&mut suite.random_stream());
@@ -303,7 +302,7 @@ where
     ///   }
     ///
     /// This method panics if it can't process its own deal.
-    pub fn deals(&mut self) -> Result<HashMap<usize, Deal<SUITE::POINT>>> {
+    pub fn deals(&mut self) -> Result<HashMap<usize, Deal<SUITE::POINT>>, DKGError> {
         let deals = self.dealer.encrypted_deals()?;
         let mut dd = HashMap::new();
         for (i, _) in self.participants.clone().iter().enumerate() {
@@ -337,15 +336,15 @@ where
     /// returns a Response to broadcast to every other participants. It returns an
     /// error in case the deal has already been stored, or if the deal is incorrect
     /// (see `vss.Verifier.ProcessEncryptedDeal()`).
-    pub fn process_deal(&mut self, dd: &Deal<SUITE::POINT>) -> Result<Response> {
+    pub fn process_deal(&mut self, dd: &Deal<SUITE::POINT>) -> Result<Response, DKGError> {
         // public key of the dealer
         let pubb = match find_pub(&self.participants, dd.index as usize) {
             Some(pubb) => pubb,
-            None => bail!("dkg: dist deal out of bounds index"),
+            None => return Err(DKGError::DistDealIndexOutOfBounds),
         };
 
         if self.verifiers.contains_key(&dd.index) {
-            bail!("dkg: already received dist deal from same index")
+            return Err(DKGError::DistDealAlreadyProcessed);
         }
 
         // verifier receiving the dealer's deal
@@ -371,9 +370,12 @@ where
     /// and returns nil with a possible error regarding the validity of the response.
     /// If the response designates a deal this dkg has issued, then the dkg will process
     /// the response, and returns a justification.
-    pub fn process_response(&mut self, resp: &Response) -> Result<Option<Justification<SUITE>>> {
+    pub fn process_response(
+        &mut self,
+        resp: &Response,
+    ) -> Result<Option<Justification<SUITE>>, DKGError> {
         if !self.verifiers.contains_key(&resp.index) {
-            bail!("dkg: complaint received but no deal for it");
+            return Err(DKGError::ComplaintWithoutDeal);
         }
 
         let v = self.verifiers.get_mut(&resp.index).unwrap();
@@ -399,13 +401,16 @@ where
 
     /// ProcessJustification takes a justification and validates it. It returns an
     /// error in case the justification is wrong.
-    pub fn process_justification(&mut self, j: &Justification<SUITE>) -> Result<()> {
+    pub fn process_justification(&mut self, j: &Justification<SUITE>) -> Result<(), DKGError> {
         if !self.verifiers.contains_key(&j.index) {
-            bail!("dkg: Justification received but no deal for it");
+            return Err(DKGError::JustificationWithoutDeal);
         }
 
-        let v = self.verifiers.get_mut(&j.index).unwrap();
-        v.process_justification(&j.justification)
+        let v = match self.verifiers.get_mut(&j.index) {
+            Some(v) => v,
+            None => return Err(DKGError::MissingVerifier),
+        };
+        Ok(v.process_justification(&j.justification)?)
     }
 
     /// SetTimeout triggers the timeout on all verifiers, and thus makes sure
@@ -467,15 +472,18 @@ where
     /// the coefficients are revealed through a Feldman VSS scheme.
     /// This dkg must have its deal certified, otherwise it returns an error. The
     /// SecretCommits returned is already added to this dkg's list of SecretCommits.
-    pub fn secret_commits(&mut self) -> Result<SecretCommits<SUITE>> {
+    pub fn secret_commits(&mut self) -> Result<SecretCommits<SUITE>, DKGError> {
         if !self.dealer.deal_certified() {
-            bail!("dkg: can't give SecretCommits if deal not certified")
+            return Err(DKGError::DealNotCertified);
         }
+
+        let commitments = match self.dealer.commits() {
+            Some(c) => c,
+            None => return Err(DKGError::MissingCommits),
+        };
+
         let mut sc = SecretCommits::<SUITE> {
-            commitments: self
-                .dealer
-                .commits()
-                .expect("dkg: commits should not be none"),
+            commitments,
             index: self.index,
             session_id: self.dealer.session_id(),
             signature: Vec::new(),
@@ -504,30 +512,33 @@ where
     pub fn process_secret_commits(
         &mut self,
         sc: &SecretCommits<SUITE>,
-    ) -> Result<Option<ComplaintCommits<SUITE>>> {
+    ) -> Result<Option<ComplaintCommits<SUITE>>, DKGError> {
         let pubb = match find_pub(&self.participants, sc.index as usize) {
             Some(public) => public,
-            None => bail!("dkg: secretcommits received with index out of bounds"),
+            None => return Err(DKGError::SecretCommitsOutOfBound),
         };
 
         if !self.is_in_qual(sc.index) {
-            bail!("dkg: secretcommits from a non QUAL member")
+            return Err(DKGError::SecretCommitsFromNonQUAL);
         }
 
         // mapping verified by isInQUAL
-        let v = self
-            .verifiers
-            .get(&sc.index)
-            .expect("dkg: verifier should exists");
+        let v = match self.verifiers.get(&sc.index) {
+            Some(v) => v,
+            None => return Err(DKGError::MissingVerifier),
+        };
 
         if v.session_id() != sc.session_id {
-            bail!("dkg: secretcommits received with wrong session id")
+            return Err(DKGError::SecretCommitsWrongId);
         }
 
         let msg = sc.hash(&self.suite)?;
         schnorr::verify(self.suite, &pubb, &msg, &sc.signature.clone())?;
 
-        let deal = v.deal().expect("dkg: deal should exists");
+        let deal = match v.deal() {
+            Some(d) => d,
+            None => return Err(DKGError::MissingDeal),
+        };
         let poly = PubPoly::new(
             &self.suite,
             Some(self.suite.point().base()),
@@ -557,14 +568,14 @@ where
     pub fn process_complaint_commits(
         &mut self,
         cc: &ComplaintCommits<SUITE>,
-    ) -> Result<ReconstructCommits<SUITE>> {
+    ) -> Result<ReconstructCommits<SUITE>, DKGError> {
         let issuer = match find_pub(&self.participants, cc.index as usize) {
             Some(issuer) => issuer,
-            None => bail!("dkg: commitcomplaint with unknown issuer"),
+            None => return Err(DKGError::CommitComplaintUnknownIssuer),
         };
 
         if !self.is_in_qual(cc.index) {
-            bail!("dkg: complaintcommit from non-qual member")
+            return Err(DKGError::CommitComplaintNonQUAL);
         }
 
         let msg = cc.hash(&self.suite)?;
@@ -572,7 +583,7 @@ where
         schnorr::verify(self.suite, &issuer, &msg, &sig)?;
 
         if !self.verifiers.contains_key(&cc.dealer_index) {
-            bail!("dkg: commitcomplaint linked to unknown verifier");
+            return Err(DKGError::CommitComplaintUnknownVerifier);
         }
 
         let v = self.verifiers.get_mut(&cc.dealer_index).unwrap();
@@ -582,7 +593,7 @@ where
         v.verify_deal(&cc.deal, false)?;
 
         if !self.commitments.contains_key(&cc.dealer_index) {
-            bail!("dkg: complaint about non received commitments");
+            return Err(DKGError::CommitComplaintNoCommits);
         }
 
         let secret_commits = self.commitments.get(&cc.dealer_index).unwrap();
@@ -590,12 +601,12 @@ where
         // the secret commits check should fail. Verification 5) in DKG Rabin's
         // paper.
         if secret_commits.check(&cc.deal.sec_share) {
-            bail!("dkg: invalid complaint, deal verifying")
+            return Err(DKGError::CommitComplaintInvalid);
         }
 
         let deal = match v.deal() {
             Some(deal) => deal,
-            None => bail!("dkg: complaint linked to non certified deal"),
+            None => return Err(DKGError::CommitComplaintUncertifiedDeal),
         };
 
         self.commitments.remove(&cc.dealer_index);
@@ -624,18 +635,21 @@ where
     /// along any others. If there are enough messages to recover the coefficients of
     /// the public polynomials of the malicious dealer in question, then the
     /// polynomial is recovered.
-    pub fn process_reconstruct_commits(&mut self, rc: &ReconstructCommits<SUITE>) -> Result<()> {
+    pub fn process_reconstruct_commits(
+        &mut self,
+        rc: &ReconstructCommits<SUITE>,
+    ) -> Result<(), DKGError> {
         if self.reconstructed.contains_key(&rc.dealer_index) {
             // commitments already reconstructed, no need for other shares
             return Ok(());
         }
         if self.commitments.contains_key(&rc.dealer_index) {
-            bail!("dkg: commitments not invalidated by any complaints")
+            return Err(DKGError::CommitmentsNotInvalidated);
         }
 
         let pubb = match find_pub(&self.participants, rc.index as usize) {
             Some(public) => public,
-            None => bail!("dkg: reconstruct commits with invalid verifier index"),
+            None => return Err(DKGError::ReconstructCommitsInvalidVerifierIndex),
         };
 
         let msg = rc.hash(&self.suite)?;
@@ -652,7 +666,7 @@ where
                 return Ok(());
             }
             if r.session_id != rc.session_id {
-                bail!("dkg: reconstruct commits invalid session id")
+                return Err(DKGError::ReconstructCommitsInvalidId);
             }
         }
         // add it to list of pending shares
@@ -707,23 +721,23 @@ where
     /// of all aggregated individual public commits of each individual secrets.
     /// the share is evaluated from the global Private Polynomial, basically SUM of
     /// fj(i) for a receiver i.
-    pub fn dist_key_share(&self) -> Result<DistKeyShare<SUITE>> {
+    pub fn dist_key_share(&self) -> Result<DistKeyShare<SUITE>, DKGError> {
         if !self.certified() {
-            bail!("dkg: distributed key not certified")
+            return Err(DKGError::DistributedKeyNotCertified);
         }
 
         let mut sh = self.suite.scalar().zero();
         let mut pubb: Option<PubPoly<SUITE>> = None;
 
         // TODO: fix this weird error management
-        let mut error: Option<anyhow::Error> = None;
+        let mut error: Option<DKGError> = None;
 
         self.qual_iter(|i, v| {
             // share of dist. secret = sum of all share received.
             let s = match v.deal() {
                 Some(deal) => deal.sec_share.v,
                 None => {
-                    error = Some(anyhow::Error::msg("dkg: deals not found"));
+                    error = Some(DKGError::DealsNotFound);
                     return false;
                 }
             };
@@ -732,9 +746,8 @@ where
             sh = sh_clone + s;
             // Dist. public key = sum of all revealed commitments
             if !self.commitments.contains_key(&i) {
-                error = Some(anyhow::Error::msg(format!(
-                    "dkg: protocol not finished: {} commitments missing",
-                    i
+                error = Some(DKGError::ProtocolNotFinished(format!(
+                    "{i} commitments missing"
                 )));
                 return false;
             }
@@ -742,7 +755,7 @@ where
             match &pubb {
                 Some(pubb_val) => match pubb_val.add(poly) {
                     Ok(res) => pubb = Some(res),
-                    Err(e) => error = Some(e),
+                    Err(e) => error = Some(DKGError::PolyError(e)),
                 },
                 None => {
                     // first polynomial we see (instead of generating n empty commits)

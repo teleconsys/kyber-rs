@@ -1,8 +1,7 @@
-use anyhow::Result;
 use serde::Serialize;
 
 use crate::{
-    encoding::{self, BinaryMarshaler},
+    encoding::{self, BinaryMarshaler, MarshallingError},
     share::{
         poly::PriShare,
         vss::{self, pedersen, suite::Suite},
@@ -58,7 +57,7 @@ pub struct Deal<POINT: Point + Serialize> {
 }
 
 impl<POINT: Point + Serialize> BinaryMarshaler for Deal<POINT> {
-    fn marshal_binary(&self) -> Result<Vec<u8>> {
+    fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
         let mut deal = self.clone();
         deal.signature = Vec::new();
         encoding::marshal_binary(&deal)

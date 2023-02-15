@@ -1,8 +1,9 @@
 use std::io::{Read, Write};
 
-use anyhow::Error;
+use thiserror::Error;
 
 use crate::cipher::cipher::Stream;
+use crate::cipher::StreamError;
 
 use crate::xof::xof;
 
@@ -21,9 +22,9 @@ pub struct Xof {
 }
 
 impl Stream for Xof {
-    fn xor_key_stream(&mut self, dst: &mut [u8], src: &[u8]) -> Result<(), Error> {
+    fn xor_key_stream(&mut self, dst: &mut [u8], src: &[u8]) -> Result<(), StreamError> {
         if dst.len() < src.len() {
-            return Err(Error::msg("dst too short"));
+            return Err(StreamError::XOFError(XOFError::ShortDestination));
         }
         if self.key.len() < src.len() {
             self.key = vec![0; src.len()];
@@ -34,7 +35,7 @@ impl Stream for Xof {
         let mut new_key = self.key.clone();
         let n = self.read(&mut new_key).expect("blake xof error");
         if n != src.len() {
-            return Err(Error::msg("short read on key"));
+            return Err(StreamError::XOFError(XOFError::ShortRead));
         }
         self.key = new_key;
 
@@ -47,7 +48,7 @@ impl Stream for Xof {
 }
 
 impl std::io::Write for Xof {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
         match &mut self.implementation {
             HashState::Readable { reader: _ } => Err(std::io::Error::new(
                 std::io::ErrorKind::Interrupted,
@@ -57,7 +58,7 @@ impl std::io::Write for Xof {
         }
     }
 
-    fn flush(&mut self) -> std::io::Result<()> {
+    fn flush(&mut self) -> Result<(), std::io::Error> {
         match &mut self.implementation {
             HashState::Readable { reader: _ } => {
                 todo!()
@@ -69,7 +70,7 @@ impl std::io::Write for Xof {
     }
 }
 impl std::io::Read for Xof {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
         match &mut self.implementation {
             HashState::Readable { reader } => reader.read(buf),
             HashState::Writeable { writer } => {
@@ -120,6 +121,16 @@ impl Xof {
             key: vec![0; 0],
         }
     }
+}
+
+#[derive(Debug, Error)]
+pub enum XOFError {
+    #[error("io error")]
+    IoError(#[from] std::io::Error),
+    #[error("short read on key")]
+    ShortRead,
+    #[error("dst too short")]
+    ShortDestination,
 }
 
 // func (x *xof) Clone() kyber.XOF {

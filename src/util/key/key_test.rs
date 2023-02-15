@@ -11,7 +11,7 @@ use crate::{
     util, xof, Group, Point, Random, Scalar, XOFFactory,
 };
 
-use super::{new_key_pair, Generator, Suite as KeySuite};
+use super::{new_key_pair, Generator, KeyError, Suite as KeySuite};
 
 #[test]
 fn test_new_key_pair() {
@@ -64,7 +64,7 @@ impl Random for FixedPrivSuiteEd25519 {
 
 impl XOFFactory for FixedPrivSuiteEd25519 {
     fn xof(&self, key: Option<&[u8]>) -> Box<dyn crate::XOF> {
-        Box::new(xof::blake::Xof::new(key))
+        Box::new(xof::blake3::Xof::new(key))
     }
 }
 
@@ -77,7 +77,10 @@ impl dss::Suite for FixedPrivSuiteEd25519 {}
 impl KeySuite for FixedPrivSuiteEd25519 {}
 
 impl Generator<EdScalar> for FixedPrivSuiteEd25519 {
-    fn new_key<S: crate::cipher::Stream>(&self, _: &mut S) -> anyhow::Result<Option<EdScalar>> {
+    fn new_key<S: crate::cipher::Stream>(
+        &self,
+        _: &mut S,
+    ) -> anyhow::Result<Option<EdScalar>, KeyError> {
         Ok(Some(self.scalar().set_int64(33)))
     }
 }

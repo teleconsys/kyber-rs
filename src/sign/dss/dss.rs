@@ -13,7 +13,6 @@
 // The resulting signature is compatible with the EdDSA verification function.
 // against the longterm distributed key.
 
-use anyhow::{bail, Ok, Result};
 use digest::Digest;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
@@ -22,10 +21,12 @@ use std::collections::HashMap;
 use crate::{
     encoding::Marshaling,
     group::{HashFactory, PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
-    share::poly::{self, PriShare, PubPoly},
-    sign::{eddsa, schnorr},
+    share::poly::{self, PolyError, PriShare, PubPoly},
+    sign::{eddsa, error::SignatureError, schnorr},
     Group, Point, Random, Scalar,
 };
+
+use thiserror::Error;
 
 /// Suite represents the functionalities needed by the dss package
 pub trait Suite: Group + HashFactory + Random + Clone {}
@@ -70,9 +71,14 @@ pub struct PartialSig<SUITE: Suite> {
 impl<SUITE: Suite> PartialSig<SUITE> {
     /// Hash returns the hash representation of this PartialSig to be used in a
     /// signature.
-    pub fn hash(&self, s: SUITE) -> Result<Vec<u8>> {
+    pub fn hash(&self, s: SUITE) -> Result<Vec<u8>, DSSError> {
         let mut h = s.hash();
-        h.update(&self.partial.hash(s)?);
+        h.update(
+            &self
+                .partial
+                .hash(s)
+                .map_err(DSSError::PartialSignatureHash)?,
+        );
         h.update(&self.session_id);
         Ok(h.finalize().to_vec())
     }
@@ -91,7 +97,7 @@ pub fn new_dss<SUITE: Suite, DKS: DistKeyShare<SUITE>>(
     random: &DKS,
     msg: &[u8],
     t: usize,
-) -> Result<DSS<SUITE, DKS>> {
+) -> Result<DSS<SUITE, DKS>, DSSError> {
     let public = suite.point().mul(secret, None);
     let mut i = 0;
     let mut found = false;
@@ -103,7 +109,7 @@ pub fn new_dss<SUITE: Suite, DKS: DistKeyShare<SUITE>>(
         }
     }
     if !found {
-        bail!("dss: public key not found in list of participants");
+        return Err(DSSError::PublicKeyNotInParticipants);
     }
 
     Ok(DSS::<SUITE, DKS> {
@@ -130,7 +136,7 @@ impl<SUITE: Suite, DKS: DistKeyShare<SUITE>> DSS<SUITE, DKS> {
     /// PartialSig can be broadcasted to every other participant or only to a
     /// trusted combiner as described in the paper.
     /// The signature format is compatible with EdDSA verification implementations.
-    pub fn partial_sig(&mut self) -> Result<PartialSig<SUITE>> {
+    pub fn partial_sig(&mut self) -> Result<PartialSig<SUITE>, DSSError> {
         // following the notations from the paper
         let alpha = self.long.pri_share().v;
         let beta = self.random.pri_share().v;
@@ -159,7 +165,7 @@ impl<SUITE: Suite, DKS: DistKeyShare<SUITE>> DSS<SUITE, DKS> {
     /// wrong, or the signature is invalid or if a partial signature has already been
     /// received by the same peer. To know whether the distributed signature can be
     /// computed after this call, one can use the `EnoughPartialSigs` method.
-    pub fn process_partial_sig(&mut self, ps: PartialSig<SUITE>) -> Result<()>
+    pub fn process_partial_sig(&mut self, ps: PartialSig<SUITE>) -> Result<(), DSSError>
     where
         <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
         SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
@@ -171,11 +177,11 @@ impl<SUITE: Suite, DKS: DistKeyShare<SUITE>> DSS<SUITE, DKS> {
 
         // nothing secret here
         if ps.session_id != self.session_id {
-            bail!("dss: session id do not match")
+            return Err(DSSError::InvalidSessionId);
         }
 
         if self.partials_idx.contains_key(&ps.partial.i) {
-            bail!("dss: partial signature already received from peer")
+            return Err(DSSError::PartialAlreadyReceived);
         }
 
         let hash = self.hash_sig()?;
@@ -187,7 +193,7 @@ impl<SUITE: Suite, DKS: DistKeyShare<SUITE>> DSS<SUITE, DKS> {
         right = right.add(&rand_share.v, &right_clone);
         let left = self.suite.point().mul(&ps.partial.v, None);
         if !left.equal(&right) {
-            bail!("dss: partial signature not valid")
+            return Err(DSSError::InvalidPartialSignature);
         }
         self.partials_idx.insert(ps.partial.i, true);
         self.partials.push(Some(ps.partial));
@@ -205,31 +211,40 @@ impl<SUITE: Suite, DKS: DistKeyShare<SUITE>> DSS<SUITE, DKS> {
     /// signatures received. It returns an error if there are not enough partial
     /// signatures. The signature is compatible with the EdDSA verification
     /// alrogithm.
-    pub fn signature(&self) -> Result<Vec<u8>> {
+    pub fn signature(&self) -> Result<Vec<u8>, DSSError> {
         if !self.enough_partial_sig() {
-            bail!("dss: not enough partial signatures to sign")
+            return Err(DSSError::NotEnoughPartials);
         }
         let gamma = poly::recover_secret(
             self.suite.clone(),
             &self.partials,
             self.t,
             self.participants.len(),
-        )?;
+        )
+        .map_err(DSSError::RecoverSecretError)?;
         // RandomPublic || gamma
         let mut buff = Vec::new();
-        self.random.commitments()[0].marshal_to(&mut buff)?;
-        gamma.marshal_to(&mut buff)?;
+        self.random.commitments()[0]
+            .marshal_to(&mut buff)
+            .map_err(SignatureError::MarshallingError)?;
+        gamma
+            .marshal_to(&mut buff)
+            .map_err(SignatureError::MarshallingError)?;
         Ok(buff)
     }
 
-    fn hash_sig(&self) -> Result<<SUITE::POINT as Point>::SCALAR> {
+    fn hash_sig(&self) -> Result<<SUITE::POINT as Point>::SCALAR, DSSError> {
         // H(R || A || msg) with
         //  * R = distributed random "key"
         //  * A = distributed public key
         //  * msg = msg to sign
         let mut h = Sha512::new();
-        self.random.commitments()[0].marshal_to(&mut h)?;
-        self.long.commitments()[0].marshal_to(&mut h)?;
+        self.random.commitments()[0]
+            .marshal_to(&mut h)
+            .map_err(SignatureError::MarshallingError)?;
+        self.long.commitments()[0]
+            .marshal_to(&mut h)
+            .map_err(SignatureError::MarshallingError)?;
         h.update(self.msg.clone());
         Ok(self.suite.scalar().set_bytes(&h.finalize()))
     }
@@ -237,13 +252,13 @@ impl<SUITE: Suite, DKS: DistKeyShare<SUITE>> DSS<SUITE, DKS> {
 
 /// Verify takes a public key, a message and a signature and returns an error if
 /// the signature is invalid.
-pub fn verify<POINT: Point>(public: &POINT, msg: &[u8], sig: &[u8]) -> Result<()> {
+pub fn verify<POINT: Point>(public: &POINT, msg: &[u8], sig: &[u8]) -> Result<(), SignatureError> {
     eddsa::verify(public, msg, sig)
 }
 
-fn find_pub<POINT: Point>(list: &[POINT], i: usize) -> Result<POINT> {
+fn find_pub<POINT: Point>(list: &[POINT], i: usize) -> Result<POINT, DSSError> {
     if i >= list.len() {
-        bail!("dss: invalid index")
+        return Err(DSSError::InvalidIndex);
     }
     Ok(list[i].clone())
 }
@@ -252,15 +267,39 @@ fn session_id<SUITE: Suite, DKS: DistKeyShare<SUITE>>(
     s: SUITE,
     a: &DKS,
     b: &DKS,
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>, DSSError> {
     let mut h = s.hash();
     for p in a.commitments() {
-        p.marshal_to(&mut h)?;
+        p.marshal_to(&mut h)
+            .map_err(SignatureError::MarshallingError)?;
     }
 
     for p in b.commitments() {
-        p.marshal_to(&mut h)?;
+        p.marshal_to(&mut h)
+            .map_err(SignatureError::MarshallingError)?;
     }
 
     Ok(h.finalize().to_vec())
+}
+
+#[derive(Error, Debug)]
+pub enum DSSError {
+    #[error("signature error")]
+    SignatureError(#[from] SignatureError),
+    #[error("public key not found in the list of participants")]
+    PublicKeyNotInParticipants,
+    #[error("invalid index")]
+    InvalidIndex,
+    #[error("not enough partial signature to sign")]
+    NotEnoughPartials,
+    #[error("could not recover secret")]
+    RecoverSecretError(PolyError),
+    #[error("could not hash partial signature")]
+    PartialSignatureHash(PolyError),
+    #[error("session id do not match")]
+    InvalidSessionId,
+    #[error("partial signature already received from peer")]
+    PartialAlreadyReceived,
+    #[error("partial signature not valid")]
+    InvalidPartialSignature,
 }

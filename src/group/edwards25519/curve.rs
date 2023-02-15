@@ -1,15 +1,17 @@
+use crate::cipher::StreamError;
 use crate::dh::Dh;
 use crate::group::edwards25519::Point;
 use crate::group::edwards25519::Scalar;
 use crate::group::Group;
 use crate::util::key::Generator;
+use crate::util::key::KeyError;
 use crate::util::random;
-use anyhow::Result;
 
 use serde::Deserialize;
 use serde::Serialize;
 use sha2::Sha256;
 use sha2::{Digest, Sha512};
+use thiserror::Error;
 
 /// Curve represents the Ed25519 group.
 /// There are no parameters and no initialization is required
@@ -87,7 +89,7 @@ impl Curve {
     pub fn new_key_and_seed<S: crate::cipher::Stream>(
         self,
         stream: &mut S,
-    ) -> Result<(Scalar, Vec<u8>, Vec<u8>)> {
+    ) -> Result<(Scalar, Vec<u8>, Vec<u8>), CurveError> {
         let mut buffer = vec![0u8; 32];
         random::bytes(&mut buffer, stream)?;
         let (sc, buff, digest) = self.new_key_and_seed_with_input(&buffer);
@@ -99,7 +101,10 @@ impl Curve {
 impl Generator<Scalar> for Curve {
     /// NewKey returns a formatted Ed25519 key (avoiding subgroup attack by requiring
     /// it to be a multiple of 8). NewKey implements the kyber/util/key.Generator interface.
-    fn new_key<S: crate::cipher::Stream>(&self, stream: &mut S) -> Result<Option<Scalar>> {
+    fn new_key<S: crate::cipher::Stream>(
+        &self,
+        stream: &mut S,
+    ) -> Result<Option<Scalar>, KeyError> {
         let (secret, _, _) = self.new_key_and_seed(stream)?;
         Ok(Some(secret))
     }
@@ -109,4 +114,10 @@ impl Default for Curve {
     fn default() -> Self {
         Curve::new()
     }
+}
+
+#[derive(Error, Debug)]
+pub enum CurveError {
+    #[error("stream error")]
+    StreamError(#[from] StreamError),
 }

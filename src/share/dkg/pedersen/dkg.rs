@@ -7,6 +7,7 @@ use crate::{
     group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
     share::{
         self,
+        dkg::DKGError,
         vss::{self, suite::Suite},
     },
     sign::schnorr,
@@ -15,8 +16,6 @@ use crate::{
 };
 
 use super::structs::{Deal, DistKeyShare, Justification, Response};
-
-use anyhow::{bail, Result};
 
 /// Package dkg implements a general distributed key generation (DKG) framework.
 /// This package serves two functionalities: (1) to run a fresh new DKG from
@@ -183,13 +182,13 @@ impl<SUITE: Suite, READ: Read + Clone> Default for DistKeyGenerator<SUITE, READ>
 /// to drive the DKG or resharing protocol.
 pub fn new_dist_key_handler<SUITE: Suite, READ: Read + Clone + 'static>(
     mut c: Config<SUITE, READ>,
-) -> Result<DistKeyGenerator<SUITE, READ>>
+) -> Result<DistKeyGenerator<SUITE, READ>, DKGError>
 where
     SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
     <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
 {
     if c.new_nodes.is_empty() && c.old_nodes.is_empty() {
-        bail!("dkg: can't run with empty node list")
+        return Err(DKGError::EmptyNodeList);
     }
 
     let mut is_resharing = false;
@@ -198,10 +197,10 @@ where
     }
     if is_resharing {
         if c.old_nodes.is_empty() {
-            bail!("dkg: resharing config needs old nodes list");
+            return Err(DKGError::ReshareMissingOldNodes);
         }
         if c.old_threshold == 0 {
-            bail!("dkg: resharing case needs old threshold field");
+            return Err(DKGError::ReshareMissingOldThreshold);
         }
     }
     // canReceive is true by default since in the default DKG mode everyone
@@ -211,7 +210,7 @@ where
     let (mut oidx, mut old_present) = find_pub(&c.old_nodes, &pubb);
     let (nidx, new_present) = find_pub(&c.new_nodes, &pubb);
     if !old_present && !new_present {
-        bail!("dkg: public key not found in old list or new list");
+        return Err(DKGError::PublicKeyNotFound);
     }
 
     let new_threshold = if c.threshold != 0 {
@@ -271,7 +270,7 @@ where
         can_receive = false;
     } else if is_resharing && new_present {
         if c.public_coeffs.is_none() && c.share.is_none() {
-            bail!("dkg: can't receive new shares without the public polynomial")
+            return Err(DKGError::NoPublicPolys);
         } else if c.public_coeffs.is_some() {
             dpub = share::poly::PubPoly::new(
                 &c.suite,
@@ -331,7 +330,7 @@ pub fn new_dist_key_generator<SUITE: Suite, READ: Read + Clone + 'static>(
     longterm: <SUITE::POINT as Point>::SCALAR,
     participants: &[SUITE::POINT],
     t: usize,
-) -> Result<DistKeyGenerator<SUITE, READ>>
+) -> Result<DistKeyGenerator<SUITE, READ>, DKGError>
 where
     SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
     <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
@@ -368,7 +367,7 @@ where
     /// If this method cannot process its own Deal, that indicates a
     /// severe problem with the configuration or implementation and
     /// results in a panic.
-    pub fn deals(&mut self) -> Result<HashMap<usize, Deal<SUITE::POINT>>> {
+    pub fn deals(&mut self) -> Result<HashMap<usize, Deal<SUITE::POINT>>, DKGError> {
         if !self.can_issue {
             // We do not hold a share, so we cannot make a deal, so
             // return an empty map and no error. This makes callers not
@@ -396,11 +395,14 @@ where
                 }
                 self.processed = true;
                 let resp = self.process_deal(&distd);
-                if resp.is_err() {
-                    panic!("dkg: cannot process own deal: ")
-                } else if resp.unwrap().response.status != vss::pedersen::vss::STATUS_APPROVAL {
-                    panic!("dkg: own deal gave a complaint")
-                }
+                match resp {
+                    Ok(r) => {
+                        if r.response.status != vss::pedersen::vss::STATUS_APPROVAL {
+                            return Err(DKGError::OwnDealComplaint);
+                        }
+                    }
+                    Err(e) => return Err(DKGError::CannotProcessOwnDeal(e.to_string())),
+                };
                 continue;
             }
             dd.insert(i, distd);
@@ -412,9 +414,9 @@ where
     /// returns a Response to broadcast to every other participant, including the old
     /// participants. It returns an error in case the deal has already been stored,
     /// or if the deal is incorrect (see vss.Verifier.ProcessEncryptedDeal).
-    pub fn process_deal(&mut self, dd: &Deal<SUITE::POINT>) -> Result<Response> {
+    pub fn process_deal(&mut self, dd: &Deal<SUITE::POINT>) -> Result<Response, DKGError> {
         if !self.new_present {
-            bail!("dkg: unexpected deal for unlisted dealer in new list")
+            return Err(DKGError::DistDealFromUnlistedDealer);
         }
         let pubb;
         let ok;
@@ -425,7 +427,7 @@ where
         }
         // public key of the dealer
         if !ok {
-            bail!("dkg: dist deal out of bounds index")
+            return Err(DKGError::DistDealIndexOutOfBounds);
         }
 
         // verify signature
@@ -506,15 +508,21 @@ where
     /// and returns nil with a possible error regarding the validity of the response.
     /// If the response designates a deal this dkg has issued, then the dkg will process
     /// the response, and returns a justification.
-    pub fn process_response(&mut self, resp: &Response) -> Result<Option<Justification<SUITE>>> {
+    pub fn process_response(
+        &mut self,
+        resp: &Response,
+    ) -> Result<Option<Justification<SUITE>>, DKGError> {
         if self.is_resharing && self.can_issue && !self.new_present {
             return self.process_resharing_response(resp);
         }
 
         if !self.verifiers.contains_key(&resp.index) {
-            bail!("dkg: responses received for unknown dealer {}", resp.index)
+            return Err(DKGError::ResponseFromUnknownDealer);
         }
-        let v = self.verifiers.get_mut(&resp.index).unwrap();
+        let v = match self.verifiers.get_mut(&resp.index) {
+            Some(v) => v,
+            None => return Err(DKGError::MissingVerifier),
+        };
         v.process_response(&resp.response)?;
 
         let my_idx = self.oidx as u32;
@@ -543,7 +551,7 @@ where
     fn process_resharing_response(
         &mut self,
         resp: &Response,
-    ) -> Result<Option<Justification<SUITE>>> {
+    ) -> Result<Option<Justification<SUITE>>, DKGError> {
         let agg = match self.old_aggregators.contains_key(&resp.index) {
             true => self.old_aggregators.get_mut(&resp.index).unwrap(),
             false => {
@@ -582,12 +590,15 @@ where
 
     /// ProcessJustification takes a justification and validates it. It returns an
     /// error in case the justification is wrong.
-    pub fn process_justification(&mut self, j: &Justification<SUITE>) -> Result<()> {
+    pub fn process_justification(&mut self, j: &Justification<SUITE>) -> Result<(), DKGError> {
         if !self.verifiers.contains_key(&j.index) {
-            bail!("dkg: Justification received but no deal for it")
+            return Err(DKGError::JustificationWithoutDeal);
         }
-        let v = self.verifiers.get_mut(&j.index).unwrap();
-        v.process_justification(&j.justification)
+        let v = match self.verifiers.get_mut(&j.index) {
+            Some(v) => v,
+            None => return Err(DKGError::MissingVerifier),
+        };
+        Ok(v.process_justification(&j.justification)?)
     }
 
     /// SetTimeout triggers the timeout on all verifiers, and thus makes sure
@@ -783,12 +794,12 @@ where
     /// of all aggregated individual public commits of each individual secrets.
     /// The share is evaluated from the global Private Polynomial, basically SUM of
     /// fj(i) for a receiver i.
-    pub fn dist_key_share(&self) -> Result<DistKeyShare<SUITE>> {
+    pub fn dist_key_share(&self) -> Result<DistKeyShare<SUITE>, DKGError> {
         if !self.threshold_certified() {
-            bail!("dkg: distributed key not certified")
+            return Err(DKGError::DistributedKeyNotCertified);
         }
         if !self.can_receive {
-            bail!("dkg: should not expect to compute any dist. share")
+            return Err(DKGError::ShouldReceive);
         }
 
         if self.is_resharing {
@@ -798,17 +809,17 @@ where
         self.dkg_key()
     }
 
-    fn dkg_key(&self) -> Result<DistKeyShare<SUITE>> {
+    fn dkg_key(&self) -> Result<DistKeyShare<SUITE>, DKGError> {
         let mut sh = self.suite.scalar().zero();
         let mut pubb: Option<share::poly::PubPoly<SUITE>> = None;
         // TODO: fix this weird error management
-        let mut error: Option<anyhow::Error> = None;
+        let mut error: Option<DKGError> = None;
         self.qual_iter(|_i, v| {
             // share of dist. secret = sum of all share received.
             let (s, deal) = match v.deal() {
                 Some(deal) => (deal.clone().sec_share.v, deal),
                 None => {
-                    error = Some(anyhow::Error::msg("dkg: deals not found"));
+                    error = Some(DKGError::DealsNotFound);
                     return false;
                 }
             };
@@ -823,7 +834,7 @@ where
             match &pubb {
                 Some(pubb_val) => match pubb_val.add(&poly) {
                     Ok(res) => pubb = Some(res),
-                    Err(e) => error = Some(e),
+                    Err(e) => error = Some(DKGError::PolyError(e)),
                 },
                 None => {
                     // first polynomial we see (instead of generating n empty commits)
@@ -849,7 +860,7 @@ where
         })
     }
 
-    fn resharing_key(&self) -> Result<DistKeyShare<SUITE>> {
+    fn resharing_key(&self) -> Result<DistKeyShare<SUITE>, DKGError> {
         let cap = self.verifiers.len();
         // only old nodes sends shares
         let mut shares = Vec::with_capacity(cap);
@@ -865,7 +876,7 @@ where
             let mut deal = match v.deal() {
                 Some(deal) => deal,
                 None => {
-                    error = Some(anyhow::Error::msg("dkg: deals not found"));
+                    error = Some(DKGError::DealsNotFound);
                     return false;
                 }
             };
@@ -924,7 +935,7 @@ where
         let pub_poly = share::poly::PubPoly::new(&self.suite, None, &final_coeffs);
 
         if !pub_poly.check(&private_share) {
-            bail!("dkg: share do not correspond to public polynomial ><");
+            return Err(DKGError::ShareDoesNotMatchPublicPoly);
         }
         Ok(DistKeyShare {
             commits: final_coeffs,
@@ -938,14 +949,14 @@ where
         &self.verifiers
     }
 
-    fn init_verifiers(&mut self, c: Config<SUITE, READ>) -> Result<()> {
+    fn init_verifiers(&mut self, c: Config<SUITE, READ>) -> Result<(), DKGError> {
         let mut already_taken = HashMap::new();
         let verifier_list = c.new_nodes;
         let dealer_list = c.old_nodes;
         let mut verifiers = HashMap::new();
         for (i, pubb) in dealer_list.iter().enumerate() {
             if already_taken.contains_key(&pubb.to_string()) {
-                bail!("duplicate public key in NewNodes list")
+                return Err(DKGError::DuplicatePublicKeyInNewList);
             }
             already_taken.insert(pubb.to_string(), true);
             let mut ver =
@@ -962,18 +973,22 @@ where
 
 impl<SUITE: Suite> DistKeyShare<SUITE> {
     /// Renew adds the new distributed key share g (with secret 0) to the distributed key share d.
-    pub fn renew(&self, suite: SUITE, g: DistKeyShare<SUITE>) -> Result<DistKeyShare<SUITE>> {
+    pub fn renew(
+        &self,
+        suite: SUITE,
+        g: DistKeyShare<SUITE>,
+    ) -> Result<DistKeyShare<SUITE>, DKGError> {
         // Check G(0) = 0*G.
         if !g
             .public()
             .equal(&suite.point().base().mul(&suite.scalar().zero(), None))
         {
-            bail!("wrong renewal function")
+            return Err(DKGError::WrongRenewal);
         }
 
         // Check whether they have the same index
         if self.share.i != g.share.i {
-            bail!("not the same party")
+            return Err(DKGError::DifferentParty);
         }
 
         let new_share = self.share.v.clone() + g.share.v;
