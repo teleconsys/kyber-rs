@@ -136,7 +136,7 @@ impl Random for SuiteEd25519 {
 impl XOFFactory for SuiteEd25519 {
     /// xof returns an XOF which is implemented via the Blake2b hash.
     fn xof(&self, key: Option<&[u8]>) -> Box<dyn crate::XOF> {
-        Box::new(xof::blake::Xof::new(key))
+        Box::new(xof::blake3::Xof::new(key))
     }
 }
 

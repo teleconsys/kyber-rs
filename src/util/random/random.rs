@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     cipher::{cipher::Stream, StreamError},
-    xof::blake::Xof,
+    xof::blake3::Xof,
 };
 
 /// bits chooses a uniform random BigInt with a given maximum BitLen.

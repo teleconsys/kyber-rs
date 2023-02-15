@@ -1,4 +1,4 @@
-use crate::xof::blake;
+use crate::xof::blake3;
 use crate::xof::xof::{XOFFactory, XOF};
 
 struct BlakeF {}
@@ -6,16 +6,7 @@ struct BlakeF {}
 impl XOFFactory for BlakeF {
     fn xof(&self, seed: Option<&[u8]>) -> Box<dyn XOF> {
         // return blake2xb.New(seed)
-        Box::new(blake::Xof::new(seed))
-    }
-}
-
-struct KeccakF {}
-
-impl XOFFactory for KeccakF {
-    fn xof(&self, _seed: Option<&[u8]>) -> Box<dyn XOF> {
-        todo!()
-        // return keccak.New(seed);
+        Box::new(blake3::Xof::new(seed))
     }
 }
 

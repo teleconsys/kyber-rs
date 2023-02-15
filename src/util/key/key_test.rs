@@ -64,7 +64,7 @@ impl Random for FixedPrivSuiteEd25519 {
 
 impl XOFFactory for FixedPrivSuiteEd25519 {
     fn xof(&self, key: Option<&[u8]>) -> Box<dyn crate::XOF> {
-        Box::new(xof::blake::Xof::new(key))
+        Box::new(xof::blake3::Xof::new(key))
     }
 }
 

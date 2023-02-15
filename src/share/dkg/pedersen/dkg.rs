@@ -832,7 +832,6 @@ where
                 &deal.commitments,
             );
             match &pubb {
-                // TODO fix this error management
                 Some(pubb_val) => match pubb_val.add(&poly) {
                     Ok(res) => pubb = Some(res),
                     Err(e) => error = Some(DKGError::PolyError(e)),

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::xof::blake::XOFError;
+use crate::xof::blake3::XOFError;
 
 /// A Stream represents a stream cipher.
 pub trait Stream {
