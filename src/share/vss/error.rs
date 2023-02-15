@@ -1,10 +1,7 @@
 use thiserror::Error;
 
 use crate::{
-    dh::DhError,
-    encoding::MarshallingError,
-    share::poly::PolyError,
-    sign::error::SignatureError,
+    dh::DhError, encoding::MarshallingError, share::poly::PolyError, sign::error::SignatureError,
 };
 
 #[derive(Debug, Error)]
@@ -61,6 +58,4 @@ pub enum VSSError {
     JustificationForApproval,
     #[error("all deals need to have same session id")]
     DealsSameID,
-    
-    
 }

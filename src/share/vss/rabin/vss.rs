@@ -610,7 +610,7 @@ where
     pub fn process_justification(&mut self, dr: &Justification<SUITE>) -> Result<(), VSSError> {
         match &mut self.aggregator {
             Some(a) => a.verify_justification(dr),
-            None => Err(VSSError::MissingAggregator)
+            None => Err(VSSError::MissingAggregator),
         }
     }
 
@@ -779,18 +779,18 @@ where
     fn verify_justification(&mut self, j: &Justification<SUITE>) -> Result<(), VSSError> {
         let pubb = find_pub(&self.verifiers, j.index as usize);
         if pubb.is_none() {
-            return Err(VSSError::JustificationIndexOutOfBounds)
+            return Err(VSSError::JustificationIndexOutOfBounds);
         }
 
         if !self.responses.contains_key(&j.index) {
-            return Err(VSSError::JustificationNoComplaints)
+            return Err(VSSError::JustificationNoComplaints);
         }
 
         // clone the resp here
         let mut r = self.responses[&j.index].clone();
 
         if r.approved {
-            return Err(VSSError::JustificationForApproval)
+            return Err(VSSError::JustificationForApproval);
         }
 
         let verification = self.verify_deal(&j.deal, false);
@@ -924,7 +924,7 @@ pub fn recover_secret<SUITE: Suite>(
         if deal.session_id == deals[0].session_id {
             shares.push(Some(deal.sec_share.clone()));
         } else {
-            return Err(VSSError::DealsSameID)
+            return Err(VSSError::DealsSameID);
         }
     }
     Ok(poly::recover_secret(suite, &shares, t, n)?)

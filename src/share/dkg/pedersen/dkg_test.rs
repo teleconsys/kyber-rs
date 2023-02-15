@@ -11,6 +11,7 @@ use crate::{
     },
     share::{
         self,
+        dkg::DKGError,
         vss::{self, suite::Suite},
     },
     Group, Point, Random, Scalar,
@@ -86,10 +87,10 @@ fn test_dkg_new_dist_key_generator() {
 
     let dkg_res =
         new_dist_key_generator::<SuiteEd25519, &'static [u8]>(suite(), sec, &[], *DEFAULT_T);
-    assert_eq!(
-        dkg_res.err().unwrap().to_string(),
-        "dkg: can't run with empty node list"
-    );
+    if let Err(DKGError::EmptyNodeList) = dkg_res {
+    } else {
+        panic!("node list should be empty")
+    }
 }
 
 #[test]

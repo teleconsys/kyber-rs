@@ -209,7 +209,7 @@ pub fn new_dealer<SUITE: Suite>(
     t: usize,
 ) -> Result<Dealer<SUITE>, VSSError> {
     if !valid_t(t, verifiers) {
-        return Err(VSSError::InvalidThreshold(format!("dealer: t {t} invalid")))
+        return Err(VSSError::InvalidThreshold(format!("dealer: t {t} invalid")));
     }
     // 	d.t = t
 
@@ -262,7 +262,7 @@ where
     /// Use this only for testing.
     pub fn plaintext_deal(&mut self, i: usize) -> Result<&mut Deal<SUITE>, VSSError> {
         if i >= self.deals.len() {
-            return Err(VSSError::DealerWrongIndex)
+            return Err(VSSError::DealerWrongIndex);
         }
         let d = &mut self.deals[i];
         Ok(d)
@@ -276,8 +276,7 @@ where
     /// This shared key is then fed into a HKDF whose output is the key to a AEAD
     /// (AES256-GCM) scheme to encrypt the deal.
     pub fn encrypted_deal(&self, i: usize) -> Result<EncryptedDeal<SUITE::POINT>, VSSError> {
-        let v_pub = find_pub(&self.verifiers, i)
-            .ok_or(VSSError::DealerWrongIndex)?;
+        let v_pub = find_pub(&self.verifiers, i).ok_or(VSSError::DealerWrongIndex)?;
         // gen ephemeral key
         let dh_secret = self.suite.scalar().pick(&mut self.suite.random_stream());
         let dh_public = self.suite.point().mul(&dh_secret, None);
@@ -425,7 +424,7 @@ pub fn new_verifier<SUITE: Suite>(
         }
     }
     if !ok {
-        return Err(VSSError::PublicKeyNotFound)
+        return Err(VSSError::PublicKeyNotFound);
     }
     let c = context(suite, dealer_key, verifiers);
     Ok(Verifier {
@@ -474,7 +473,7 @@ where
     ) -> Result<Response, VSSError> {
         let d = self.decrypt_deal(e)?;
         if d.sec_share.i != self.index {
-            return Err(VSSError::DealWrongIndex)
+            return Err(VSSError::DealWrongIndex);
         }
 
         let t = d.t;
@@ -632,7 +631,7 @@ pub fn recover_secret<SUITE: Suite>(
         if deal.session_id == deals[0].session_id {
             shares.push(Some(deal.sec_share.clone()));
         } else {
-            return Err(VSSError::DealsSameID)
+            return Err(VSSError::DealsSameID);
         }
     }
     Ok(share::poly::recover_secret(suite, &shares, t, n)?)
@@ -811,12 +810,12 @@ where
 
     pub fn verify_response(&mut self, r: &Response) -> Result<(), VSSError> {
         if !self.sid.is_empty() && r.session_id != self.sid {
-            return Err(VSSError::ResponseInconsistentSessionId)
+            return Err(VSSError::ResponseInconsistentSessionId);
         }
 
         let public = find_pub(&self.verifiers, r.index as usize);
         if public.is_none() {
-            return Err(VSSError::ResponseIndexOutOfBounds)
+            return Err(VSSError::ResponseIndexOutOfBounds);
         }
 
         let msg = r.hash(&self.suite)?;
@@ -829,18 +828,18 @@ where
     fn verify_justification(&mut self, j: &Justification<SUITE>) -> Result<(), VSSError> {
         let pubb = find_pub(&self.verifiers, j.index as usize);
         if pubb.is_none() {
-            return Err(VSSError::JustificationIndexOutOfBounds)
+            return Err(VSSError::JustificationIndexOutOfBounds);
         }
 
         if !self.responses.contains_key(&j.index) {
-            return Err(VSSError::JustificationNoComplaints)
+            return Err(VSSError::JustificationNoComplaints);
         }
 
         // clone the resp here
         let mut r = self.responses[&j.index].clone();
 
         if r.status != STATUS_COMPLAINT {
-            return Err(VSSError::JustificationForApproval)
+            return Err(VSSError::JustificationForApproval);
         }
 
         match self.verify_deal(&j.deal, false) {
@@ -848,7 +847,7 @@ where
             Err(err) => {
                 // if one justification is bad, then flag the dealer as malicious
                 self.bad_dealer = true;
-                return Err(err)
+                return Err(err);
             }
         }
         Ok(())
@@ -856,10 +855,10 @@ where
 
     pub fn add_response(&mut self, r: &Response) -> Result<(), VSSError> {
         if find_pub(&self.verifiers, r.index as usize).is_none() {
-            return Err(VSSError::ComplaintIndexOutOfBounds)
+            return Err(VSSError::ComplaintIndexOutOfBounds);
         }
         if self.responses.get(&r.index).is_some() {
-            return Err(VSSError::ResponseAlreadyExisting)
+            return Err(VSSError::ResponseAlreadyExisting);
         }
         self.responses.insert(r.index, r.clone());
         Ok(())
