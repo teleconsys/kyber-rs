@@ -35,6 +35,7 @@ use crate::encoding::{self, unmarshal_binary, BinaryMarshaler, Marshaling, Marsh
 use crate::group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical};
 use crate::share::poly::{self, new_pri_poly, PriShare, PubPoly};
 use crate::share::vss::suite::Suite;
+use crate::share::vss::VSSError;
 use crate::sign::schnorr;
 use crate::Point;
 use crate::Scalar;
@@ -127,7 +128,7 @@ impl<SUITE: Suite> Default for Deal<SUITE> {
 }
 
 impl<SUITE: Suite> Deal<SUITE> {
-    fn decode(buff: &[u8]) -> anyhow::Result<Deal<SUITE>> {
+    fn decode(buff: &[u8]) -> Result<Deal<SUITE>, VSSError> {
         let mut d = Deal::default();
         unmarshal_binary(&mut d, buff)?;
         Ok(d)
@@ -179,7 +180,7 @@ pub struct Response {
 
 impl Response {
     /// Hash returns the Hash representation of the Response
-    pub fn hash<SUITE: Suite>(&self, s: &SUITE) -> anyhow::Result<Vec<u8>> {
+    pub fn hash<SUITE: Suite>(&self, s: &SUITE) -> Result<Vec<u8>, VSSError> {
         let mut h = s.hash();
         h.write_all("response".as_bytes())?;
         h.write_all(&self.session_id)?;
@@ -206,7 +207,7 @@ pub struct Justification<SUITE: Suite> {
 
 impl<SUITE: Suite> Justification<SUITE> {
     /// Hash returns the hash of a Justification.
-    fn hash(self, s: SUITE) -> anyhow::Result<Vec<u8>> {
+    fn hash(self, s: SUITE) -> Result<Vec<u8>, VSSError> {
         let mut h = s.hash();
         h.update("justification".as_bytes());
         h.update(&self.session_id);
@@ -231,9 +232,9 @@ pub fn new_dealer<SUITE: Suite>(
     secret: <SUITE::POINT as Point>::SCALAR,
     verifiers: &[SUITE::POINT],
     t: usize,
-) -> anyhow::Result<Dealer<SUITE>> {
+) -> Result<Dealer<SUITE>, VSSError> {
     if !valid_t(t, verifiers) {
-        anyhow::bail!("dealer: t {} invalid", t);
+        return Err(VSSError::InvalidThreshold(format!("dealer: t {t} invalid")));
     }
 
     let h = derive_h(suite, verifiers);
@@ -290,9 +291,9 @@ where
 {
     /// PlaintextDeal returns the plaintext version of the deal destined for peer i.
     /// Use this only for testing.
-    pub fn plaintext_deal(&mut self, i: usize) -> anyhow::Result<&mut Deal<SUITE>> {
+    pub fn plaintext_deal(&mut self, i: usize) -> Result<&mut Deal<SUITE>, VSSError> {
         if i >= self.deals.len() {
-            anyhow::bail!("dealer: PlaintextDeal given wrong index");
+            return Err(VSSError::DealerWrongIndex);
         }
         let d = &mut self.deals[i];
         Ok(d)
@@ -305,9 +306,8 @@ where
     /// ephemeral key and the verifier's public key.
     /// This shared key is then fed into a HKDF whose output is the key to a AEAD
     /// (AES256-GCM) scheme to encrypt the deal.
-    pub fn encrypted_deal(&self, i: usize) -> anyhow::Result<EncryptedDeal<SUITE::POINT>> {
-        let v_pub = find_pub(&self.verifiers, i)
-            .ok_or_else(|| anyhow::Error::msg("dealer: wrong index to generate encrypted deal"))?;
+    pub fn encrypted_deal(&self, i: usize) -> Result<EncryptedDeal<SUITE::POINT>, VSSError> {
+        let v_pub = find_pub(&self.verifiers, i).ok_or(VSSError::DealerWrongIndex)?;
         // gen ephemeral key
         let dh_secret = self.suite.scalar().pick(&mut self.suite.random_stream());
         let dh_public = self.suite.point().mul(&dh_secret, None);
@@ -334,7 +334,7 @@ where
     /// encrypted_deals calls `EncryptedDeal` for each index of the verifier and
     /// returns the list of encrypted deals. Each index in the returned slice
     /// corresponds to the index in the list of verifiers.
-    pub fn encrypted_deals(&self) -> anyhow::Result<Vec<EncryptedDeal<SUITE::POINT>>> {
+    pub fn encrypted_deals(&self) -> Result<Vec<EncryptedDeal<SUITE::POINT>>, VSSError> {
         // deals := make([]*EncryptedDeal, len(d.verifiers));
         let mut deals = vec![];
         // var err error
@@ -352,7 +352,7 @@ where
     pub fn process_response(
         &mut self,
         r: &Response,
-    ) -> anyhow::Result<Option<Justification<SUITE>>> {
+    ) -> Result<Option<Justification<SUITE>>, VSSError> {
         self.aggregator.verify_response(r)?;
 
         if r.approved {
@@ -445,7 +445,7 @@ pub fn new_verifier<SUITE: Suite>(
     longterm: &<SUITE::POINT as Point>::SCALAR,
     dealer_key: &SUITE::POINT,
     verifiers: &[SUITE::POINT],
-) -> anyhow::Result<Verifier<SUITE>> {
+) -> Result<Verifier<SUITE>, VSSError> {
     let pubb = suite.point().mul(longterm, None);
     let mut ok = false;
     let mut index = 0;
@@ -457,7 +457,7 @@ pub fn new_verifier<SUITE: Suite>(
         }
     }
     if !ok {
-        anyhow::bail!("vss: public key not found in the list of verifiers");
+        return Err(VSSError::PublicKeyNotFound);
     }
     let c = context(suite, dealer_key, verifiers);
     Ok(Verifier {
@@ -503,10 +503,10 @@ where
     pub fn process_encrypted_deal(
         &mut self,
         e: &EncryptedDeal<SUITE::POINT>,
-    ) -> anyhow::Result<Response> {
+    ) -> Result<Response, VSSError> {
         let d = self.decrypt_deal(e)?;
         if d.sec_share.i != self.index {
-            anyhow::bail!("vss: verifier got wrong index from deal");
+            return Err(VSSError::DealWrongIndex);
         }
 
         let t = d.t;
@@ -536,17 +536,14 @@ where
             approved: true,
             ..Default::default()
         };
-        let result = self.verify_deal(&d, true);
 
-        if let Err(err) = result {
-            r.approved = false;
-            // TODO: manage error
-            match err {
-                VerifyDealError::DealAlreadyProcessedError => anyhow::bail!(err),
-                VerifyDealError::TextError(e) => {
-                    if !e.eq("vss: share does not verify against commitments in Deal") {
-                        anyhow::bail!(e)
-                    }
+        match self.verify_deal(&d, true) {
+            Ok(_) => (),
+            Err(e) => {
+                r.approved = false;
+                if let VSSError::DealDoesNotVerify = e {
+                } else {
+                    return Err(e);
                 }
             }
         }
@@ -561,7 +558,7 @@ where
         Ok(r)
     }
 
-    pub fn decrypt_deal(&self, e: &EncryptedDeal<SUITE::POINT>) -> anyhow::Result<Deal<SUITE>> {
+    pub fn decrypt_deal(&self, e: &EncryptedDeal<SUITE::POINT>) -> Result<Deal<SUITE>, VSSError> {
         let eph_buff = e.dhkey.marshal_binary()?;
         // verify signature
         schnorr::verify(
@@ -587,10 +584,10 @@ where
     /// verifier should expect to see a Justification from the Dealer. It returns an
     /// error if it's not a valid response.
     /// Call `v.DealCertified()` to check if the whole protocol is finished.
-    pub fn process_response(&mut self, resp: &Response) -> anyhow::Result<()> {
+    pub fn process_response(&mut self, resp: &Response) -> Result<(), VSSError> {
         match &mut self.aggregator {
             Some(aggregator) => aggregator.verify_response(resp),
-            None => anyhow::bail!("no aggregator for verifier"),
+            None => Err(VSSError::NoAggregatorForVerifier),
         }
     }
 
@@ -610,10 +607,10 @@ where
     /// something went wrong during the verification. If it is the case, that
     /// probably means the Dealer is acting maliciously. In order to be sure, call
     /// `v.EnoughApprovals()` and if true, `v.DealCertified()`.
-    pub fn process_justification(&mut self, dr: &Justification<SUITE>) -> anyhow::Result<()> {
+    pub fn process_justification(&mut self, dr: &Justification<SUITE>) -> Result<(), VSSError> {
         match &mut self.aggregator {
             Some(a) => a.verify_justification(dr),
-            None => anyhow::bail!("missing aggregator"),
+            None => Err(VSSError::MissingAggregator)
         }
     }
 
@@ -698,32 +695,6 @@ fn new_aggregator<SUITE: Suite>(
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum VerifyDealError {
-    DealAlreadyProcessedError,
-    TextError(String),
-}
-
-impl fmt::Display for VerifyDealError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            VerifyDealError::DealAlreadyProcessedError => self.fmt(f),
-            VerifyDealError::TextError(t) => write!(f, "{}", t),
-        }
-    }
-}
-
-impl std::error::Error for VerifyDealError {}
-
-#[derive(Debug, Clone)]
-struct DealAlreadyProcessedError;
-
-impl fmt::Display for DealAlreadyProcessedError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "vss: verifier already received a deal")
-    }
-}
-
 impl<SUITE: Suite> Aggregator<SUITE>
 where
     SUITE::POINT: PointCanCheckCanonicalAndSmallOrder,
@@ -732,9 +703,9 @@ where
     /// verify_deal analyzes the deal and returns an error if it's incorrect. If
     /// inclusion is true, it also returns an error if it the second time this struct
     /// analyzes a Deal.
-    pub fn verify_deal(&mut self, d: &Deal<SUITE>, inclusion: bool) -> Result<(), VerifyDealError> {
+    pub fn verify_deal(&mut self, d: &Deal<SUITE>, inclusion: bool) -> Result<(), VSSError> {
         if self.deal.is_some() && inclusion {
-            return Err(VerifyDealError::DealAlreadyProcessedError);
+            return Err(VSSError::DealAlreadyProcessed);
         }
         if self.deal.is_none() {
             self.commits = d.commitments.clone();
@@ -743,28 +714,20 @@ where
         }
 
         if !valid_t(d.t, &self.verifiers) {
-            return Err(VerifyDealError::TextError(
-                "vss: invalid t received in Deal".to_string(),
-            ));
+            return Err(VSSError::DealInvalidThreshold);
         }
 
         if self.sid != d.session_id {
-            return Err(VerifyDealError::TextError(
-                "vss: find different sessionIDs from Deal".to_string(),
-            ));
+            return Err(VSSError::DealInvalidSessionId);
         }
 
         let fi = &d.sec_share;
         let gi = &d.rnd_share;
         if fi.i != gi.i {
-            return Err(VerifyDealError::TextError(
-                "vss: not the same index for f and g share in Deal".to_string(),
-            ));
+            return Err(VSSError::DealInconsistentIndex);
         }
         if fi.i >= self.verifiers.len() {
-            return Err(VerifyDealError::TextError(
-                "vss: index out of bounds in Deal".to_string(),
-            ));
+            return Err(VSSError::DealIndexOutOfBounds);
         }
         // compute fi * G + gi * H
         let fig = self.suite.point().base().mul(&fi.v, None);
@@ -776,11 +739,9 @@ where
 
         let pub_share = commit_poly.eval(fi.i);
         if ci != pub_share.v {
-            return Err(VerifyDealError::TextError(
-                "vss: share does not verify against commitments in Deal".to_string(),
-            ));
+            return Err(VSSError::DealDoesNotVerify);
         }
-        Result::Ok(())
+        Ok(())
     }
 
     /// cleanVerifiers checks the aggregator's response array and creates a StatusComplaint
@@ -798,14 +759,14 @@ where
         }
     }
 
-    pub fn verify_response(&mut self, r: &Response) -> anyhow::Result<()> {
+    pub fn verify_response(&mut self, r: &Response) -> Result<(), VSSError> {
         if r.session_id != self.sid {
-            anyhow::bail!("vss: receiving inconsistent sessionID in response")
+            return Err(VSSError::ResponseInconsistentSessionId);
         }
 
         let public = find_pub(&self.verifiers, r.index as usize);
         if public.is_none() {
-            anyhow::bail!("vss: index out of bounds in response")
+            return Err(VSSError::ResponseIndexOutOfBounds);
         }
 
         let msg = r.hash(&self.suite)?;
@@ -815,21 +776,21 @@ where
         self.add_response(r)
     }
 
-    fn verify_justification(&mut self, j: &Justification<SUITE>) -> anyhow::Result<()> {
+    fn verify_justification(&mut self, j: &Justification<SUITE>) -> Result<(), VSSError> {
         let pubb = find_pub(&self.verifiers, j.index as usize);
         if pubb.is_none() {
-            anyhow::bail!("vss: index out of bounds in justification")
+            return Err(VSSError::JustificationIndexOutOfBounds)
         }
 
         if !self.responses.contains_key(&j.index) {
-            anyhow::bail!("vss: no complaints received for this justification")
+            return Err(VSSError::JustificationNoComplaints)
         }
 
         // clone the resp here
         let mut r = self.responses[&j.index].clone();
 
         if r.approved {
-            anyhow::bail!("vss: justification received for an approval")
+            return Err(VSSError::JustificationForApproval)
         }
 
         let verification = self.verify_deal(&j.deal, false);
@@ -842,15 +803,15 @@ where
         // add the updated resp
         self.responses.insert(j.index, r);
 
-        verification.map_err(|e| anyhow::Error::msg(e.to_string()))
+        verification
     }
 
-    pub fn add_response(&mut self, r: &Response) -> anyhow::Result<()> {
+    pub fn add_response(&mut self, r: &Response) -> Result<(), VSSError> {
         if find_pub(&self.verifiers, r.index as usize).is_none() {
-            anyhow::bail!("vss: index out of bounds in Complaint");
+            return Err(VSSError::ComplaintIndexOutOfBounds);
         }
         if self.responses.get(&r.index).is_some() {
-            anyhow::bail!("vss: already existing response from same origin")
+            return Err(VSSError::ResponseAlreadyExisting);
         }
         self.responses.insert(r.index, r.clone());
         Ok(())
@@ -931,7 +892,7 @@ pub(crate) fn session_id<SUITE: Suite>(
     verifiers: &[SUITE::POINT],
     commitments: &[SUITE::POINT],
     t: usize,
-) -> anyhow::Result<Vec<u8>> {
+) -> Result<Vec<u8>, VSSError> {
     let mut h = suite.hash();
     dealer.marshal_to(&mut h)?;
 
@@ -956,18 +917,17 @@ pub fn recover_secret<SUITE: Suite>(
     deals: Vec<Deal<SUITE>>,
     n: usize,
     t: usize,
-) -> anyhow::Result<<SUITE::POINT as Point>::SCALAR> {
+) -> Result<<SUITE::POINT as Point>::SCALAR, VSSError> {
     let mut shares = Vec::with_capacity(deals.len());
     for deal in &deals {
         // all sids the same
         if deal.session_id == deals[0].session_id {
             shares.push(Some(deal.sec_share.clone()));
         } else {
-            anyhow::bail!("vss: all deals need to have same session id");
+            return Err(VSSError::DealsSameID)
         }
     }
-    // TODO fix this error management
-    poly::recover_secret(suite, &shares, t, n).map_err(|e| anyhow::Error::msg(""))
+    Ok(poly::recover_secret(suite, &shares, t, n)?)
 }
 
 // KEY_SIZE is arbitrary, make it long enough to seed the XOF

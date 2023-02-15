@@ -405,7 +405,8 @@ where
         }
 
         let v = self.verifiers.get_mut(&j.index).unwrap();
-        v.process_justification(&j.justification)
+        // TODO fix this error
+        v.process_justification(&j.justification).map_err(|e| anyhow::Error::msg("msg"))
     }
 
     /// SetTimeout triggers the timeout on all verifiers, and thus makes sure

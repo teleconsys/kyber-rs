@@ -10,7 +10,7 @@ use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, MarshallingError};
 use crate::group::edwards25519::{Curve, Point as EdPoint, Scalar as EdScalar};
 use crate::group::{PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical};
 use crate::sign::error::SignatureError;
-use crate::util::key::{Pair, KeyError};
+use crate::util::key::{KeyError, Pair};
 use crate::{Group, Point, Scalar};
 
 /// EdDSA is a structure holding the data necessary to make a series of

@@ -1,7 +1,7 @@
 /// Package ecies implements the Elliptic Curve Integrated Encryption Scheme (ECIES).
 // package ecies
 use crate::{
-    dh::{AEAD, NONCE_SIZE, DhError},
+    dh::{DhError, AEAD, NONCE_SIZE},
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling, MarshallingError},
     util::random::Randstream,
     Group, Point, Scalar,

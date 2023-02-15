@@ -587,7 +587,8 @@ where
             bail!("dkg: Justification received but no deal for it")
         }
         let v = self.verifiers.get_mut(&j.index).unwrap();
-        v.process_justification(&j.justification)
+        // TODO fix error management
+        v.process_justification(&j.justification).map_err(|e| anyhow::Error::msg(""))
     }
 
     /// SetTimeout triggers the timeout on all verifiers, and thus makes sure
