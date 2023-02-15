@@ -1,2 +1,2 @@
 mod xof;
-pub use xof::Xof;
+pub use xof::{XOFError, Xof};

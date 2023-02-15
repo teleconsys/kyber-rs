@@ -740,7 +740,8 @@ where
             }
             let poly = self.commitments.get(&i).unwrap();
             match &pubb {
-                Some(pubb_val) => match pubb_val.add(poly) {
+                    // TODO fix this error management
+                Some(pubb_val) => match pubb_val.add(poly).map_err(|e| anyhow::Error::msg("")) {
                     Ok(res) => pubb = Some(res),
                     Err(e) => error = Some(e),
                 },

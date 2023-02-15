@@ -8,9 +8,7 @@
 // Both schemes of this package are core building blocks for more advanced
 // secret sharing techniques.
 
-use anyhow::bail;
-use anyhow::Ok;
-use anyhow::Result;
+use thiserror::Error;
 use byteorder::LittleEndian;
 use byteorder::WriteBytesExt;
 use digest::Digest;
@@ -22,12 +20,10 @@ use std::vec;
 
 use crate::encoding::BinaryMarshaler;
 
+use crate::encoding::MarshallingError;
 use crate::group::HashFactory;
 use crate::{cipher::Stream, Group, Point, Scalar};
 
-// Some error definitions
-const ERROR_GROUPS: &str = "non-matching groups";
-const ERROR_COEFFS: &str = "different number of coefficients";
 
 /// PriShare represents a private share.
 #[derive(Clone, Serialize, Deserialize)]
@@ -49,7 +45,7 @@ impl<SCALAR: Scalar> Default for PriShare<SCALAR> {
 
 impl<SCALAR: Scalar> PriShare<SCALAR> {
     /// Hash returns the hash representation of this share
-    pub fn hash<HASHFACTORY: HashFactory>(&self, s: HASHFACTORY) -> Result<Vec<u8>> {
+    pub fn hash<HASHFACTORY: HashFactory>(&self, s: HASHFACTORY) -> Result<Vec<u8>, PolyError> {
         let mut h = s.hash();
         self.v.marshal_to(&mut h)?;
         h.write_u32::<LittleEndian>(self.i as u32)?;
@@ -147,12 +143,12 @@ impl<GROUP: Group> PriPoly<GROUP> {
 
     /// Add computes the component-wise sum of the polynomials p and q and returns it
     /// as a new polynomial.
-    pub fn add(&self, q: &PriPoly<GROUP>) -> Result<PriPoly<GROUP>> {
+    pub fn add(&self, q: &PriPoly<GROUP>) -> Result<PriPoly<GROUP>, PolyError> {
         if self.g.string() != q.g.string() {
-            return Err(anyhow::Error::msg("errorGroups"));
+            return Err(PolyError::NoGroupsMatch);
         }
         if self.threshold() != q.threshold() {
-            return Err(anyhow::Error::msg("errorCoeffs"));
+            return Err(PolyError::WrongCoefficientsNumber);
         }
         let mut coeffs = Vec::with_capacity(self.threshold());
         //coeffs := make([]kyber.Scalar, p.Threshold())
@@ -169,7 +165,7 @@ impl<GROUP: Group> PriPoly<GROUP> {
     /// unequal (e.g., due to mismatching cryptographic groups or polynomial size), this routine
     /// returns in variable time. Otherwise it runs in constant time regardless of whether it
     /// eventually returns true or false.
-    pub fn equal(&self, q: &PriPoly<GROUP>) -> Result<bool> {
+    pub fn equal(&self, q: &PriPoly<GROUP>) -> Result<bool, PolyError> {
         if self.g.string() != q.g.string() {
             return Ok(false);
         }
@@ -242,10 +238,10 @@ pub fn recover_secret<GROUP: Group>(
     shares: &[Option<PriShare<<GROUP::POINT as Point>::SCALAR>>],
     t: usize,
     n: usize,
-) -> Result<<GROUP::POINT as Point>::SCALAR> {
+) -> Result<<GROUP::POINT as Point>::SCALAR, PolyError> {
     let (x, y) = xy_scalar(&g, shares, t, n);
     if x.len() < t {
-        bail!("share: not enough shares to recover secret");
+        return Err(PolyError::NotEnoughSharesForSecret)
     }
 
     let mut acc = g.scalar().zero();
@@ -327,10 +323,10 @@ pub fn recover_pri_poly<GROUP: Group>(
     shares: &[Option<PriShare<<GROUP::POINT as Point>::SCALAR>>],
     t: usize,
     n: usize,
-) -> Result<PriPoly<GROUP>> {
+) -> Result<PriPoly<GROUP>, PolyError> {
     let (x, y) = xy_scalar(g, shares, t, n);
     if x.len() != t {
-        bail!("share: not enough shares to recover private polynomial");
+        return Err(PolyError::NotEnoughSharesForPublic)
     }
 
     let mut acc_poly = PriPoly {
@@ -377,7 +373,7 @@ pub struct PubShare<POINT: Point> {
 
 impl<POINT: Point> PubShare<POINT> {
     /// Hash returns the hash representation of this share
-    pub fn hash<HASHFACTORY: HashFactory>(&self, s: HASHFACTORY) -> Result<Vec<u8>> {
+    pub fn hash<HASHFACTORY: HashFactory>(&self, s: HASHFACTORY) -> Result<Vec<u8>, PolyError> {
         let mut h = s.hash();
         self.v.marshal_to(&mut h)?;
         h.write_u32::<LittleEndian>(self.i as u32)?;
@@ -463,13 +459,13 @@ impl<GROUP: Group> PubPoly<GROUP> {
     /// discrete logarithm between p.b and q.b. In this particular case, we are using
     /// p.b as a default value which of course does not correspond to the correct
     /// base point and thus should not be used in further computations.
-    pub fn add(&self, q: &Self) -> Result<Self> {
+    pub fn add(&self, q: &Self) -> Result<Self, PolyError> {
         if self.g.string() != q.g.string() {
-            bail!(ERROR_GROUPS);
+            return Err(PolyError::NoGroupsMatch)
         }
 
         if self.threshold() != q.threshold() {
-            bail!(ERROR_COEFFS);
+            return Err(PolyError::WrongCoefficientsNumber)
         }
 
         let mut commits = vec![];
@@ -488,7 +484,7 @@ impl<GROUP: Group> PubPoly<GROUP> {
     /// q are trivially unequal (e.g., due to mismatching cryptographic groups),
     /// this routine returns in variable time. Otherwise it runs in constant time
     /// regardless of whether it eventually returns true or false.
-    pub fn equal(&self, q: &PubPoly<GROUP>) -> Result<bool> {
+    pub fn equal(&self, q: &PubPoly<GROUP>) -> Result<bool, PolyError> {
         if self.g.string() != q.g.string() {
             return Ok(false);
         }
@@ -557,11 +553,11 @@ pub fn recover_commit<GROUP: Group>(
     shares: &[Option<PubShare<GROUP::POINT>>],
     t: usize,
     n: usize,
-) -> Result<GROUP::POINT> {
+) -> Result<GROUP::POINT, PolyError> {
     let (x, y) = xy_commit(&g, shares, t, n);
 
     if x.len() < t {
-        bail!("share: not enough good public shares to reconstruct secret commitment")
+        return Err(PolyError::NotEnoughtGoodPublics)
     }
 
     let mut num = g.scalar();
@@ -598,10 +594,10 @@ pub fn recover_pub_poly<GROUP: Group>(
     shares: &[Option<PubShare<GROUP::POINT>>],
     t: usize,
     n: usize,
-) -> Result<PubPoly<GROUP>> {
+) -> Result<PubPoly<GROUP>, PolyError> {
     let (x, y) = xy_commit(&g, shares, t, n);
     if x.len() < t {
-        bail!("share: not enough good public shares to reconstruct secret commitment");
+        return Err(PolyError::NotEnoughtGoodPublics);
     }
 
     let mut acc_poly = PubPoly::new(&g, None, &[]);
@@ -654,4 +650,24 @@ fn lagrange_basis<GROUP: Group>(
         basis.coeffs[i] = basis.coeffs[i].clone() * acc.clone();
     }
     basis
+}
+
+#[derive(Error, Debug)]
+pub enum PolyError {
+    #[error("marshalling error")]
+    MarshallingError(#[from] MarshallingError),
+    #[error("io error")]
+    IoError(#[from] std::io::Error),
+    #[error("not enough good public shares to reconstruct secret commitment")]
+    NotEnoughtGoodPublics,
+    #[error("non-matching groups")]
+    NoGroupsMatch,
+    #[error("different number of coefficients")]
+    WrongCoefficientsNumber,
+    #[error("not enough shares to recover private polynomial")]
+    NotEnoughSharesForPublic,
+    #[error("not enough shares to recover secret")]
+    NotEnoughSharesForSecret,
+
+
 }

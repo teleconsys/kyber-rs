@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use crate::{
     encoding::Marshaling,
     group::{HashFactory, PointCanCheckCanonicalAndSmallOrder, ScalarCanCheckCanonical},
-    share::poly::{self, PriShare, PubPoly},
+    share::poly::{self, PriShare, PubPoly, PolyError},
     sign::{eddsa, error::SignatureError, schnorr},
     Group, Point, Random, Scalar,
 };
@@ -292,12 +292,10 @@ pub enum DSSError {
     InvalidIndex,
     #[error("not enough partial signature to sign")]
     NotEnoughPartials,
-    // TODO ERROR : change with the true error type
     #[error("could not recover secret")]
-    RecoverSecretError(anyhow::Error),
-    // TODO ERROR : change with the true error type
+    RecoverSecretError(PolyError),
     #[error("could not hash partial signature")]
-    PartialSignatureHash(anyhow::Error),
+    PartialSignatureHash(PolyError),
     #[error("session id do not match")]
     InvalidSessionId,
     #[error("partial signature already received from peer")]

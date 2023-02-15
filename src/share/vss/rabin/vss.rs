@@ -966,7 +966,8 @@ pub fn recover_secret<SUITE: Suite>(
             anyhow::bail!("vss: all deals need to have same session id");
         }
     }
-    poly::recover_secret(suite, &shares, t, n)
+    // TODO fix this error management
+    poly::recover_secret(suite, &shares, t, n).map_err(|e| anyhow::Error::msg(""))
 }
 
 // KEY_SIZE is arbitrary, make it long enough to seed the XOF

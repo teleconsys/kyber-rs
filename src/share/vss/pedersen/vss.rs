@@ -639,7 +639,8 @@ pub fn recover_secret<SUITE: Suite>(
             anyhow::bail!("vss: all deals need to have same session id");
         }
     }
-    share::poly::recover_secret(suite, &shares, t, n)
+    // TODO fix this error management
+    share::poly::recover_secret(suite, &shares, t, n).map_err(|e| anyhow::Error::msg(""))
 }
 
 #[derive(Debug, Clone)]

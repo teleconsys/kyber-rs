@@ -1,12 +1,11 @@
 use crate::{
-    cipher::cipher,
+    cipher::cipher::{self, StreamError},
     encoding::{BinaryMarshaler, BinaryUnmarshaler},
     group::edwards25519::SuiteEd25519,
     sign::eddsa::{verify_with_checks, EdDSA},
     util::random,
     Random,
 };
-use anyhow::Result;
 
 use super::verify;
 
@@ -277,7 +276,7 @@ pub struct ConstantStream {
 }
 
 impl cipher::Stream for ConstantStream {
-    fn xor_key_stream(&mut self, dst: &mut [u8], _: &[u8]) -> Result<()> {
+    fn xor_key_stream(&mut self, dst: &mut [u8], _: &[u8]) -> Result<(), StreamError> {
         dst.copy_from_slice(&self.seed);
         Ok(())
     }
