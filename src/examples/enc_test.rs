@@ -1,5 +1,5 @@
 use crate::{
-    group::edwards25519::SuiteEd25519, util::random::Randstream, Group, Point, Random, Scalar,
+    group::edwards25519::SuiteEd25519, util::random::RandStream, Group, Point, Random, Scalar,
 };
 use anyhow::Result;
 
@@ -11,14 +11,14 @@ pub fn el_gamal_encrypt<GROUP: Group>(
     // Embed the message (or as much of it as will fit) into a curve point.
     let m = group
         .point()
-        .embed(Some(message), &mut Randstream::default());
+        .embed(Some(message), &mut RandStream::default());
     let mut max = group.point().embed_len();
     if max > message.len() {
         max = message.len()
     }
     let remainder = message[max..].to_vec();
     // ElGamal-encrypt the point to produce ciphertext (K,C).
-    let k = group.scalar().pick(&mut Randstream::default()); // ephemeral private key
+    let k = group.scalar().pick(&mut RandStream::default()); // ephemeral private key
     let k_caps = group.point().mul(&k, None); // ephemeral DH public key
     let s = group.point().mul(&k, Some(pubkey)); // ephemeral DH shared secret
     let c = s.clone().add(&s, &m); // message blinded with secret

@@ -20,17 +20,25 @@ use crate::{xof, Random, XOFFactory};
 
 use super::Point;
 
-/// SuiteEd25519 implements some basic functionalities such as Group, HashFactory,
-/// and XOFFactory.
+/// [`SuiteEd25519`] implements some basic functionalities such as [`Group`], [`HashFactory`],
+/// and [`XOFFactory`].
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
 pub struct SuiteEd25519 {
-    // Curve
+    // TODO: find a way to implement an embedded Stream without breaking everything
     // r: Box<dyn Stream>,
     curve: Curve,
 }
 
 impl SuiteEd25519 {
-    //     func (s *SuiteEd25519) Read(r io.Reader, objs ...interface{}) error {
+    /// [`new_blake3_sha256_ed25519()`] returns a cipher suite based on `blake3`,
+    /// `SHA-256`, and the `Ed25519 curve`.It produces cryptographically random
+    /// numbers via crate [`rand`].
+    pub fn new_blake3_sha256_ed25519() -> SuiteEd25519 {
+        SuiteEd25519::default()
+    }
+
+    // TODO: find a way to provide this extended flexibility
+    // func (s *SuiteEd25519) Read(r io.Reader, objs ...interface{}) error {
     // return fixbuf.Read(r, s, objs...)
     // }
     //
@@ -42,15 +50,6 @@ impl SuiteEd25519 {
     // func (s *SuiteEd25519) New(t reflect.Type) interface{} {
     // return marshalling.GroupNew(s, t)
     // }
-
-    /// new_blake_sha256ed25519 returns a cipher suite based on package
-    /// go.dedis.ch/kyber/v3/xof/blake2xb, SHA-256, and the Ed25519 curve.
-    /// It produces cryptographically random numbers via package crypto/rand.
-    pub fn new_blake3_sha256_ed25519() -> SuiteEd25519 {
-        SuiteEd25519::default()
-        // suite := new(SuiteEd25519)
-        // return suite
-    }
 
     // /// NewBlakeSHA256Ed25519WithRand returns a cipher suite based on package
     // /// go.dedis.ch/kyber/v3/xof/blake2xb, SHA-256, and the Ed25519 curve.
@@ -113,28 +112,19 @@ impl Group for SuiteEd25519 {
     }
 }
 
-// impl Default for SuiteEd25519 {
-//     fn default() -> Self {
-//         SuiteEd25519 {
-//             curve: Curve::default(),
-//             // r: todo!(),
-//         }
-//     }
-// }
-
 impl Random for SuiteEd25519 {
-    /// RandomStream returns a cipher.Stream that returns a key stream
-    /// from crypto/rand.
+    /// [`random_stream()`] returns a [`Box<Stream>`] that contains a [`Stream`]
     fn random_stream(&self) -> Box<dyn Stream> {
+        // TODO: add this when the embedded r is added
         // if self.r != nil {
         //     return s.r;
         // }
-        Box::<util::random::random::Randstream>::default()
+        Box::<util::random::random::RandStream>::default()
     }
 }
 
 impl XOFFactory for SuiteEd25519 {
-    /// xof returns an XOF which is implemented via the Blake2b hash.
+    /// [`xof()`] returns an [`XOF`] which is implemented via the `blake3` hash.
     fn xof(&self, key: Option<&[u8]>) -> Box<dyn crate::XOF> {
         Box::new(xof::blake3::Xof::new(key))
     }

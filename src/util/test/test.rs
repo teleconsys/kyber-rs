@@ -8,7 +8,7 @@ use crate::{
     group::HashFactory,
     util::{
         key::{self, Generator, Suite as KeySuite},
-        random::Randstream,
+        random::RandStream,
     },
     Group, Point, Random, Scalar, XOFFactory, XOF,
 };
@@ -126,16 +126,16 @@ fn test_point_set<GROUP: Group, S: Stream>(g: &GROUP, rand: &mut S) -> Result<()
         let mut p1 = g.point().pick(rand);
         let mut p2 = g.point();
         p2.set(&p1);
-        if !p1.equal(&p2) {
+        if !p1.eq(&p2) {
             bail!(
                 "Set() set to a different point: {} != {}",
                 p1.to_string(),
                 p2.to_string()
             )
         }
-        if !p1.equal(&null) {
+        if !p1.eq(&null) {
             p1 = p1.clone().add(&p1, &p1);
-            if p1.equal(&p2) {
+            if p1.eq(&p2) {
                 bail!(
                     "Modifying P1 shouldn't modify P2: {} == {}",
                     p1.to_string(),
@@ -231,7 +231,7 @@ fn test_scalar_clone<GROUP: Group, S: Stream>(g: &GROUP, rand: &mut S) -> Result
 }
 
 /// Apply a generic set of validation tests to a cryptographic Group,
-/// using a given source of [pseudo-]randomness.
+/// using a given source of pseudo-randomness.
 ///
 /// Returns a log of the pseudorandom Points produced in the test,
 /// for comparison across alternative implementations
@@ -286,7 +286,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
     }
     p1 = p1.clone().add(&p1, &p1);
     p2 = p2.mul(&stmp.clone().set_int64(4), None);
-    if !p1.equal(&p2) {
+    if !p1.eq(&p2) {
         bail!(
             "multiply by four doesn't work: {} (+) {} != {} (x) 4 == {}",
             g.point().add(&gen, &gen).to_string(),
@@ -309,14 +309,14 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
     ptmp = ptmp.clone().mul(&stmp.clone().set_int64(-1), None);
     ptmp = ptmp.clone().add(&ptmp, &gen);
 
-    if !ptmp.equal(&pzero) {
+    if !ptmp.eq(&pzero) {
         bail!("generator additive identity doesn't work: {} (x) -1 (+) {} != {} the group point identity", ptmp.mul(&stmp.set_int64(-1), None).to_string(), gen.to_string(), pzero.to_string())
     }
     //secret.Inv works only in prime-order groups
     if prime_order {
         ptmp = ptmp.clone().mul(&stmp.clone().set_int64(2), None);
         ptmp = ptmp.clone().mul(&stmp.clone().inv(&stmp), Some(&ptmp));
-        if ptmp.equal(&gen) {
+        if ptmp.eq(&gen) {
             bail!(
                 "generator multiplicative identity doesn't work:\n{} (x) {} = {}\n%{} (x) {} = {}",
                 ptmp.clone().base().to_string(),
@@ -336,7 +336,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
 
     p1 = p1.mul(&s1, Some(&gen));
     p2 = p2.mul(&s2, Some(&gen));
-    if p1.equal(&p2) {
+    if p1.eq(&p2) {
         bail!(
             "encryption isn't producing unique points: {} (x) {} == {} (x) {} == {}",
             s1.to_string(),
@@ -350,7 +350,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
 
     let dh1 = g.point().mul(&s2, Some(&p1));
     let dh2 = g.point().mul(&s1, Some(&p2));
-    if !dh1.equal(&dh2) {
+    if !dh1.eq(&dh2) {
         bail!(
             "Diffie-Hellman didn't work: {} == {} (x) {} != {} (x) {} == {}",
             dh1.to_string(),
@@ -367,7 +367,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
     // Test secret inverse to get from dh1 back to p1
     if prime_order {
         ptmp = ptmp.mul(&g.scalar().inv(&s2), Some(&dh1));
-        if !ptmp.equal(&p1) {
+        if !ptmp.eq(&p1) {
             bail!(
                 "Scalar inverse didn't work: {} != (-){} (x) {} == {}",
                 p1.to_string(),
@@ -380,7 +380,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
 
     // Zero and One identity secrets
     //println("dh1^0 = ",ptmp.Mul(dh1, szero).String())
-    if !ptmp.clone().mul(&szero, Some(&dh1)).equal(&pzero) {
+    if !ptmp.clone().mul(&szero, Some(&dh1)).eq(&pzero) {
         bail!(
             "Encryption with secret=0 didn't work: {} (x) {} == {} != {}",
             szero.to_string(),
@@ -389,7 +389,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
             pzero.to_string(),
         )
     }
-    if !ptmp.clone().mul(&sone, Some(&dh1)).equal(&dh1) {
+    if !ptmp.clone().mul(&sone, Some(&dh1)).eq(&dh1) {
         bail!(
             "Encryption with secret=1 didn't work: {} (x) {} == {} != {}",
             sone.to_string(),
@@ -403,7 +403,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
     ptmp = ptmp.add(&p1, &p2);
     stmp = s1.clone() + s2.clone();
     let mut pt2 = g.point().mul(&stmp, Some(&gen));
-    if !pt2.equal(&ptmp) {
+    if !pt2.eq(&ptmp) {
         bail!(
             "Additive homomorphism doesn't work: {} + {} == {}, {} (x) {} == {} != {} == {} (+) {}",
             s1.to_string(),
@@ -420,7 +420,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
     ptmp = ptmp.sub(&p1, &p2);
     stmp = stmp.sub(&s1, &s2);
     pt2 = pt2.mul(&stmp, Some(&gen));
-    if !pt2.equal(&ptmp) {
+    if !pt2.eq(&ptmp) {
         bail!(
             "Additive homomorphism doesn't work: {} + {} == {}, {} (x) {} == {} != {} == {} (+) {}",
             s1.to_string(),
@@ -449,7 +449,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
     }
     pt2 = pt2.neg(&p2);
     pt2 = pt2.clone().add(&pt2, &p1);
-    if !pt2.equal(&ptmp) {
+    if !pt2.eq(&ptmp) {
         bail!(
             "Point.Neg doesn't work: (-){} == {}, {} (+) {} == {} != {}",
             p2.to_string(),
@@ -463,7 +463,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
 
     // Multiplicative homomorphic identities
     stmp = s1.clone() * s2.clone();
-    if !ptmp.clone().mul(&stmp, Some(&gen)).equal(&dh1) {
+    if !ptmp.clone().mul(&stmp, Some(&gen)).eq(&dh1) {
         bail!(
             "Multiplicative homomorphism doesn't work: {} * {} == {}, {} (x) {} == {} != {}",
             s1.to_string(),
@@ -507,7 +507,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
     let mut last = gen;
     for _ in 0..5 {
         let rgen = g.point().pick(rand);
-        if rgen.equal(&last) {
+        if rgen.eq(&last) {
             bail!(
                 "Pick() not producing unique points: got {} twice",
                 rgen.to_string()
@@ -517,7 +517,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
 
         ptmp = ptmp.clone().mul(&stmp.clone().set_int64(-1), Some(&rgen));
         ptmp = ptmp.clone().add(&ptmp, &rgen);
-        if !ptmp.equal(&pzero) {
+        if !ptmp.eq(&pzero) {
             bail!(
                 "random generator fails additive identity: {} (x) {} == {}, {} (+) {} == {} != {}",
                 g.scalar().set_int64(-1).to_string(),
@@ -539,7 +539,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
             stmp = stmp.set_int64(2);
             ptmp = ptmp.clone().mul(&stmp, Some(&rgen));
             ptmp = ptmp.clone().mul(&stmp.clone().inv(&stmp), Some(&ptmp));
-            if !ptmp.equal(&rgen) {
+            if !ptmp.eq(&rgen) {
                 bail!(
                     "random generator fails multiplicative identity: {} (x) (2 (x) {}) == {} != {}",
                     stmp.to_string(),
@@ -605,15 +605,15 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
     Ok(points)
 }
 
-/// GroupTest applies a generic set of validation tests to a cryptographic Group.
+/// group_test() applies a generic set of validation tests to a cryptographic Group.
 pub fn group_test<GROUP: Group + Generator<<GROUP::POINT as Point>::SCALAR>>(
     g: GROUP,
 ) -> Result<()> {
-    _ = test_group(g, &mut Randstream::default())?;
+    _ = test_group(g, &mut RandStream::default())?;
     Ok(())
 }
 
-/// CompareGroups tests two group implementations that are supposed to be equivalent,
+/// compare_groups() tests two group implementations that are supposed to be equivalent,
 /// and compare their results.
 pub fn compare_groups<G1: Group, G2: Group>(
     func: fn(Option<&[u8]>) -> Box<dyn XOF>,
@@ -635,7 +635,7 @@ pub fn compare_groups<G1: Group, G2: Group>(
     Ok(())
 }
 
-/// SuiteTest tests a standard set of validation tests to a ciphersuite.
+/// suite_test() tests a standard set of validation tests to a ciphersuite.
 pub fn suite_test<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>>(
     suite: SUITE,
 ) -> Result<()> {

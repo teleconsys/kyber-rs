@@ -9,7 +9,7 @@ use crate::{
 
 use sha2::{Digest, Sha512};
 
-/// Suite represents the set of functionalities needed by the package schnorr.
+/// [`Suite`] represents the set of functionalities needed by the crate schnorr.
 pub trait Suite: Group + Random {}
 
 impl<T> Suite for T
@@ -19,9 +19,9 @@ where
 {
 }
 
-/// Sign creates a Sign signature from a msg and a private key. This
-/// signature can be verified with VerifySchnorr. It's also a valid EdDSA
-/// signature when using the edwards25519 Group.
+/// [`sign()`] creates a signature from a `msg` and a `private key`. This
+/// signature can be verified with [`verify_schnorr()`]. It's also a valid `EdDSA`
+/// signature when using the `edwards25519` [`Group`].
 pub fn sign<SUITE: Suite>(
     s: &SUITE,
     private: &<SUITE::POINT as Point>::SCALAR,
@@ -46,11 +46,10 @@ pub fn sign<SUITE: Suite>(
     Ok(b)
 }
 
-/// VerifyWithChecks uses a public key buffer, a message and a signature.
-/// It will return nil if sig is a valid signature for msg created by
-/// key public, or an error otherwise. Compared to `Verify`, it performs
-/// additional checks around the canonicality and ensures the public key
-/// does not have a small order when using `edwards25519` group.
+/// [`verify_with_checks()`] uses a `public key buffer`, a `message` and a `signature`.
+/// It will return an [`Error`](SignatureError) if the signature is not valid.
+/// Compared to [`verify()`], it performs additional checks around the `canonicality`
+/// and ensures the public key does not have a `small order` when using `edwards25519` [`Group`].
 fn verify_with_checks<GROUP: Group>(
     g: GROUP,
     pubb: &[u8],
@@ -101,7 +100,7 @@ where
     let ah = g.point().mul(&h, Some(&public));
     let ras = g.point().add(&r, &ah);
 
-    if !s_caps.equal(&ras) {
+    if !s_caps.eq(&ras) {
         return Err(SignatureError::InvalidSignature(
             "reconstructed S is not equal to signature".to_owned(),
         ));
@@ -110,8 +109,8 @@ where
     Ok(())
 }
 
-/// Verify verifies a given Schnorr signature. It returns nil iff the
-/// given signature is valid.
+/// [`verify()`] verifies a given `Schnorr signature`. It returns an
+/// [`Error`](SignatureError) if the signature is invalid.
 pub fn verify<GROUP: Group>(
     g: GROUP,
     public: &GROUP::POINT,

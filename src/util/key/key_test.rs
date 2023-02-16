@@ -58,7 +58,7 @@ impl Group for FixedPrivSuiteEd25519 {
 
 impl Random for FixedPrivSuiteEd25519 {
     fn random_stream(&self) -> Box<dyn Stream> {
-        Box::<util::random::random::Randstream>::default()
+        Box::<util::random::random::RandStream>::default()
     }
 }
 

@@ -5,6 +5,7 @@ use crate::{
     cipher::Stream,
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling, MarshallingError},
     group::{self, internal::marshalling, PointCanCheckCanonicalAndSmallOrder, PointError},
+    Point as PointTrait,
 };
 
 use super::{
@@ -65,46 +66,16 @@ impl Marshaling for Point {
     }
 }
 
-impl PartialEq for Point {
-    /// Equality test for two Points on the same curve
-    fn eq(&self, other: &Self) -> bool {
-        let (mut b1, mut b2) = ([0u8; 32], [0u8; 32]);
-        self.ge.to_bytes(&mut b1);
-        other.ge.to_bytes(&mut b2);
-
-        for i in 0..b1.len() {
-            if b1[i] != b2[i] {
-                return false;
-            }
-        }
-        true
-    }
-}
-
 impl group::Point for Point {
     type SCALAR = Scalar;
 
-    /// Equality test for two Points on the same curve
-    fn equal(&self, p2: &Self) -> bool {
-        let mut b1 = [0_u8; 32];
-        let mut b2 = [0_u8; 32];
-        self.ge.to_bytes(&mut b1);
-        p2.ge.to_bytes(&mut b2);
-        for i in 0..b1.len() {
-            if b1[i] != b2[i] {
-                return false;
-            }
-        }
-        true
-    }
-
-    /// Set to the neutral element, which is (0,1) for twisted Edwards curves.
+    /// [`null()`] sets [`self`] to the neutral element, which is `(0,1)` for twisted Edwards curves.
     fn null(mut self) -> Self {
         self.ge.zero();
         self
     }
 
-    /// Set to the standard base point for this curve
+    /// [`base()`] sets [`self`] to the standard base point for this curve
     fn base(mut self) -> Self {
         self.ge = BASEEXT;
         self
@@ -153,6 +124,7 @@ impl group::Point for Point {
                 continue;
             }
 
+            // TODO: manage this case
             // If we're using the full group,
             // we just need any point on the curve, so we're done.
             //		if c.full {
@@ -168,7 +140,7 @@ impl group::Point for Point {
                 // multiply by cofactor
                 let old_self = &self.clone();
                 self = self.mul(&COFACTOR_SCALAR, Some(old_self));
-                if self.equal(&NULL_POINT) {
+                if self.eq(&NULL_POINT) {
                     // unlucky; try again
                     continue;
                 }
@@ -181,7 +153,7 @@ impl group::Point for Point {
             // and retry point generation until it is.
             let mut q = Point::default();
             q = q.mul(&PRIME_ORDER_SCALAR, Some(&self));
-            if q.equal(&NULL_POINT) {
+            if q.eq(&NULL_POINT) {
                 return self; // success
             }
             // Keep trying...
@@ -225,7 +197,7 @@ impl group::Point for Point {
         self.clone()
     }
 
-    /// Mul multiplies point p by scalar s using the repeated doubling method.
+    /// [`mul()`] multiplies [`Point`] `p` by [`Scalar`] `s` using the repeated doubling method.
     fn mul(mut self, s: &Scalar, p: Option<&Self>) -> Self {
         let mut a = s.v;
 
@@ -246,6 +218,22 @@ impl group::Point for Point {
     }
 }
 
+impl PartialEq for Point {
+    /// [`eq()`] is an equality test for two [`points`](Point) on the same curve
+    fn eq(&self, p2: &Self) -> bool {
+        let mut b1 = [0_u8; 32];
+        let mut b2 = [0_u8; 32];
+        self.ge.to_bytes(&mut b1);
+        p2.ge.to_bytes(&mut b2);
+        for i in 0..b1.len() {
+            if b1[i] != b2[i] {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 impl ToString for Point {
     fn to_string(&self) -> String {
         let mut b = [0u8; 32];
@@ -255,7 +243,7 @@ impl ToString for Point {
 }
 
 impl PointCanCheckCanonicalAndSmallOrder for Point {
-    /// HasSmallOrder determines whether the group element has small order
+    /// [`has_small_order()`] determines whether the group element has small order
     ///
     /// Provides resilience against malicious key substitution attacks (M-S-UEO)
     /// and message bound security (MSB) even for malicious keys
@@ -289,7 +277,7 @@ impl PointCanCheckCanonicalAndSmallOrder for Point {
         (k >> 8) & 1 > 0
     }
 
-    /// IsCanonical determines whether the group element is canonical
+    /// [`is_canonical()`] determines whether the group element is canonical
     ///
     /// Checks whether group element s is less than p, according to RFC8032§5.1.3.1
     /// https://tools.ietf.org/html/rfc8032#section-5.1.3
@@ -297,7 +285,7 @@ impl PointCanCheckCanonicalAndSmallOrder for Point {
     /// Taken from
     /// https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1113
     ///
-    /// The method accepts a buffer instead of calling `MarshalBinary` on the receiver
+    /// The method accepts a buffer instead of calling `marshal_binary()` on the receiver
     /// because that always returns a value modulo `prime`.
     fn is_canonical(&self, b: &[u8]) -> bool {
         if b.len() != 32 {

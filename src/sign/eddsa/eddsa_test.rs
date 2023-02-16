@@ -16,7 +16,7 @@ struct EdDSATestVector<'a> {
     signature: &'a str,
 }
 
-/// EdDSATestVectors taken from RFC8032 section 7.1
+/// [`EDDSA_TEST_VECTORS`] taken from `RFC8032` section 7.1
 static EDDSA_TEST_VECTORS: &[EdDSATestVector<'static>] = &[
     EdDSATestVector{
 	    private: "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
@@ -282,8 +282,8 @@ impl cipher::Stream for ConstantStream {
     }
 }
 
-// ConstantStream is a cipher.Stream which always returns
-// the same value.
+/// [`ConstantStream`] is a [`cipher::Stream`] which always returns
+/// the same value.
 pub fn constant_stream(buff: Vec<u8>) -> Box<dyn cipher::Stream> {
     Box::new(ConstantStream {
         seed: buff[..32].to_vec(),

@@ -11,7 +11,7 @@ use crate::{
         vss::{self, suite::Suite},
     },
     sign::schnorr,
-    util::random::Randstream,
+    util::random::RandStream,
     Point, Scalar,
 };
 
@@ -234,7 +234,7 @@ where
         can_issue = true;
     } else if !is_resharing && new_present {
         // fresh DKG case
-        let mut random_stream = Randstream::default();
+        let mut random_stream = RandStream::default();
         //if the user provided a reader, use it alone or combined with crypto/rand
         if c.reader.is_some() && !c.user_reader_only {
             let mut r_vec = Vec::new();
@@ -242,12 +242,12 @@ where
             r_vec.push(r);
             let rng_core = Box::new(StdRng::from_entropy()) as Box<dyn RngCore>;
             r_vec.push(Box::new(rng_core) as Box<dyn Read>);
-            random_stream = Randstream::new(r_vec); //, rand.Reader
+            random_stream = RandStream::new(r_vec); //, rand.Reader
         } else if c.reader.is_some() && c.user_reader_only {
             let mut r_vec = Vec::new();
             let r = Box::new(c.reader.clone().unwrap()) as Box<dyn Read>;
             r_vec.push(r);
-            random_stream = Randstream::new(r_vec);
+            random_stream = RandStream::new(r_vec);
         }
         let secret_coeff = c.suite.scalar().pick(&mut random_stream);
         dealer = vss::pedersen::vss::new_dealer(
@@ -478,7 +478,7 @@ where
             // Check that the received committed share is equal to the one we
             // generate from the known public polynomial
             let expected_pub_share = self.dpub.eval(dd.index as usize);
-            if !expected_pub_share.v.equal(&deal_commits.unwrap()[0]) {
+            if !expected_pub_share.v.eq(&deal_commits.unwrap()[0]) {
                 return reject();
             }
         }
@@ -981,7 +981,7 @@ impl<SUITE: Suite> DistKeyShare<SUITE> {
         // Check G(0) = 0*G.
         if !g
             .public()
-            .equal(&suite.point().base().mul(&suite.scalar().zero(), None))
+            .eq(&suite.point().base().mul(&suite.scalar().zero(), None))
         {
             return Err(DKGError::WrongRenewal);
         }
@@ -1016,7 +1016,7 @@ fn get_pub<POINT: Point>(list: &[POINT], i: usize) -> (POINT, bool) {
 
 fn find_pub<POINT: Point>(list: &[POINT], to_find: &POINT) -> (usize, bool) {
     for (i, p) in list.iter().enumerate() {
-        if p.equal(to_find) {
+        if p.eq(to_find) {
             return (i, true);
         }
     }

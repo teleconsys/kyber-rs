@@ -15,9 +15,7 @@ use digest::{
 use hkdf::Hkdf;
 use thiserror::Error;
 
-use crate::{
-    encoding::MarshallingError, group::HashFactory, share::vss::suite::Suite, sign::error, Point,
-};
+use crate::{encoding::MarshallingError, group::HashFactory, share::vss::suite::Suite, Point};
 
 pub(crate) const NONCE_SIZE: usize = 12;
 
@@ -72,7 +70,7 @@ where
 pub trait Dh {
     type H: HmacCompatible;
 
-    /// dhExchange computes the shared key from a private key and a public key
+    /// [`dh_exchange()`] computes the shared key from a private key and a public key
     fn dh_exchange<SUITE: Suite>(
         suite: SUITE,
         own_private: <SUITE::POINT as Point>::SCALAR,
@@ -205,13 +203,13 @@ impl<DH: Dh> AEAD<DH> {
         })
     }
 
-    /// Seal encrypts and authenticates plaintext, authenticates the
-    /// additional data and appends the result to dst, returning the updated
-    /// slice. The nonce must be NonceSize() bytes long and unique for all
+    /// [`seal()`] encrypts and authenticates `plaintext`, authenticates the
+    /// `additional_data` and appends the result to `dst`, returning the updated
+    /// slice. The nonce must be [`NONCE_SIZE`] bytes long and unique for all
     /// time, for a given key.
     ///
-    /// To reuse plaintext's storage for the encrypted output, use plaintext[:0]
-    /// as dst. Otherwise, the remaining capacity of dst must not overlap plaintext.
+    /// To reuse `plaintext`'s storage for the encrypted output, use `plaintext[..0]`
+    /// as `dst`. Otherwise, the remaining capacity of dst must not overlap plaintext.
     pub fn seal(
         &self,
         dst: Option<&mut [u8]>,
@@ -226,16 +224,16 @@ impl<DH: Dh> AEAD<DH> {
         Ok(encrypted)
     }
 
-    /// Open decrypts and authenticates ciphertext, authenticates the
-    /// additional data and, if successful, appends the resulting plaintext
-    /// to dst, returning the updated slice. The nonce must be NonceSize()
+    /// [`open()`] decrypts and authenticates `ciphertext`, authenticates the
+    /// `additional_data` and, if successful, appends the resulting `plaintext`
+    /// to `dst`, returning the updated slice. The `nonce` must be [`NONCE_SIZE`]
     /// bytes long and both it and the additional data must match the
-    /// value passed to Seal.
+    /// value passed to [`seal()`].
     ///
-    /// To reuse ciphertext's storage for the decrypted output, use ciphertext[:0]
-    /// as dst. Otherwise, the remaining capacity of dst must not overlap plaintext.
+    /// To reuse ciphertext's storage for the decrypted output, use `ciphertext[..0]`
+    /// as `dst`. Otherwise, the remaining capacity of `dst` must not overlap `plaintext`.
     ///
-    /// Even if the function fails, the contents of dst, up to its capacity,
+    /// Even if the function fails, the contents of `dst`, up to its capacity,
     /// may be overwritten.
     pub fn open(
         &self,

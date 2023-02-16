@@ -87,7 +87,7 @@ fn test_simple<T: ScalarTrait>(new: fn() -> T) {
     let mut s1 = new();
     let mut s2 = new();
     s1 = s1.set_int64(2);
-    s2 = s2.pick(&mut random::Randstream::default());
+    s2 = s2.pick(&mut random::RandStream::default());
 
     let s22 = s2.clone() + s2.clone();
 

@@ -355,12 +355,12 @@ impl CachedGroupElement {
     }
 }
 
-/// Expand the 32-byte (256-bit) exponent in slice a into
-/// a sequence of 256 multipliers, one per exponent bit position.
+/// [`slide()`] expands the 32-byte (256-bit) `exponent` in slice a into
+/// a sequence of 256 `multipliers`, one per exponent bit position.
 /// Clumps nearby 1 bits into multi-bit multipliers to reduce
 /// the total number of add/sub operations in a point multiply;
-/// each multiplier is either zero or an odd number between -15 and 15.
-/// Assumes the target array r has been preinitialized with zeros
+/// each multiplier is either `zero` or an `odd number` between `-15` and `15`.
+/// Assumes the target array `r` has been preinitialized with zeros
 /// in case the input slice a is less than 32 bytes.
 pub fn slide(r: &mut [i8; 256], a: &[u8; 32]) {
     // Explode the exponent a into a little-endian array, one bit per byte
@@ -404,14 +404,14 @@ pub fn slide(r: &mut [i8; 256], a: &[u8; 32]) {
     }
 }
 
-/// equal returns 1 if b == c and 0 otherwise.
+/// [`equal()`] returns `1` if `b == c` and `0` otherwise.
 fn equal(b: i32, c: i32) -> i32 {
     let mut x = (b ^ c) as u32;
     x = x.wrapping_sub(1);
     (x >> 31) as i32
 }
 
-// negative returns 1 if b < 0 and 0 otherwise.
+/// [`negative()`] returns `1` if `b < 0` and `0` otherwise.
 fn negative(b: i32) -> i32 {
     (b >> 31) & 1
 }
@@ -429,12 +429,12 @@ fn select_pre_computed(t: &mut PreComputedGroupElement, pos: usize, b: i32) {
     t.cmove(&minus_t, b_negative);
 }
 
-/// geScalarMultBase computes h = a*B, where
-///   a = a[0]+256*a[1]+...+256^31 a[31]
-///   B is the Ed25519 base point (x,4/5) with x positive.
+/// [`ge_scalar_mult_base()`] computes `h = a*B`, where
+///   `a = a[0]+256*a[1]+...+256^31 a[31]`
+///   `B` is the Ed25519 base point `(x,4/5)` with `x` positive.
 ///
 /// Preconditions:
-///   a[31] <= 127
+///   `a[31] <= 127`
 pub fn ge_scalar_mult_base(h: &mut ExtendedGroupElement, a: &mut [u8; 32]) {
     let mut e = [0_i8; 64];
 
@@ -495,12 +495,12 @@ fn select_cached(c: &mut CachedGroupElement, ai: &[CachedGroupElement; 8], b: i3
     c.cmove(&minus_c, b_negative)
 }
 
-/// geScalarMult computes h = a*B, where
-///   a = a[0]+256*a[1]+...+256^31 a[31]
-///   B is the Ed25519 base point (x,4/5) with x positive.
+/// [`ge_scalar_mult()`] computes `h = a*B`, where
+///   `a = a[0]+256*a[1]+...+256^31 a[31]`
+///   `B` is the Ed25519 base point `(x,4/5)` with `x` positive.
 ///
 /// Preconditions:
-///   a[31] <= 127
+///   `a[31] <= 127`
 pub fn ge_scalar_mult(
     h: &mut ExtendedGroupElement,
     a: &mut [u8; 32],

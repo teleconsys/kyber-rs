@@ -2,12 +2,12 @@ use super::ge::{
     slide, CachedGroupElement, CompletedGroupElement, ExtendedGroupElement, ProjectiveGroupElement,
 };
 
-/// geScalarMultVartime computes h = a*B, where
-///   a = a[0]+256*a[1]+...+256^31 a[31]
-///   B is the Ed25519 base point (x,4/5) with x positive.
+/// [`ge_scalar_mult_vartime()`] computes `h = a*B`, where
+///   `a = a[0]+256*a[1]+...+256^31 a[31]`
+///   `B` is the Ed25519 base point `(x,4/5)` with `x` positive.
 ///
 /// Preconditions:
-///   a[31] <= 127
+///   `a[31] <= 127`
 pub fn ge_scalar_mult_vartime(
     h: &mut ExtendedGroupElement,
     a: &mut [u8; 32],

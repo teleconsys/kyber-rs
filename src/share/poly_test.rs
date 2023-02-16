@@ -467,7 +467,7 @@ fn test_refresh_dkg() {
             assert!(g
                 .point()
                 .mul(&tmp_pri_shares[j].clone().unwrap().v, None)
-                .equal(&sub_pub_polys[j].eval(i).v));
+                .eq(&sub_pub_polys[j].eval(i).v));
 
             // Check 2: Verify that the received sub public shares are
             // commitments to the original secret
@@ -476,12 +476,12 @@ fn test_refresh_dkg() {
                 .as_ref()
                 .unwrap()
                 .v
-                .equal(&sub_pub_polys[j].commit()));
+                .eq(&sub_pub_polys[j].commit()));
         }
         // Check 3: Verify that the received public shares interpolate to the
         // original DKG public key
         let com = recover_commit(g, &tmp_pub_shares, t, n).unwrap();
-        assert!(dkg_commits[0].equal(&com));
+        assert!(dkg_commits[0].eq(&com));
 
         // Compute the refreshed private DKG share of node i
         let s = recover_secret(g, &tmp_pri_shares, t, n).unwrap();
@@ -504,7 +504,7 @@ fn test_refresh_dkg() {
     }
 
     // Check that the old and new DKG public keys are the same
-    assert!(dkg_commits[0].equal(&new_dkg_commits[0]));
+    assert!(dkg_commits[0].eq(&new_dkg_commits[0]));
 
     // Check that the old and new DKG private shares are different
     for i in 0..n {
@@ -524,5 +524,5 @@ fn test_refresh_dkg() {
     assert!(g
         .point()
         .mul(&refreshed_pri_poly.secret(), None)
-        .equal(&dkg_commits[0]));
+        .eq(&dkg_commits[0]));
 }

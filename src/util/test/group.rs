@@ -2,7 +2,7 @@ use criterion::{measurement::Measurement, BatchSize, BenchmarkGroup};
 
 use crate::{
     encoding::{BinaryMarshaler, BinaryUnmarshaler},
-    util::random::Randstream,
+    util::random::RandStream,
     Group, Point, Scalar,
 };
 
@@ -21,7 +21,7 @@ pub struct GroupBench<GROUP: Group> {
 
 /// NewGroupBench returns a new GroupBench.
 pub fn new_group_bench<GROUP: Group>(g: GROUP) -> GroupBench<GROUP> {
-    let rng = &mut Randstream::default();
+    let rng = &mut RandStream::default();
     let x = g.scalar().pick(rng);
     let y = g.scalar().pick(rng);
     let xe = x.marshal_binary().unwrap();
@@ -100,7 +100,7 @@ impl<GROUP: Group> GroupBench<GROUP> {
 
     /// ScalarPick benchmarks the Pick operation for scalars
     pub fn scalar_pick<M: Measurement>(&self, c: &mut BenchmarkGroup<M>) {
-        let rng = &mut Randstream::default();
+        let rng = &mut RandStream::default();
         c.bench_function("scalar_pick", |b| {
             b.iter_batched(|| self.x.clone(), |s| s.pick(rng), BatchSize::SmallInput)
         });
@@ -177,7 +177,7 @@ impl<GROUP: Group> GroupBench<GROUP> {
 
     /// PointPick benchmarks the pick-ing operation for points
     pub fn point_pick<M: Measurement>(&self, c: &mut BenchmarkGroup<M>) {
-        let rng = &mut Randstream::default();
+        let rng = &mut RandStream::default();
         c.bench_function("point_pick", |b| {
             b.iter_batched(
                 || self.x_caps.clone(),

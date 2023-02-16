@@ -665,7 +665,7 @@ fn check_dks<SUITE: Suite>(dks1: &DistKeyShare<SUITE>, dks2: &DistKeyShare<SUITE
         return false;
     }
     for (i, p) in dks1.commits.iter().enumerate() {
-        if !p.equal(&dks2.commits[i]) {
+        if !p.eq(&dks2.commits[i]) {
             return false;
         }
     }

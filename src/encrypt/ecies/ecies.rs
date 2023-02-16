@@ -1,26 +1,26 @@
-/// Package ecies implements the Elliptic Curve Integrated Encryption Scheme (ECIES).
-// package ecies
+// crate ecies implements the Elliptic Curve Integrated Encryption Scheme (ECIES).
+
 use crate::{
     dh::{DhError, AEAD, NONCE_SIZE},
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling, MarshallingError},
-    util::random::Randstream,
+    util::random::RandStream,
     Group, Point, Scalar,
 };
 use thiserror::Error;
 
-/// Encrypt first computes a shared DH key using the given public key, then
+/// [`encrypt()`] first computes a shared DH key using the given public key, then
 /// HKDF-derives a symmetric key (and nonce) from that, and finally uses these
 /// values to encrypt the given message via AES-GCM. If the hash input parameter
-/// is nil then SHA256 is used as a default. Encrypt returns a byte slice
+/// is `None` then SHA256 is used as a default. [`encrypt()`] returns a byte slice
 /// containing the ephemeral elliptic curve point of the DH key exchange and the
-/// ciphertext or an error.
+/// `ciphertext` or an [`Error`](EciesError).
 pub fn encrypt<GROUP: Group>(
     group: GROUP,
     public: GROUP::POINT,
     message: &[u8],
 ) -> Result<Vec<u8>, EciesError> {
     // Generate an ephemeral elliptic curve scalar and point
-    let r = group.scalar().pick(&mut Randstream::default());
+    let r = group.scalar().pick(&mut RandStream::default());
     let r_caps = group.point().mul(&r, None);
 
     // Compute shared DH key
@@ -50,12 +50,12 @@ pub fn encrypt<GROUP: Group>(
     Ok(ctx)
 }
 
-/// Decrypt first computes a shared DH key using the received ephemeral elliptic
+/// [`decrypt()`] first computes a shared DH key using the received ephemeral elliptic
 /// curve point (stored in the first part of ctx), then HKDF-derives a symmetric
 /// key (and nonce) from that, and finally uses these values to decrypt the
 /// given ciphertext (stored in the second part of ctx) via AES-GCM. If the hash
 /// input parameter is nil then SHA256 is used as a default. Decrypt returns the
-/// plaintext message or an error.
+/// `plaintext message` or an [`Error`](EciesError).
 pub fn decrypt<GROUP: Group>(
     group: GROUP,
     private: <GROUP::POINT as Point>::SCALAR,

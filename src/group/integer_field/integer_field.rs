@@ -24,12 +24,10 @@ lazy_static! {
 
 const MARSHAL_INT_ID: [u8; 8] = [b'm', b'o', b'd', b'.', b'i', b'n', b't', b' '];
 
-/// ByteOrder denotes the endianness of the operation.
-#[derive(Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
+/// [`ByteOrder`] denotes the endianness of the operation.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum ByteOrder {
-    /// little_endian endianness
     LittleEndian,
-    /// BigEndian endianness
     BigEndian,
 }
 
@@ -51,16 +49,16 @@ impl From<bool> for ByteOrder {
     }
 }
 
-/// Int is a generic implementation of finite field arithmetic
-/// on integer finite fields with a given constant modulus,
-/// built using Go's built-in big.Int package.
-/// Int satisfies the kyber.scalar interface,
-/// and hence serves as a basic implementation of kyber.scalar,
-/// e.g., representing discrete-log exponents of Schnorr groups
+/// [`Int`] is a generic implementation of finite field arithmetic
+/// on `integer finite fields` with a given constant `modulus`,
+/// built using [`num_bigint_dig`] crate.
+/// The [`Scalar`] trait is implemented for [`Int`],
+/// and hence serves as a basic implementation of [`Scalar`],
+/// e.g., representing discrete-log exponents of `Schnorr groups`
 /// or scalar multipliers for elliptic curves.
 ///
-/// Int offers an API similar to and compatible with big.Int,
-/// but "carries around" a pointer to the relevant modulus
+/// [`Int`] offers an API similar to and compatible with [`BigInt`],
+/// but "carries around"  the relevant modulus
 /// and automatically normalizes the value to that modulus
 /// after all arithmetic operations, simplifying modular arithmetic.
 /// Binary operations assume that the source(s)
@@ -71,11 +69,11 @@ impl From<bool> for ByteOrder {
 /// whose target is assumed never to change.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Int {
-    /// Integer value from 0 through m-1
+    /// integer value from `0` through `m-1`
     pub(crate) v: BigInt,
-    /// Modulus for finite field arithmetic
+    /// modulus for finite field arithmetic
     pub(crate) m: BigInt,
-    /// Endianness which will be used on input and output
+    /// endianness which will be used on input and output
     pub bo: ByteOrder,
 }
 
@@ -90,7 +88,7 @@ impl Default for Int {
 }
 
 impl Int {
-    /// init64 creates an Int with an int64 value and big.Int modulus.
+    /// [`init64()`] creates an [`Int`] with an [`i64`] value and [`BigInt`] modulus.
     pub fn init64(mut self, v: i64, m: BigInt) -> Self {
         self.m = m.clone();
         self.bo = BigEndian;
@@ -103,8 +101,7 @@ impl Int {
         self
     }
 
-    /// init a Int with a given big.Int value and modulus pointer.
-    /// Note that the value is copied; the modulus is not.
+    /// [`init()`] a [`Int`] with a given [`BigInt`] `value` and a given [`BigInt`] `modulus`.
     fn init(mut self, v: BigInt, m: BigInt) -> Self {
         self.m = m.clone();
         self.bo = BigEndian;
@@ -112,10 +109,10 @@ impl Int {
         self
     }
 
-    /// little_endian encodes the value of this Int into a little-endian byte-slice
-    /// at least min bytes but no more than max bytes long.
+    /// [`little_endian()`] encodes the value of this [`Int`] into a little-endian byte-slice
+    /// at least `min` bytes but no more than `max` bytes long.
     /// Panics if max != 0 and the Int cannot be represented in max bytes.
-    pub fn little_endian(&self, min: usize, max: usize) -> Result<Vec<u8>, BigIntError> {
+    pub fn little_endian(&self, min: usize, max: usize) -> Result<Vec<u8>, IntError> {
         let mut act = self.marshal_size();
         let (_, v_bytes) = self.v.to_bytes_be();
         let v_size = v_bytes.len();
@@ -127,7 +124,7 @@ impl Int {
             pad = min
         }
         if max != 0 && pad > max {
-            return Err(BigIntError::NotRepresentable);
+            return Err(IntError::NotRepresentable);
         }
 
         let buf = vec![0; pad];
@@ -135,39 +132,39 @@ impl Int {
         Ok(reverse(buf2, &v_bytes))
     }
 
-    /// new_int creates a new Int with a given big.Int and a big.Int modulus.
+    /// [`new_int()`] creates a new [`Int`] with a given [`BigInt`] and a [`BigInt`] `modulus`.
     pub fn new_int(v: BigInt, m: BigInt) -> Int {
         Int::default().init(v, m)
     }
 
-    /// new_int64 creates a new Int with a given int64 value and big.Int modulus.
+    /// [`new_int64()`] creates a new [`Int`] with a given [`i64`] value and [`BigInt`] `modulus`.
     pub fn new_int64(v: i64, m: BigInt) -> Int {
         Int::default().init64(v, m)
     }
 
-    /// new_int_bytes creates a new Int with a given slice of bytes and a big.Int
-    /// modulus.
+    /// [`new_int_bytes()`] creates a new [`Int`] with a given slice of bytes and a [`BigInt`]
+    /// `modulus`.
     pub fn new_int_bytes(a: &[u8], m: &BigInt, byte_order: ByteOrder) -> Int {
         Int::default().init_bytes(a, m, byte_order)
     }
 
-    /// new_int_string creates a new Int with a given string and a big.Int modulus.
+    /// [`new_int_string()`] creates a new [`Int`] with a given [`String`] and a [`BigInt`] `modulus`.
     /// The value is set to a rational fraction n/d in a given base.
     pub fn new_int_string(n: String, d: String, base: i32, m: &BigInt) -> Int {
         Int::default().init_string(n, d, base, m)
     }
 
-    /// Equal returns true if the TWO Ints are equal
+    /// [`equal()`] returns [`true`] if the two [`ints`](Int) are equal
     pub fn equal(&self, s2: &Self) -> bool {
         self.v.cmp(&s2.v) == Equal
     }
 
-    /// cmpr compares TWO Ints for equality or inequality
+    /// [`cmpr()`] compares two [`ints`](Int) for equality or inequality
     pub fn cmpr(&self, s2: &Self) -> Ordering {
         self.v.cmp(&s2.v)
     }
 
-    // init_bytes init the Int to a number represented in a big-endian byte string.
+    /// [`init_bytes()`] init the [`Int`] to a number represented in a `big-endian` byte string.
     pub fn init_bytes(self, a: &[u8], m: &BigInt, byte_order: ByteOrder) -> Self {
         Int {
             m: m.clone(),
@@ -177,8 +174,8 @@ impl Int {
         .set_bytes(a)
     }
 
-    /// init_string inits the Int to a rational fraction n/d
-    /// specified with a pair of strings in a given base.
+    /// [`init_string()`] inits the [`Int`] to a rational fraction n/d
+    /// specified with a pair of [`strings`](String) in a given base.
     fn init_string(mut self, n: String, d: String, base: i32, m: &BigInt) -> Int {
         self.m = m.clone();
         self.bo = BigEndian;
@@ -186,11 +183,11 @@ impl Int {
             .expect("init_string: invalid fraction representation")
     }
 
-    /// set_string sets the Int to a rational fraction n/d represented by a pair of strings.
-    /// If d == "", then the denominator is taken to be 1.
-    /// Returns (i,true) on success, or
-    /// (nil,false) if either string fails to parse.
-    pub fn set_string(mut self, n: String, d: String, base: i32) -> Result<Self, BigIntError> {
+    /// [`set_string()`] sets the [`Int`] to a rational fraction n/d represented by a pair of [`strings`](String).
+    /// If `d == ""`, then the denominator is taken to be `1`.
+    /// Returns the [`Int`] on success or an [`Error`](BigIntError)
+    /// if the string failed to parse
+    pub fn set_string(mut self, n: String, d: String, base: i32) -> Result<Self, IntError> {
         self.v = BigInt::from_str_radix(n.as_str(), base as u32)?;
         if !d.is_empty() {
             let mut di = Int {
@@ -211,8 +208,8 @@ impl PartialEq for Int {
 }
 
 impl BinaryMarshaler for Int {
-    /// MarshalBinary encodes the value of this Int into a byte-slice exactly Len() bytes long.
-    /// It uses i's ByteOrder to determine which byte order to output.
+    /// [`marshal_binary()`] encodes the value of this [`Int`] into a byte-slice exactly [`self.marshal_size()`] bytes long.
+    /// It uses `i`'s [`ByteOrder`] to determine which byte order to output.
     fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
         let l = self.marshal_size();
         // may be shorter than l
@@ -235,8 +232,8 @@ impl BinaryMarshaler for Int {
 }
 
 impl BinaryUnmarshaler for Int {
-    /// unmarshal_binary tries to decode a Int from a byte-slice buffer.
-    /// Returns an error if the buffer is not exactly Len() bytes long
+    /// [`unmarshal_binary()`] tries to decode a [`Int`] from a byte-slice buffer.
+    /// Returns an [`Error`](MarshallingError) if the buffer is not exactly [`self.marshal_size()`] bytes long
     /// or if the contents of the buffer represents an out-of-range integer.
     fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError> {
         let mut buf: Vec<u8> = data.to_vec();
@@ -264,8 +261,8 @@ impl Marshaling for Int {
         marshalling::scalar_marshal_to(self, w)
     }
 
-    /// marshal_size returns the length in bytes of encoded integers with modulus m.
-    /// The length of encoded Ints depends only on the size of the modulus,
+    /// [`marshal_size()`] returns the length in bytes of encoded integers with modulus `m`.
+    /// The length of encoded [`ints`](Int) depends only on the size of the modulus,
     /// and not on the the value of the encoded integer,
     /// making the encoding is fixed-length for simplicity and security.
     fn marshal_size(&self) -> usize {
@@ -307,7 +304,7 @@ impl_op_ex!(+|a: &Int, b: &Int| -> Int {
 });
 
 impl Scalar for Int {
-    /// Set both value and modulus to be equal to another Int.
+    /// [`set()`] sets both `value` and `modulus` to be equal to another [`Int`].
     /// Since this method copies the modulus as well,
     fn set(self, a: &Self) -> Self {
         let mut ai = self;
@@ -316,8 +313,8 @@ impl Scalar for Int {
         ai
     }
 
-    /// set_int64 sets the Int to an arbitrary 64-bit "small integer" value.
-    /// The modulus must already be initialized.
+    /// [`set_int64()`] sets the [`Int`] to an arbitrary 64-bit "small integer" value.
+    /// The `modulus` must already be initialized.
     fn set_int64(self, v: i64) -> Self {
         let mut i = self;
         i.v = BigInt::from(v);
@@ -329,15 +326,15 @@ impl Scalar for Int {
         i
     }
 
-    /// Zero set the Int to the value 0.  The modulus must already be initialized.
+    /// [`zero()`] set the [`Int`] to the value `0`. The modulus must already be initialized.
     fn zero(self) -> Self {
         let mut i = self;
         i.v = BigInt::from(0_i64);
         i
     }
 
-    /// Sub sets the target to a - b mod m.
-    /// Target receives a's modulus.
+    /// [`sub()`] sets the target to `a - b mod m`.
+    /// Target receives `a`'s modulus.
     fn sub(mut self, a: &Self, b: &Self) -> Self {
         self.m = a.m.clone();
         let sub = &a.v - &b.v;
@@ -346,7 +343,7 @@ impl Scalar for Int {
         self
     }
 
-    /// Pick a [pseudo-]random integer modulo m
+    /// [`pick()`] a pseudo-random integer modulo `m`
     /// using bits from the given stream cipher.
     fn pick(self, rand: &mut impl Stream) -> Self {
         let mut s = self.clone();
@@ -354,9 +351,9 @@ impl Scalar for Int {
         s
     }
 
-    /// set_bytes set the value value to a number represented
+    /// [`set_bytes()`] set the value value to a number represented
     /// by a byte string.
-    /// Endianness depends on the endianess set in i.
+    /// `Endianness` depends on the endianess set in `i`.
     fn set_bytes(self, a: &[u8]) -> Self {
         let mut buff = a.to_vec();
         if self.bo == LittleEndian {
@@ -369,14 +366,14 @@ impl Scalar for Int {
         }
     }
 
-    /// One sets the Int to the value 1.  The modulus must already be initialized.
+    /// [`one()`] sets the [`Int`] to the value `1`.  The `modulus` must already be initialized.
     fn one(self) -> Self {
         let mut i = self;
         i.v = BigInt::from(1_i64);
         i
     }
 
-    /// div sets the target to a * b^-1 mod m, where b^-1 is the modular inverse of b.
+    /// [`div()`] sets the target to `a * b^-1 mod m`, where `b^-1` is the modular inverse of `b`.
     fn div(mut self, a: &Self, b: &Self) -> Self {
         let _t = BigInt::default();
         self.v = a.v.clone() * b.v.clone();
@@ -384,7 +381,7 @@ impl Scalar for Int {
         self
     }
 
-    /// Inv sets the target to the modular inverse of a with respect to modulus m.
+    /// [`inv()`] sets the target to the modular inverse of a with respect to modulus `m`.
     fn inv(self, a: &Self) -> Self {
         let mut i = self;
         i.v = a.clone().v.mod_inverse(&a.m.clone()).unwrap();
@@ -392,7 +389,7 @@ impl Scalar for Int {
         i
     }
 
-    /// Neg sets the target to -a mod m.
+    /// [`neg()`] sets the target to `-a mod m`.
     fn neg(self, a: &Self) -> Self {
         let mut i = self;
         i.m = a.m.clone();
@@ -405,18 +402,18 @@ impl Scalar for Int {
 }
 
 impl Int {
-    /// Nonzero returns true if the integer value is nonzero.
+    /// [`nonzero()`] returns `true` if the integer value is `nonzero`.
     pub fn nonzero(&self) -> bool {
         self.v.sign() != Sign::NoSign
     }
 
-    /// Int64 returns the int64 representation of the value.
-    /// If the value is not representable in an int64 the result is undefined.
+    /// [`int64()`] returns the [`i64`] representation of the value.
+    /// If the value is not representable in an [`i64`] the result is undefined.
     pub fn int64(&self) -> i64 {
         self.uint64() as i64
     }
 
-    /// SetUint64 sets the Int to an arbitrary uint64 value.
+    /// [`set_uint64()`] sets the Int to an arbitrary [`u64`] value.
     /// The modulus must already be initialized.
     pub fn set_uint64(&self, v: u64) -> Self {
         let mut i = self.clone();
@@ -424,8 +421,8 @@ impl Int {
         i
     }
 
-    /// Uint64 returns the uint64 representation of the value.
-    /// If the value is not representable in an uint64 the result is undefined.
+    /// [`uint64()`] returns the [`u64`] representation of the value.
+    /// If the value is not representable in an [`u64`] the result is undefined.
     pub fn uint64(&self) -> u64 {
         let mut b = self.v.to_bytes_le().1;
         b.resize(8, 0_u8);
@@ -440,8 +437,8 @@ impl Int {
         }
     }
 
-    /// Exp sets the target to a^e mod m,
-    /// where e is an arbitrary big.Int exponent (not necessarily 0 <= e < m).
+    /// [`exp()`] sets the target to `a^e mod m`,
+    /// where `e` is an arbitrary [`BigInt`] exponent (not necessarily `0 <= e < m`).
     pub fn exp(mut self, a: &Self, e: &BigInt) -> Self {
         self.m = a.m.clone();
         // to protect against golang/go#22830
@@ -449,8 +446,8 @@ impl Int {
         self
     }
 
-    /// Jacobi computes the Jacobi symbol of (a/m), which indicates whether a is
-    /// zero (0), a positive square in m (1), or a non-square in m (-1).
+    /// [`jacobi()`] computes the `Jacobi` symbol of `(a/m)`, which indicates whether a is
+    /// `zero` (`0`), a positive square in `m` (`1`), or a non-square in `m` (`-1`).
     pub fn jacobi(&self, a_s: &Self) -> Self {
         let mut i = self.clone();
         i.m = a_s.m.clone();
@@ -458,29 +455,29 @@ impl Int {
         i
     }
 
-    /// Sqrt computes some square root of a mod m of ONE exists.
-    /// Assumes the modulus m is an odd prime.
-    /// Returns true on success, false if input a is not a square.
-    pub fn sqrt(&mut self, a_s: &Self) -> Result<(), BigIntError> {
+    /// [`sqrt()`] computes some square root of a `mod m` of ONE exists.
+    /// Assumes the modulus `m` is an `odd prime`.
+    /// Returns `true` on success, `false` if input a is not a square.
+    pub fn sqrt(&mut self, a_s: &Self) -> Result<(), IntError> {
         if a_s.v.sign() == Sign::Minus {
-            return Err(BigIntError::ImaginaryRoot);
+            return Err(IntError::ImaginaryRoot);
         }
         self.v = a_s.v.sqrt() % a_s.m.clone();
         self.m = a_s.m.clone();
         Ok(())
     }
 
-    /// BigEndian encodes the value of this Int into a big-endian byte-slice
-    /// at least min bytes but no more than max bytes long.
-    /// Panics if max != 0 and the Int cannot be represented in max bytes.
-    pub fn big_endian(&self, min: usize, max: usize) -> Result<Vec<u8>, BigIntError> {
+    /// [`big_endian()`] encodes the value of this [`Int`] into a big-endian byte-slice
+    /// at least `min` bytes but no more than `max` bytes long.
+    /// Returns an [`Error`](IntError) if `max != 0` and the [`Int`] cannot be represented in `max` bytes.
+    pub fn big_endian(&self, min: usize, max: usize) -> Result<Vec<u8>, IntError> {
         let act = self.marshal_size();
         let (mut pad, mut ofs) = (act, 0);
         if pad < min {
             (pad, ofs) = (min, min - act)
         }
         if max != 0 && pad > max {
-            return Err(BigIntError::NotRepresentable);
+            return Err(IntError::NotRepresentable);
         }
         let mut buf = vec![0_u8; pad];
         let b = self.v.to_bytes_be().1;
@@ -489,9 +486,9 @@ impl Int {
     }
 }
 
-/// reverse copies src into dst in byte-reversed order and returns dst,
-/// such that src[0] goes into dst[len-1] and vice versa.
-/// dst and src may be the same slice but otherwise must not overlap.
+/// [`reverse()`] copies `src` into `dst` in byte-reversed order and returns `dst`,
+/// such that `src[0]` goes into `dst[len-1]` and vice versa.
+/// `dst` and `src` may be the same slice but otherwise must not overlap.
 fn reverse(dst: &[u8], src: &[u8]) -> Vec<u8> {
     let mut dst = dst.to_vec();
     let l = dst.len();
@@ -503,7 +500,7 @@ fn reverse(dst: &[u8], src: &[u8]) -> Vec<u8> {
 }
 
 #[derive(Debug, Error)]
-pub enum BigIntError {
+pub enum IntError {
     #[error("marshalling error")]
     MarshallingError(#[from] MarshallingError),
     #[error("parse big int error")]

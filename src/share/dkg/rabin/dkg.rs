@@ -258,7 +258,7 @@ pub fn new_dist_key_generator<SUITE: Suite>(
     let mut found = false;
     let mut index = 0;
     for (i, p) in participants.iter().enumerate() {
-        if p.equal(&pubb) {
+        if p.eq(&pubb) {
             found = true;
             index = i as u32;
             break;

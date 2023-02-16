@@ -1,4 +1,4 @@
-use crate::{group::edwards25519::SuiteEd25519, util::random::Randstream, Group, Point, Scalar};
+use crate::{group::edwards25519::SuiteEd25519, util::random::RandStream, Group, Point, Scalar};
 
 use super::{decrypt, encrypt};
 
@@ -6,7 +6,7 @@ use super::{decrypt, encrypt};
 fn test_ecies() {
     let message = "Hello ECIES".as_bytes();
     let suite = SuiteEd25519::new_blake3_sha256_ed25519();
-    let private = suite.scalar().pick(&mut Randstream::default());
+    let private = suite.scalar().pick(&mut RandStream::default());
     let public = suite.point().mul(&private, None);
     let ciphertext = encrypt(suite, public, message).unwrap();
     let plaintext = decrypt(suite, private, &ciphertext).unwrap();
@@ -17,7 +17,7 @@ fn test_ecies() {
 fn test_ecies_fail_point() {
     let message = "Hello ECIES".as_bytes();
     let suite = SuiteEd25519::new_blake3_sha256_ed25519();
-    let private = suite.scalar().pick(&mut Randstream::default());
+    let private = suite.scalar().pick(&mut RandStream::default());
     let public = suite.point().mul(&private, None);
     let mut ciphertext = encrypt(suite, public, message).unwrap();
     ciphertext[0] ^= 0xff;
@@ -29,7 +29,7 @@ fn test_ecies_fail_point() {
 fn test_ecies_fail_ciphertext() {
     let message = "Hello ECIES".as_bytes();
     let suite = SuiteEd25519::new_blake3_sha256_ed25519();
-    let private = suite.scalar().pick(&mut Randstream::default());
+    let private = suite.scalar().pick(&mut RandStream::default());
     let public = suite.point().mul(&private, None);
     let mut ciphertext = encrypt(suite, public, message).unwrap();
     let l = suite.point_len();

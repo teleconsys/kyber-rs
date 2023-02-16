@@ -417,7 +417,7 @@ pub fn new_verifier<SUITE: Suite>(
     let mut ok = false;
     let mut index = 0;
     for (i, v) in verifiers.iter().enumerate() {
-        if v.equal(&pubb) {
+        if v.eq(&pubb) {
             ok = true;
             index = i;
             break;
@@ -786,7 +786,7 @@ where
         let commit_poly = share::poly::PubPoly::new(&self.suite, None, &d.commitments);
 
         let pub_share = commit_poly.eval(fi.i);
-        if !fig.equal(&pub_share.v) {
+        if !fig.eq(&pub_share.v) {
             return Err(VSSError::DealDoesNotVerify);
         }
         Ok(())
