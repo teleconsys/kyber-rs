@@ -1,11 +1,9 @@
-// var marshalPointID = [8]byte{'e', 'd', '.', 'p', 'o', 'i', 'n', 't'}
 use serde::{Deserialize, Serialize};
 
 use crate::{
     cipher::Stream,
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling, MarshallingError},
     group::{self, internal::marshalling, PointCanCheckCanonicalAndSmallOrder, PointError},
-    Point as PointTrait,
 };
 
 use super::{
@@ -205,11 +203,11 @@ impl group::Point for Point {
             None => {
                 ge_scalar_mult_base(&mut self.ge, &mut a);
             }
-            Some(a_caps) => {
+            Some(a_p) => {
                 if self.var_time {
-                    ge_scalar_mult_vartime(&mut self.ge, &mut a, &mut a_caps.clone().ge);
+                    ge_scalar_mult_vartime(&mut self.ge, &mut a, &mut a_p.clone().ge);
                 } else {
-                    ge_scalar_mult(&mut self.ge, &mut a, &mut a_caps.clone().ge);
+                    ge_scalar_mult(&mut self.ge, &mut a, &mut a_p.clone().ge);
                 }
             }
         }

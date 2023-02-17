@@ -1,5 +1,5 @@
-// This code is a port of the public domain, "ref10" implementation of ed25519
-// from SUPERCOP.
+/// This code is a port of the public domain, "ref10" implementation of ed25519
+/// from SUPERCOP.
 
 /// [`FieldElement`]  represents an element of the field `GF(2^255 - 19)`.  An element
 /// t, entries `t[0]...t[9]`, represents the integer `t[0]+2^26 t[1]+2^51 t[2]+2^77

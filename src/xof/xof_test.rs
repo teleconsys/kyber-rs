@@ -5,13 +5,12 @@ struct BlakeF {}
 
 impl XOFFactory for BlakeF {
     fn xof(&self, seed: Option<&[u8]>) -> Box<dyn XOF> {
-        // return blake2xb.New(seed)
         Box::new(blake3::Xof::new(seed))
     }
 }
 
 fn impls() -> Vec<Box<dyn XOFFactory>> {
-    vec![Box::new(BlakeF {}) /*, Box::new(keccakF {})*/]
+    vec![Box::new(BlakeF {})]
 }
 
 #[test]
@@ -26,7 +25,6 @@ fn test_enc_dec() {
 }
 
 fn test_enc_dec_impl(s: &(impl XOFFactory + ?Sized), _size: &usize) {
-    // t.Logf("implementation %T sz %v", s, size)
     let key = "key".as_bytes();
 
     let mut s1 = s.xof(Some(key));
@@ -54,7 +52,6 @@ fn test_clone_impls() {
 }
 
 fn test_clone(s: &(impl XOFFactory + ?Sized)) {
-    // t.Logf("implementation %T", s)
     let key = "key".as_bytes();
 
     let mut s1 = s.xof(Some(key));
@@ -82,8 +79,6 @@ fn test_errors_impls() {
 }
 
 fn test_errors(s: &(impl XOFFactory + ?Sized)) {
-    // t.Logf("implementation %T", s)
-
     let key = "key".as_bytes();
     let mut s1 = s.xof(Some(key));
     let src = "hello".as_bytes();
@@ -103,7 +98,6 @@ fn test_random_impls() {
 }
 
 fn test_random(s: &(impl XOFFactory + ?Sized)) {
-    // t.Logf("implementation %T", s)
     let mut xof1 = s.xof(None);
 
     for _ in 0..1000 {
@@ -127,9 +121,9 @@ fn test_random(s: &(impl XOFFactory + ?Sized)) {
     assert!((d - 0.50).abs() < 0.1, "two seed bitDiff {d}");
 }
 
-/// bit_diff compares the bits between two arrays returning the fraction
+/// [`bit_diff()`] compares the bits between two arrays returning the fraction
 /// of differences. If the two arrays are not of the same length
-/// no comparison is made and a -1 is returned.
+/// no comparison is made and a `-1` is returned.
 fn bit_diff(a: &[u8], b: &[u8]) -> f64 {
     if a.len() != b.len() {
         return -1_f64;
@@ -153,8 +147,6 @@ fn test_no_seed_impls() {
 }
 
 fn test_no_seed(s: &(impl XOFFactory + ?Sized)) {
-    // t.Logf("implementation %T", s)
-
     let mut xof1 = s.xof(None);
     let mut dst1 = [0_u8; 1024];
     xof1.read_exact(&mut dst1).unwrap();
@@ -173,7 +165,6 @@ fn test_reseed_impls() {
 }
 
 fn test_reseed(s: &(impl XOFFactory + ?Sized)) {
-    // t.Logf("implementation %T", s)
     let seed = "seed".as_bytes();
 
     let mut xof1 = s.xof(Some(seed));
@@ -199,17 +190,19 @@ fn test_enc_dec_mismatch_impls() {
 }
 
 fn test_enc_dec_mismatch(s: &(impl XOFFactory + ?Sized)) {
-    // t.Logf("implementation %T", s)
     let seed = "seed".as_bytes();
     let mut x1 = s.xof(Some(seed));
     let mut x2 = s.xof(Some(seed));
+
     let msg = "hello world".as_bytes().to_vec();
     let mut enc = vec![0_u8; msg.len()];
     let mut dec = vec![0_u8; msg.len()];
+
     x1.xor_key_stream(&mut enc[0..3], &msg[0..3]).unwrap();
     x1.xor_key_stream(&mut enc[3..4], &msg[3..4]).unwrap();
     x1.xor_key_stream(&mut enc[4..], &msg[4..]).unwrap();
     x2.xor_key_stream(&mut dec[0..5], &enc[0..5]).unwrap();
     x2.xor_key_stream(&mut dec[5..], &enc[5..]).unwrap();
+
     assert_eq!(msg, dec, "wrong decode");
 }

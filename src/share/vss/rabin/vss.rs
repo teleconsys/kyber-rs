@@ -1,4 +1,4 @@
-/// Crate vss implements the verifiable secret sharing scheme from the
+/// Crate [`rabin::vss`] implements the verifiable secret sharing scheme from the
 /// paper "Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold
 /// Scheme for Implicit Certificates".
 /// VSS enables a dealer to share a secret securely and verifiably among n
@@ -242,11 +242,11 @@ pub fn new_dealer<SUITE: Suite>(
     let d_pubb = suite.point().mul(&longterm, None);
 
     // Compute public polynomial coefficients
-    let f_caps = f.commit(Some(&suite.point().base()));
-    let (_, secret_commits) = f_caps.info();
-    let g_caps = g.commit(Some(&h));
+    let f_p = f.commit(Some(&suite.point().base()));
+    let (_, secret_commits) = f_p.info();
+    let g_p = g.commit(Some(&h));
 
-    let c = f_caps.add(&g_caps)?;
+    let c = f_p.add(&g_p)?;
     let (_, commitments) = c.info();
 
     let session_id = session_id(&suite, &d_pubb, verifiers, &commitments, t)?;
@@ -498,7 +498,7 @@ where
     /// If the deal itself is invalid, it returns a complaint response that must be
     /// broadcasted to every other participants including the dealer.
     /// If the deal has already been received, or the signature generation of the
-    /// response failed, it returns an error without any responses.
+    /// response failed, it returns an [`Error`](VSSError) without any responses.
     pub fn process_encrypted_deal(
         &mut self,
         e: &EncryptedDeal<SUITE::POINT>,
@@ -540,8 +540,7 @@ where
             Ok(_) => (),
             Err(e) => {
                 r.approved = false;
-                if let VSSError::DealDoesNotVerify = e {
-                } else {
+                if let VSSError::DealAlreadyProcessed = e {
                     return Err(e);
                 }
             }
@@ -699,7 +698,7 @@ where
     <SUITE::POINT as Point>::SCALAR: ScalarCanCheckCanonical,
 {
     /// [`verify_deal()`] analyzes the [`Deal`] and returns an [`Error`](VSSError) if it's incorrect. If
-    /// inclusion is `true`, it also returns an error if it the second time this struct
+    /// inclusion is `true`, it also returns an [`Error`](VSSError::DealAlreadyProcessed) if it the second time this struct
     /// analyzes a Deal.
     pub fn verify_deal(&mut self, d: &Deal<SUITE>, inclusion: bool) -> Result<(), VSSError> {
         if self.deal.is_some() && inclusion {

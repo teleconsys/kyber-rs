@@ -1,5 +1,4 @@
-// crate ecies implements the Elliptic Curve Integrated Encryption Scheme (ECIES).
-
+/// crate ecies implements the Elliptic Curve Integrated Encryption Scheme (ECIES).
 use crate::{
     dh::{DhError, AEAD, NONCE_SIZE},
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling, MarshallingError},
@@ -21,7 +20,7 @@ pub fn encrypt<GROUP: Group>(
 ) -> Result<Vec<u8>, EciesError> {
     // Generate an ephemeral elliptic curve scalar and point
     let r = group.scalar().pick(&mut RandStream::default());
-    let r_caps = group.point().mul(&r, None);
+    let r_p = group.point().mul(&r, None);
 
     // Compute shared DH key
     let dh = group.point().mul(&r, Some(&public));
@@ -36,14 +35,14 @@ pub fn encrypt<GROUP: Group>(
     let mut nonce = [0u8; NONCE_SIZE];
     nonce.copy_from_slice(&buf[32..len]);
 
-    let gcm = AEAD::<GROUP>::new(r_caps.clone(), &buf)?;
+    let gcm = AEAD::<GROUP>::new(r_p.clone(), &buf)?;
 
     // Encrypt message using AES-GCM
     let c = gcm.seal(None, &nonce, message, None)?;
 
     // Serialize ephemeral elliptic curve point and ciphertext
     let mut ctx = Vec::new();
-    r_caps.marshal_to(&mut ctx)?;
+    r_p.marshal_to(&mut ctx)?;
     for v in c {
         ctx.push(v);
     }
@@ -62,12 +61,12 @@ pub fn decrypt<GROUP: Group>(
     ctx: &[u8],
 ) -> Result<Vec<u8>, EciesError> {
     // Reconstruct the ephemeral elliptic curve point
-    let mut r_caps = group.point();
+    let mut r_p = group.point();
     let l = group.point_len();
-    r_caps.unmarshal_binary(&ctx[..l])?;
+    r_p.unmarshal_binary(&ctx[..l])?;
 
     // Compute shared DH key and derive the symmetric key and nonce via HKDF
-    let dh = group.point().mul(&private, Some(&r_caps));
+    let dh = group.point().mul(&private, Some(&r_p));
     let len = 32 + NONCE_SIZE;
     let buf = derive_key::<GROUP>(&dh, len)?;
 
@@ -75,7 +74,7 @@ pub fn decrypt<GROUP: Group>(
     nonce.copy_from_slice(&buf[32..len]);
 
     // Decrypt message using AES-GCM
-    let gcm = AEAD::<GROUP>::new(r_caps.clone(), &buf)?;
+    let gcm = AEAD::<GROUP>::new(r_p.clone(), &buf)?;
     Ok(gcm.open(None, &nonce, &ctx[l..], None)?)
 }
 

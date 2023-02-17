@@ -11,7 +11,7 @@ use super::ge::{
 pub fn ge_scalar_mult_vartime(
     h: &mut ExtendedGroupElement,
     a: &mut [u8; 32],
-    a_caps: &mut ExtendedGroupElement,
+    a_p: &mut ExtendedGroupElement,
 ) {
     let mut a_slide = [0_i8; 256];
     let mut ai = [CachedGroupElement::default(); 8]; // A,3A,5A,7A,9A,11A,13A,15A
@@ -28,8 +28,8 @@ pub fn ge_scalar_mult_vartime(
     // in addition-ready cached group element form.
     // We only need odd multiples of A because slide()
     // produces only odd-multiple clumps of bits.
-    a_caps.to_cached(&mut ai[0]);
-    a_caps.double(&mut t);
+    a_p.to_cached(&mut ai[0]);
+    a_p.double(&mut t);
     t.to_extended(&mut a2);
     for i in 0..7 {
         t.add(&a2, &ai[i]);

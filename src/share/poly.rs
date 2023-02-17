@@ -1,13 +1,12 @@
-// crate share implements Shamir secret sharing and polynomial commitments.
-// Shamir's scheme allows you to split a secret value into multiple parts, so called
-// shares, by evaluating a secret sharing polynomial at certain indices. The
-// shared secret can only be reconstructed (via Lagrange interpolation) if a
-// threshold of the participants provide their shares. A polynomial commitment
-// scheme allows a committer to commit to a secret sharing polynomial so that
-// a verifier can check the claimed evaluations of the committed polynomial.
-// Both schemes of this package are core building blocks for more advanced
-// secret sharing techniques.
-
+/// crate share implements Shamir secret sharing and polynomial commitments.
+/// Shamir's scheme allows you to split a secret value into multiple parts, so called
+/// shares, by evaluating a secret sharing polynomial at certain indices. The
+/// shared secret can only be reconstructed (via Lagrange interpolation) if a
+/// threshold of the participants provide their shares. A polynomial commitment
+/// scheme allows a committer to commit to a secret sharing polynomial so that
+/// a verifier can check the claimed evaluations of the committed polynomial.
+/// Both schemes of this package are core building blocks for more advanced
+/// secret sharing techniques.
 use byteorder::LittleEndian;
 use byteorder::WriteBytesExt;
 use digest::Digest;
@@ -557,7 +556,7 @@ pub fn recover_commit<GROUP: Group>(
     let mut den = g.scalar();
     let mut tmp = g.scalar();
     let mut acc = g.point().null();
-    let mut tmp_caps = g.point();
+    let mut tmp_p = g.point();
 
     for (i, xi) in x.iter() {
         num = num.one();
@@ -572,9 +571,9 @@ pub fn recover_commit<GROUP: Group>(
         }
         let num_clone = num.clone();
         num = num.div(&num_clone, &den);
-        tmp_caps = tmp_caps.mul(&num, Some(&y[i]));
+        tmp_p = tmp_p.mul(&num, Some(&y[i]));
         let acc_clone = acc.clone();
-        acc = acc.add(&acc_clone, &tmp_caps);
+        acc = acc.add(&acc_clone, &tmp_p);
     }
 
     Ok(acc)

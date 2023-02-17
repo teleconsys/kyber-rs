@@ -1,18 +1,17 @@
-// crate dss implements the Distributed Schnorr Signature protocol from the
-// paper "Provably Secure Distributed Schnorr Signatures and a (t, n)
-// Threshold Scheme for Implicit Certificates".
-// https://dl.acm.org/citation.cfm?id=678297
-// To generate a distributed signature from a group of participants, the group
-// must first generate one longterm distributed secret with the dkg crate
-// and then one random secret to be used only once.
-// Each participant then creates a DSS struct, that can issue partial signatures
-// with `partial_sig()`. These partial signatures can be broadcasted to
-// the whole group or to a trusted combiner. Once one has collected enough
-// partial signatures, it is possible to compute the distributed signature with
-// the `signature` method.
-// The resulting signature is compatible with the EdDSA verification function.
-// against the longterm distributed key.
-
+/// crate dss implements the Distributed Schnorr Signature protocol from the
+/// paper "Provably Secure Distributed Schnorr Signatures and a (t, n)
+/// Threshold Scheme for Implicit Certificates".
+/// https://dl.acm.org/citation.cfm?id=678297
+/// To generate a distributed signature from a group of participants, the group
+/// must first generate one longterm distributed secret with the dkg crate
+/// and then one random secret to be used only once.
+/// Each participant then creates a DSS struct, that can issue partial signatures
+/// with `partial_sig()`. These partial signatures can be broadcasted to
+/// the whole group or to a trusted combiner. Once one has collected enough
+/// partial signatures, it is possible to compute the distributed signature with
+/// the `signature` method.
+/// The resulting signature is compatible with the EdDSA verification function.
+/// against the longterm distributed key.
 use digest::Digest;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;

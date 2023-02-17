@@ -1,4 +1,4 @@
-// Crate key creates asymmetric key pairs.
+/// Crate key creates asymmetric key pairs.
 use crate::{group::edwards25519::CurveError, Group, Point, Random, Scalar};
 use thiserror::Error;
 

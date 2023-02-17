@@ -19,10 +19,10 @@ pub fn el_gamal_encrypt<GROUP: Group>(
     let remainder = message[max..].to_vec();
     // ElGamal-encrypt the point to produce ciphertext (K,C).
     let k = group.scalar().pick(&mut RandStream::default()); // ephemeral private key
-    let k_caps = group.point().mul(&k, None); // ephemeral DH public key
+    let k_p = group.point().mul(&k, None); // ephemeral DH public key
     let s = group.point().mul(&k, Some(pubkey)); // ephemeral DH shared secret
     let c = s.clone().add(&s, &m); // message blinded with secret
-    (k_caps, c, remainder)
+    (k_p, c, remainder)
 }
 
 pub fn el_gamal_decrypt<GROUP: Group>(
@@ -67,11 +67,11 @@ fn example_el_gamal_encryption() {
 
     // Create a public/private keypair
     let a = suite.scalar().pick(&mut suite.random_stream()); // Alice's private key
-    let a_caps = suite.point().mul(&a, None); // Alice's public key
+    let a_p = suite.point().mul(&a, None); // Alice's public key
 
     // ElGamal-encrypt a message using the public key.
     let m = "The quick brown fox".as_bytes();
-    let (k, c, _) = el_gamal_encrypt(suite, &a_caps, m);
+    let (k, c, _) = el_gamal_encrypt(suite, &a_p, m);
 
     // Decrypt it using the corresponding private key.
     let dec_res = el_gamal_decrypt(suite, &a, k, c);

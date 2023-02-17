@@ -238,14 +238,14 @@ fn test_example_dkg() {
         }));
     }
 
-    let r_caps = share::poly::recover_commit(suite, &pub_shares, n, n).unwrap(); // R = f(V1, V2, ...Vi)
+    let r_p = share::poly::recover_commit(suite, &pub_shares, n, n).unwrap(); // R = f(V1, V2, ...Vi)
 
     let decrypted_point = suite.point().sub(
         // C - (R - pA)
         &c,
         &suite.point().sub(
             // R - pA
-            &r_caps,
+            &r_p,
             &suite.point().mul(&p, Some(&a)), // pA
         ),
     );

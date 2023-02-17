@@ -1,6 +1,5 @@
-// Crate eddsa implements the EdDSA signature algorithm according to
-// RFC8032.
-
+/// Crate eddsa implements the EdDSA signature algorithm according to
+/// RFC8032.
 use digest::Digest;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;

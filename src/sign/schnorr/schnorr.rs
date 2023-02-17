@@ -95,12 +95,12 @@ where
     let h = hash(&g, &public, &r, msg)?;
 
     // compute S = g^s
-    let s_caps = g.point().mul(&s, None);
+    let s_p = g.point().mul(&s, None);
     // compute RAh = R + A^h
     let ah = g.point().mul(&h, Some(&public));
     let ras = g.point().add(&r, &ah);
 
-    if !s_caps.eq(&ras) {
+    if !s_p.eq(&ras) {
         return Err(SignatureError::InvalidSignature(
             "reconstructed S is not equal to signature".to_owned(),
         ));

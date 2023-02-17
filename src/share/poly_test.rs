@@ -252,22 +252,22 @@ fn test_public_add() {
     let n = 10;
     let t = n / 2 + 1;
 
-    let g_caps = g.point().pick(&mut g.random_stream());
+    let g_p = g.point().pick(&mut g.random_stream());
     let h = g.point().pick(&mut g.random_stream());
 
     let p = new_pri_poly(g, t, None, g.random_stream());
     let q = new_pri_poly(g, t, None, g.random_stream());
 
-    let p_caps = p.commit(Some(&g_caps));
-    let q_caps = q.commit(Some(&h));
+    let p_p = p.commit(Some(&g_p));
+    let q_p = q.commit(Some(&h));
 
-    let r = p_caps.add(&q_caps).unwrap();
+    let r = p_p.add(&q_p).unwrap();
 
     let shares = r.shares(n);
     let recovered = recover_commit(g, &shares, t, n).unwrap();
 
-    let x = p_caps.commit();
-    let y = q_caps.commit();
+    let x = p_p.commit();
+    let y = q_p.commit();
     let z = g.point().add(&x, &y);
 
     assert_eq!(
@@ -282,21 +282,21 @@ fn test_public_poly_equal() {
     let n = 10;
     let t = n / 2 + 1;
 
-    let g_caps = g.point().pick(&mut g.random_stream());
+    let g_p = g.point().pick(&mut g.random_stream());
 
     let p1 = new_pri_poly(g, t, None, g.random_stream());
     let p2 = new_pri_poly(g, t, None, g.random_stream());
     let p3 = new_pri_poly(g, t, None, g.random_stream());
 
-    let p_caps1 = p1.commit(Some(&g_caps));
-    let p_caps2 = p2.commit(Some(&g_caps));
-    let p_caps3 = p3.commit(Some(&g_caps));
+    let p_p1 = p1.commit(Some(&g_p));
+    let p_p2 = p2.commit(Some(&g_p));
+    let p_p3 = p3.commit(Some(&g_p));
 
-    let p12 = p_caps1.add(&p_caps2).unwrap();
-    let p13 = p_caps1.add(&p_caps3).unwrap();
+    let p12 = p_p1.add(&p_p2).unwrap();
+    let p13 = p_p1.add(&p_p3).unwrap();
 
-    let p123 = p12.add(&p_caps3).unwrap();
-    let p132 = p13.add(&p_caps2).unwrap();
+    let p123 = p12.add(&p_p3).unwrap();
+    let p132 = p13.add(&p_p2).unwrap();
 
     assert!(p123.equal(&p132).unwrap(), "public polynomials not equal");
 }

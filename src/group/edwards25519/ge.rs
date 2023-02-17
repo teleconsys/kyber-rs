@@ -1,12 +1,11 @@
-// Group elements are members of the elliptic curve -x^2 + y^2 = 1 + d * x^2 *
-// y^2 where d = -121665/121666.
-//
-// Several representations are used:
-//   projectiveGroupElement: (X:Y:Z) satisfying x=X/Z, y=Y/Z
-//   extendedGroupElement: (X:Y:Z:T) satisfying x=X/Z, y=Y/Z, XY=ZT
-//   completedGroupElement: ((X:Z),(Y:T)) satisfying x=X/Z, y=Y/T
-//   preComputedGroupElement: (y+x,y-x,2dxy)
-
+/// `Group elements` are members of the elliptic curve -x^2 + y^2 = 1 + d * x^2 *
+/// y^2 where d = -121665/121666.
+///
+/// Several representations are used:
+///   [`ProjectiveGroupElement`]: `(X:Y:Z)` satisfying `x=X/Z`, `y=Y/Z`
+///   [`ExtendedGroupElement`]: `(X:Y:Z:T)` satisfying `x=X/Z`, `y=Y/Z`, `XY=ZT`
+///   [`CompletedGroupElement`]: `((X:Z),(Y:T))` satisfying `x=X/Z`, `y=Y/T`
+///   [`PreComputedGroupElement`]: `(y+x,y-x,2dxy)`
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -504,7 +503,7 @@ fn select_cached(c: &mut CachedGroupElement, ai: &[CachedGroupElement; 8], b: i3
 pub fn ge_scalar_mult(
     h: &mut ExtendedGroupElement,
     a: &mut [u8; 32],
-    a_caps: &mut ExtendedGroupElement,
+    a_p: &mut ExtendedGroupElement,
 ) {
     let mut t = CompletedGroupElement::default();
     let mut u = ExtendedGroupElement::default();
@@ -531,9 +530,9 @@ pub fn ge_scalar_mult(
 
     // compute cached array of multiples of A from 1A through 8A
     let mut ai = [CachedGroupElement::default(); 8]; // A,1A,2A,3A,4A,5A,6A,7A
-    a_caps.to_cached(&mut ai[0]);
+    a_p.to_cached(&mut ai[0]);
     for i in 0..7 {
-        t.add(a_caps, &ai[i]);
+        t.add(a_p, &ai[i]);
         t.to_extended(&mut u);
         u.to_cached(&mut ai[i + 1]);
     }

@@ -104,8 +104,8 @@ impl cipher::Stream for ConstantStream {
     }
 }
 
-// ConstantStream is a cipher.Stream which always returns
-// the same value.
+/// [`constant_stream()`] is a [`cipher::Stream`] which always returns
+/// the same value.
 pub fn constant_stream(buff: Vec<u8>) -> Box<dyn cipher::Stream> {
     Box::new(ConstantStream {
         seed: buff[..32].to_vec(),

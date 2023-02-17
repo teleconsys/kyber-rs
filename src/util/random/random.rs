@@ -97,13 +97,11 @@ impl Stream for RandStream {
         let reader_bytes = 32;
 
         // try to read readerBytes bytes from all readers and write them in a buffer
-        // let b: bytes.Buffer;
         let mut b = vec![];
         let mut nerr = 0_usize;
         let mut buff = vec![0_u8; reader_bytes];
         for reader in &mut self.readers {
             let result = reader.read_exact(&mut buff);
-            // n, err := io.ReadFull(reader, buff)
             if result.is_err() {
                 nerr += 1;
                 continue;
@@ -121,11 +119,8 @@ impl Stream for RandStream {
         let mut h: Sha256 = Sha256::new();
         h.update(b);
         let seed = h.finalize();
-        // h.Write(b.Bytes())
-        // seed := h.Sum(nil)
+
         let mut blake = Xof::new(Some(&seed));
         blake.xor_key_stream(dst, src)
-        // blake2 := blake2xb.New(seed)
-        // blake2.XORKeyStream(dst, src)
     }
 }
