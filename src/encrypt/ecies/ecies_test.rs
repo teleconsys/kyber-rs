@@ -21,6 +21,7 @@ fn test_ecies_fail_point() {
     let public = suite.point().mul(&private, None);
     let mut ciphertext = encrypt(suite, public, message).unwrap();
     ciphertext[0] ^= 0xff;
+    // TODO: fix this check to get the specific error
     let res = decrypt(suite, private, &ciphertext);
     assert!(res.is_err())
 }
@@ -34,6 +35,7 @@ fn test_ecies_fail_ciphertext() {
     let mut ciphertext = encrypt(suite, public, message).unwrap();
     let l = suite.point_len();
     ciphertext[l] ^= 0xff;
+    // TODO: fix this check to get the specific error
     let res = decrypt(suite, private, &ciphertext);
     assert!(res.is_err())
 }

@@ -84,8 +84,10 @@ fn test_errors(s: &(impl XOFFactory + ?Sized)) {
     let src = "hello".as_bytes();
     let dst: &mut [u8] = &mut [0; 100];
     s1.xor_key_stream(dst, src).unwrap();
+    // TODO: fix this check to get the specific error
     assert!(s1.write(src).is_err(), "write after read should error");
 
+    // TODO: fix this check to get the specific error
     let result = s1.as_mut().xor_key_stream(&mut dst[0..src.len() - 1], src);
     assert!(result.is_err(), "dst too short should error");
 }
@@ -170,6 +172,7 @@ fn test_reseed(s: &(impl XOFFactory + ?Sized)) {
     let mut xof1 = s.xof(Some(seed));
     let mut dst1 = [0_u8; 1024];
     xof1.read_exact(&mut dst1).unwrap();
+    // TODO: fix this check to get the specific error
     assert!(xof1.write(seed).is_err(), "without reseed should be Err");
     xof1.reseed();
     let mut xof2 = xof1.clone();

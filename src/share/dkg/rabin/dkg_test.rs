@@ -80,6 +80,7 @@ fn test_dkg_deal() {
     let mut dkgs = full_exchange(&t);
     let dkg = &mut dkgs[0];
 
+    // TODO: fix this check to get the specific error
     let res = dkg.dist_key_share();
     assert!(res.is_err());
     //assert.Nil(t, dks)
@@ -112,6 +113,7 @@ fn test_dkg_process_deal() {
     // verifier don't find itself
     let good_p = rec.participants.clone();
     rec.participants = Vec::new();
+    // TODO: fix this check to get the specific error
     let res = rec.process_deal(deal);
     assert!(res.is_err());
     rec.participants = good_p;
@@ -119,6 +121,7 @@ fn test_dkg_process_deal() {
     // wrong index
     let good_idx = deal.index;
     deal.index = (NB_PARTICIPANTS + 1) as u32;
+    // TODO: fix this check to get the specific error
     let res = rec.process_deal(deal);
     assert!(res.is_err());
     deal.index = good_idx;
@@ -126,6 +129,7 @@ fn test_dkg_process_deal() {
     // wrong deal
     let good_sig = deal.deal.signature.clone();
     deal.deal.signature = random_bytes(deal.deal.signature.len());
+    // TODO: fix this check to get the specific error
     let res = rec.process_deal(deal);
     assert!(res.is_err());
     deal.deal.signature = good_sig;
@@ -137,6 +141,7 @@ fn test_dkg_process_deal() {
     assert_eq!(0, resp.index);
 
     // duplicate
+    // TODO: fix this check to get the specific error
     let res = rec.process_deal(deal);
     assert!(res.is_err());
 }
@@ -172,6 +177,7 @@ fn test_dkg_process_response() {
     // no verifier tied to Response
     assert!(dkgs[0].verifiers.contains_key(&0));
     let v = dkgs[0].verifiers.remove(&0).unwrap();
+    // TODO: fix this check to get the specific error
     let res = dkgs[0].process_response(&resp);
     assert!(res.is_err());
     dkgs[0].verifiers.insert(0, v);
@@ -179,6 +185,7 @@ fn test_dkg_process_response() {
     // invalid response
     let good_sig = resp.response.signature.clone();
     resp.response.signature = random_bytes(good_sig.len());
+    // TODO: fix this check to get the specific error
     let res = dkgs[0].process_response(&resp);
     assert!(res.is_err());
     resp.response.signature = good_sig;
@@ -229,6 +236,7 @@ fn test_dkg_process_response() {
     // remove verifiers
     let v = dkgs[0].verifiers.remove(&j.index).unwrap();
     let res = dkgs[0].process_justification(&j);
+    // TODO: fix this check to get the specific error
     assert!(res.is_err());
     dkgs[0].verifiers.insert(j.index, v);
 }
@@ -245,12 +253,14 @@ fn test_dkg_secret_commits() {
     // wrong index
     let good_idx = sc.index;
     sc.index = (NB_PARTICIPANTS + 1) as u32;
+    // TODO: fix this check to get the specific error
     let res = dkgs[1].process_secret_commits(&sc);
     assert!(res.is_err());
     sc.index = good_idx;
 
     // not in qual: delete the verifier
     let good_v = dkgs[1].verifiers.remove(&0).unwrap();
+    // TODO: fix this check to get the specific error
     let res = dkgs[1].process_secret_commits(&sc);
     assert!(res.is_err());
     dkgs[1].verifiers.insert(0, good_v);
@@ -258,6 +268,7 @@ fn test_dkg_secret_commits() {
     // invalid sig
     let good_sig = sc.signature.clone();
     sc.signature = random_bytes(good_sig.len());
+    // TODO: fix this check to get the specific error
     let res = dkgs[1].process_secret_commits(&sc);
     assert!(res.is_err());
     sc.signature = good_sig;
@@ -265,6 +276,7 @@ fn test_dkg_secret_commits() {
     // invalid session id
     let good_sid = sc.session_id;
     sc.session_id = random_bytes(good_sid.len());
+    // TODO: fix this check to get the specific error
     let res = dkgs[1].process_secret_commits(&sc);
     assert!(res.is_err());
     sc.session_id = good_sid;
@@ -321,6 +333,7 @@ fn test_dkg_complaint_commits() {
     // ComplaintCommits: wrong index
     let good_index = cc.index;
     cc.index = NB_PARTICIPANTS as u32;
+    // TODO: fix this check to get the specific error
     let res = dkgs[2].process_complaint_commits(&cc);
     assert!(res.is_err());
     cc.index = good_index;
@@ -328,12 +341,14 @@ fn test_dkg_complaint_commits() {
     // invalid signature
     let good_sig = cc.signature.clone();
     cc.signature = random_bytes(cc.signature.len());
+    // TODO: fix this check to get the specific error
     let res = dkgs[2].process_complaint_commits(&cc);
     assert!(res.is_err());
     cc.signature = good_sig;
 
     // no verifiers
     let v = dkgs[2].verifiers.remove(&0).unwrap();
+    // TODO: fix this check to get the specific error
     let res = dkgs[2].process_complaint_commits(&cc);
     assert!(res.is_err());
     dkgs[2].verifiers.insert(0, v);
@@ -347,17 +362,20 @@ fn test_dkg_complaint_commits() {
         t: good_deal.t,
         commitments: good_deal.commitments.clone(),
     };
+    // TODO: fix this check to get the specific error
     let res = dkgs[2].process_complaint_commits(&cc);
     assert!(res.is_err());
     cc.deal = good_deal;
 
     //  no commitments
     let sc = dkgs[2].commitments.remove(&0).unwrap();
+    // TODO: fix this check to get the specific error
     let res = dkgs[2].process_complaint_commits(&cc);
     assert!(res.is_err());
     dkgs[2].commitments.insert(0, sc);
 
     // secret commits are passing the check
+    // TODO: fix this check to get the specific error
     let res = dkgs[2].process_complaint_commits(&cc);
     assert!(res.is_err());
 
@@ -432,18 +450,21 @@ fn test_dkg_reconstruct_commits() {
     dkgs[2].reconstructed.remove(&0);
 
     // commitments not invalidated by any complaints
+    // TODO: fix this check to get the specific error
     assert!(dkgs[2].process_reconstruct_commits(&rc).is_err());
     dkgs[2].commitments.remove(&0);
 
     // invalid index
     let good_i = rc.index;
     rc.index = NB_PARTICIPANTS as u32;
+    // TODO: fix this check to get the specific error
     assert!(dkgs[2].process_reconstruct_commits(&rc).is_err());
     rc.index = good_i;
 
     // invalid sig
     let good_sig = rc.signature.clone();
     rc.signature = random_bytes(good_sig.len());
+    // TODO: fix this check to get the specific error
     assert!(dkgs[2].process_reconstruct_commits(&rc).is_err());
     rc.signature = good_sig;
 
@@ -484,6 +505,7 @@ fn test_dkg_reconstruct_commits() {
         // invalid session ID
         let good_sid = rc.session_id.clone();
         rc.session_id = random_bytes(good_sid.len());
+        // TODO: fix this check to get the specific error
         assert!(dkgs[2].process_reconstruct_commits(rc).is_err());
         rc.session_id = good_sid;
 
@@ -584,6 +606,7 @@ fn test_dist_key_share() {
     // NOTE: need a block for the mut reference to dkgs
     {
         let last_dkg = &mut dkgs[dkgs_len - 1];
+        // TODO: fix this check to get the specific error
         let res = last_dkg.dist_key_share();
         assert!(res.is_err());
 
@@ -609,6 +632,7 @@ fn test_dist_key_share() {
         let last_dkg = &mut dkgs[dkgs_len - 1];
         // missing one commitment
         let last_commitment_0 = last_dkg.commitments.remove(&0_u32).unwrap();
+        // TODO: fix this check to get the specific error
         let res = last_dkg.dist_key_share();
         assert!(res.is_err());
         last_dkg.commitments.insert(0_u32, last_commitment_0);
