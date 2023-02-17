@@ -3,7 +3,7 @@ use scanner_rust::Scanner;
 use std::fs::File;
 
 use kyber_rs::{
-    cipher::{cipher, StreamError},
+    cipher::{stream, StreamError},
     encoding::BinaryMarshaler,
     group::edwards25519::SuiteEd25519,
     sign::eddsa::{verify, EdDSA},
@@ -97,7 +97,7 @@ pub struct ConstantStream {
     pub seed: Vec<u8>,
 }
 
-impl cipher::Stream for ConstantStream {
+impl stream::Stream for ConstantStream {
     fn xor_key_stream(&mut self, dst: &mut [u8], _: &[u8]) -> Result<(), StreamError> {
         dst.copy_from_slice(&self.seed);
         Ok(())
@@ -106,7 +106,7 @@ impl cipher::Stream for ConstantStream {
 
 /// [`constant_stream()`] is a [`cipher::Stream`] which always returns
 /// the same value.
-pub fn constant_stream(buff: Vec<u8>) -> Box<dyn cipher::Stream> {
+pub fn constant_stream(buff: Vec<u8>) -> Box<dyn stream::Stream> {
     Box::new(ConstantStream {
         seed: buff[..32].to_vec(),
     })

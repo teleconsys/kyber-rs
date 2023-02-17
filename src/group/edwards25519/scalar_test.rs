@@ -10,7 +10,7 @@ use crate::{
         edwards25519::{scalar_test_types::ONE, Scalar},
         ScalarCanCheckCanonical,
     },
-    util::random::random,
+    util::random::random_stream,
 };
 
 #[test]
@@ -87,7 +87,7 @@ fn test_simple<T: ScalarTrait>(new: fn() -> T) {
     let mut s1 = new();
     let mut s2 = new();
     s1 = s1.set_int64(2);
-    s2 = s2.pick(&mut random::RandStream::default());
+    s2 = s2.pick(&mut random_stream::RandStream::default());
 
     let s22 = s2.clone() + s2.clone();
 

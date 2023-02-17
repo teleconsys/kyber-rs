@@ -7,7 +7,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use thiserror::Error;
 
-use crate::cipher::cipher::Stream;
+use crate::cipher::stream::Stream;
 use crate::dh::{Dh, HmacCompatible};
 use crate::encoding::Marshaling;
 use std::fmt::Debug;

@@ -8,14 +8,14 @@ use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, ModInverse, ParseBigIntError, Sign};
 use num_traits::{Num, Signed};
 
-use crate::cipher::cipher::Stream;
+use crate::cipher::stream::Stream;
 use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling, MarshallingError};
 use crate::group::internal::marshalling;
 use crate::group::Scalar;
 use crate::util::random::random_int;
 use serde::{Deserialize, Serialize};
 
-use crate::group::integer_field::integer_field::ByteOrder::{BigEndian, LittleEndian};
+use crate::group::integer_field::integer::ByteOrder::{BigEndian, LittleEndian};
 
 lazy_static! {
     pub static ref ONE: BigInt = BigInt::from(1_i64);

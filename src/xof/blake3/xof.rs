@@ -2,10 +2,10 @@ use std::io::{Read, Write};
 
 use thiserror::Error;
 
-use crate::cipher::cipher::Stream;
+use crate::cipher::stream::Stream;
 use crate::cipher::StreamError;
 
-use crate::xof::xof;
+use crate::xof::traits;
 
 #[derive(Clone)]
 enum HashState {
@@ -83,8 +83,8 @@ impl std::io::Read for Xof {
     }
 }
 
-impl xof::XOF for Xof {
-    fn clone(&self) -> Box<dyn xof::XOF> {
+impl traits::XOF for Xof {
+    fn clone(&self) -> Box<dyn traits::XOF> {
         Box::new(Xof {
             implementation: self.implementation.clone(),
             key: self.key.clone(),

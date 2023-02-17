@@ -1,5 +1,5 @@
 use crate::xof::blake3;
-use crate::xof::xof::{XOFFactory, XOF};
+use crate::xof::traits::{XOFFactory, XOF};
 
 struct BlakeF {}
 

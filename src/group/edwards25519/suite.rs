@@ -119,7 +119,7 @@ impl Random for SuiteEd25519 {
         // if self.r != nil {
         //     return s.r;
         // }
-        Box::<util::random::random::RandStream>::default()
+        Box::<util::random::random_stream::RandStream>::default()
     }
 }
 

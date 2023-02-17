@@ -1,5 +1,5 @@
-mod key;
+mod key_pair;
 #[cfg(test)]
 mod key_test;
 
-pub use key::*;
+pub use key_pair::*;

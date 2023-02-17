@@ -1,4 +1,4 @@
-/// Crate [`rabin::dkg`] implements the protocol described in
+/// module [`rabin::dkg`] implements the protocol described in
 /// "Secure Distributed Key Generation for Discrete-Log
 /// Based Cryptosystems" by R. Gennaro, S. Jarecki, H. Krawczyk, and T. Rabin.
 /// DKG enables a group of participants to generate a distributed key
@@ -86,7 +86,7 @@ impl<SUITE: Suite> dss::DistKeyShare<SUITE> for DistKeyShare<SUITE> {
 
 /// [`Deal`] holds the Deal for one participant as well as the index of the issuing
 /// Dealer.
-///  NOTE: Doing that in vss crate would be possible but then the Dealer is always
+///  NOTE: Doing that in vss module would be possible but then the Dealer is always
 ///  assumed to be a member of the participants. It's only the case here.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Deal<POINT: Point> {

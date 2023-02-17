@@ -1,2 +1,3 @@
-pub mod integer_field;
-mod integer_field_test;
+pub mod integer;
+#[cfg(test)]
+mod integer_test;

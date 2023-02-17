@@ -1,4 +1,4 @@
-use crate::util::key::KeyError;
+use crate::util::key::{KeyError, self};
 use anyhow::{bail, Result};
 use digest::{Digest, DynDigest};
 
@@ -7,7 +7,7 @@ use crate::{
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling},
     group::HashFactory,
     util::{
-        key::{self, Generator, Suite as KeySuite},
+        key::{Generator, Suite as KeySuite},
         random::RandStream,
     },
     Group, Point, Random, Scalar, XOFFactory, XOF,

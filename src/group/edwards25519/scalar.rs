@@ -6,12 +6,12 @@ use num_bigint::BigInt;
 use num_bigint_dig as num_bigint;
 use serde::{Deserialize, Serialize};
 
-use crate::cipher::cipher::Stream;
+use crate::cipher::stream::Stream;
 use crate::group::edwards25519::constants;
 use crate::group::edwards25519::constants::PRIME_ORDER;
 use crate::group::edwards25519::fe::{load3, load4};
-use crate::group::integer_field::integer_field::ByteOrder::LittleEndian;
-use crate::group::integer_field::integer_field::Int;
+use crate::group::integer_field::integer::ByteOrder::LittleEndian;
+use crate::group::integer_field::integer::Int;
 use subtle::ConstantTimeEq;
 
 use super::constants::{FULL_ORDER, L_MINUS2};
@@ -142,7 +142,7 @@ impl group::Scalar for Scalar {
     }
 
     fn pick(self, rand: &mut impl Stream) -> Self {
-        let mut i = integer_field::integer_field::Int::new_int(
+        let mut i = integer_field::integer::Int::new_int(
             random::random_int(&PRIME_ORDER, rand),
             PRIME_ORDER.clone(),
         );

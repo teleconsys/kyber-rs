@@ -1,4 +1,4 @@
-/// Crate [`rabin::vss`] implements the verifiable secret sharing scheme from the
+/// module [`rabin::vss`] implements the verifiable secret sharing scheme from the
 /// paper "Provably Secure Distributed Schnorr Signatures and a (t, n) Threshold
 /// Scheme for Implicit Certificates".
 /// VSS enables a dealer to share a secret securely and verifiably among n

@@ -1,4 +1,4 @@
-/// crate ecies implements the Elliptic Curve Integrated Encryption Scheme (ECIES).
+/// module `ecies` implements the Elliptic Curve Integrated Encryption Scheme (ECIES).
 use crate::{
     dh::{DhError, AEAD, NONCE_SIZE},
     encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling, MarshallingError},

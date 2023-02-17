@@ -3,8 +3,8 @@ use std::io::{Read, Write};
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 
 use crate::{
-    cipher::{cipher::Stream, StreamError},
-    util::random::random::RandStream,
+    cipher::{stream::Stream, StreamError},
+    util::random::random_stream::RandStream,
 };
 
 const SIZE: usize = 32;

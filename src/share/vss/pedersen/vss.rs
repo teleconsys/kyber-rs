@@ -1,4 +1,4 @@
-/// crate [`pedersen::vss`] implements the verifiable secret sharing scheme from
+/// module [`pedersen::vss`] implements the verifiable secret sharing scheme from
 /// "Non-Interactive and Information-Theoretic Secure Verifiable Secret Sharing"
 /// by Torben Pryds Pedersen.
 /// https://link.springer.com/content/pdf/10.1007/3-540-46766-1_9.pdf

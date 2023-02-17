@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::cipher::cipher::Stream;
+use crate::cipher::stream::Stream;
 
 /// An [`XOF`] is an extendable output function, which is a cryptographic
 /// primitive that can take arbitrary input in the same way a hash

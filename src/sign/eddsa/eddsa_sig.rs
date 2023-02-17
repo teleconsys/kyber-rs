@@ -1,4 +1,4 @@
-/// Crate eddsa implements the EdDSA signature algorithm according to
+/// module eddsa implements the EdDSA signature algorithm according to
 /// RFC8032.
 use digest::Digest;
 use serde::{Deserialize, Serialize};

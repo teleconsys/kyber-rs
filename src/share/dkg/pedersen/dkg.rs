@@ -1,5 +1,5 @@
-/// crate [`pedersen::dkg`] implements a general distributed key generation (DKG) framework.
-/// This crate serves two functionalities: (1) to run a fresh new DKG from
+/// module [`pedersen::dkg`] implements a general distributed key generation (DKG) framework.
+/// This module serves two functionalities: (1) to run a fresh new DKG from
 /// scratch and (2) to reshare old shares to a potentially distinct new set of
 /// nodes (the "resharing" protocol). The former protocol is described in "A
 /// threshold cryptosystem without a trusted party" by Torben Pryds Pedersen.

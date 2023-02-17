@@ -9,7 +9,7 @@ use rand::{rngs::StdRng, RngCore, SeedableRng};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    cipher::{cipher::Stream, StreamError},
+    cipher::{stream::Stream, StreamError},
     xof::blake3::Xof,
 };
 
@@ -46,7 +46,7 @@ pub fn random_int(modulus: &BigInt, rand: &mut impl Stream) -> BigInt {
     }
 }
 
-// [`bytes()`] fills a slice with random bytes from `rand`.
+/// [`bytes()`] fills a slice with random bytes from [`rand`].
 pub fn bytes(b: &mut [u8], rand: &mut impl Stream) -> Result<(), StreamError> {
     let src_buff = vec![0u8; b.len()];
     rand.xor_key_stream(b, &src_buff)?;

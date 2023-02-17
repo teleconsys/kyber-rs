@@ -1,4 +1,4 @@
-/// crate share implements Shamir secret sharing and polynomial commitments.
+/// module `share` implements Shamir secret sharing and polynomial commitments.
 /// Shamir's scheme allows you to split a secret value into multiple parts, so called
 /// shares, by evaluating a secret sharing polynomial at certain indices. The
 /// shared secret can only be reconstructed (via Lagrange interpolation) if a
