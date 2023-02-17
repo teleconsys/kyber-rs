@@ -23,6 +23,12 @@ use crate::encoding::MarshallingError;
 use crate::group::HashFactory;
 use crate::{cipher::Stream, Group, Point, Scalar};
 
+/// [`ScalarMap`] is an handy type alias for a map of [`Scalar`].
+type ScalarMap<GROUP> = HashMap<usize, <<GROUP as Group>::POINT as Point>::SCALAR>;
+
+/// [`PointMap`] is an handy type alias for a map of [`Point`].
+type PointMap<GROUP> = HashMap<usize, <GROUP as Group>::POINT>;
+
 /// [`PriShare`] represents a private share.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PriShare<SCALAR> {
@@ -275,10 +281,7 @@ fn xy_scalar<GROUP: Group>(
     shares: &[Option<PriShare<<GROUP::POINT as Point>::SCALAR>>],
     t: usize,
     n: usize,
-) -> (
-    HashMap<usize, <GROUP::POINT as Point>::SCALAR>,
-    HashMap<usize, <GROUP::POINT as Point>::SCALAR>,
-) {
+) -> (ScalarMap<GROUP>, ScalarMap<GROUP>) {
     // we are sorting first the shares since the shares may be unrelated for
     // some applications. In this case, all participants needs to interpolate on
     // the exact same order shares.
@@ -510,10 +513,7 @@ pub fn xy_commit<GROUP: Group>(
     shares: &[Option<PubShare<GROUP::POINT>>],
     t: usize,
     n: usize,
-) -> (
-    HashMap<usize, <GROUP::POINT as Point>::SCALAR>,
-    HashMap<usize, GROUP::POINT>,
-) {
+) -> (ScalarMap<GROUP>, PointMap<GROUP>) {
     // we are sorting first the shares since the shares may be unrelated for
     // some applications. In this case, all participants needs to interpolate on
     // the exact same order shares.

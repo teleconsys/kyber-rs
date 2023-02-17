@@ -1,4 +1,4 @@
-use crate::util::key::{KeyError, self};
+use crate::util::key::{self, KeyError};
 use anyhow::{bail, Result};
 use digest::{Digest, DynDigest};
 

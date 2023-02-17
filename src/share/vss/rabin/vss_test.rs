@@ -7,9 +7,10 @@ use crate::{
     group::edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
     share::vss::{
         rabin::vss::{self, find_pub, new_verifier, recover_secret, session_id, Response},
-        suite::Suite, VSSError,
+        suite::Suite,
+        VSSError,
     },
-    sign::{schnorr, error::SignatureError},
+    sign::{error::SignatureError, schnorr},
     Group, Point, Random, Scalar,
 };
 
@@ -151,7 +152,7 @@ fn test_vss_verifier_new() {
         &test_data.suite,
         &wrong_key,
         &test_data.dealer_pub,
-        &test_data.verifiers_pub
+        &test_data.verifiers_pub,
     ) {
     } else {
         panic!("public key {wrong_key:?} should not be valid");
@@ -315,7 +316,9 @@ fn test_vss_verifier_decrypt_deal() {
     // TODO: fix this check
     let good_dh = enc_d.dhkey;
     enc_d.dhkey = test_data.suite.point();
-    if let Err(VSSError::SignatureError(SignatureError::InvalidSignature(_))) = v.decrypt_deal(&enc_d) {
+    if let Err(VSSError::SignatureError(SignatureError::InvalidSignature(_))) =
+        v.decrypt_deal(&enc_d)
+    {
     } else {
         panic!("dh key should be invalid")
     };

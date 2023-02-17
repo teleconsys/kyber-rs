@@ -11,9 +11,10 @@ use crate::{
     share::vss::{
         pedersen::vss::{self, recover_secret, Response, STATUS_APPROVAL, STATUS_COMPLAINT},
         pedersen::vss::{find_pub, session_id},
-        suite::Suite, VSSError,
+        suite::Suite,
+        VSSError,
     },
-    sign::{schnorr, error::SignatureError},
+    sign::{error::SignatureError, schnorr},
     Group, Point, Random, Scalar,
 };
 
@@ -160,7 +161,7 @@ fn test_vss_verifier_new() {
         &test_data.suite,
         &wrong_key,
         &test_data.dealer_pub,
-        &test_data.verifiers_pub
+        &test_data.verifiers_pub,
     ) {
     } else {
         panic!("public key {wrong_key:?} should not be valid");
@@ -279,7 +280,9 @@ fn test_vss_verifier_decrypt_deal() {
     // TODO: fix this check
     let good_dh = enc_d.dhkey;
     enc_d.dhkey = test_data.suite.point();
-    if let Err(VSSError::SignatureError(SignatureError::InvalidSignature(_))) = v.decrypt_deal(&enc_d) {
+    if let Err(VSSError::SignatureError(SignatureError::InvalidSignature(_))) =
+        v.decrypt_deal(&enc_d)
+    {
     } else {
         panic!("dh key should be invalid")
     };
