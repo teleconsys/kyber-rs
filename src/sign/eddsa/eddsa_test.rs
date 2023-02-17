@@ -1,5 +1,5 @@
 use crate::{
-    cipher::cipher::{self, StreamError},
+    cipher::stream::{self, StreamError},
     encoding::{BinaryMarshaler, BinaryUnmarshaler},
     group::edwards25519::SuiteEd25519,
     sign::eddsa::{verify_with_checks, EdDSA},
@@ -16,7 +16,7 @@ struct EdDSATestVector<'a> {
     signature: &'a str,
 }
 
-/// EdDSATestVectors taken from RFC8032 section 7.1
+/// [`EDDSA_TEST_VECTORS`] taken from `RFC8032` section 7.1
 static EDDSA_TEST_VECTORS: &[EdDSATestVector<'static>] = &[
     EdDSATestVector{
 	    private: "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
@@ -275,16 +275,16 @@ pub struct ConstantStream {
     pub seed: Vec<u8>,
 }
 
-impl cipher::Stream for ConstantStream {
+impl stream::Stream for ConstantStream {
     fn xor_key_stream(&mut self, dst: &mut [u8], _: &[u8]) -> Result<(), StreamError> {
         dst.copy_from_slice(&self.seed);
         Ok(())
     }
 }
 
-// ConstantStream is a cipher.Stream which always returns
-// the same value.
-pub fn constant_stream(buff: Vec<u8>) -> Box<dyn cipher::Stream> {
+/// [`ConstantStream`] is a [`cipher::Stream`] which always returns
+/// the same value.
+pub fn constant_stream(buff: Vec<u8>) -> Box<dyn stream::Stream> {
     Box::new(ConstantStream {
         seed: buff[..32].to_vec(),
     })

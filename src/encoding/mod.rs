@@ -1,6 +1,6 @@
-mod encoding;
+mod encodings;
 
-pub use encoding::{
+pub use encodings::{
     marshal_binary, unmarshal_binary, BinaryMarshaler, BinaryUnmarshaler, Marshaling,
     MarshallingError,
 };

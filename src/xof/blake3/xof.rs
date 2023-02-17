@@ -2,10 +2,10 @@ use std::io::{Read, Write};
 
 use thiserror::Error;
 
-use crate::cipher::cipher::Stream;
+use crate::cipher::stream::Stream;
 use crate::cipher::StreamError;
 
-use crate::xof::xof;
+use crate::xof::traits;
 
 #[derive(Clone)]
 enum HashState {
@@ -16,8 +16,8 @@ enum HashState {
 pub struct Xof {
     implementation: HashState,
 
-    // key is here to not make excess garbage during repeated calls
-    // to XORKeyStream.
+    /// `key` is here to not make excess garbage during repeated calls
+    /// to [`xor_key_stream()`].
     key: Vec<u8>,
 }
 
@@ -33,7 +33,7 @@ impl Stream for Xof {
         }
 
         let mut new_key = self.key.clone();
-        let n = self.read(&mut new_key).expect("blake xof error");
+        let n = self.read(&mut new_key).expect("xor key stream read error");
         if n != src.len() {
             return Err(StreamError::XOFError(XOFError::ShortRead));
         }
@@ -83,8 +83,8 @@ impl std::io::Read for Xof {
     }
 }
 
-impl xof::XOF for Xof {
-    fn clone(&self) -> Box<dyn xof::XOF> {
+impl traits::XOF for Xof {
+    fn clone(&self) -> Box<dyn traits::XOF> {
         Box::new(Xof {
             implementation: self.implementation.clone(),
             key: self.key.clone(),
@@ -92,7 +92,6 @@ impl xof::XOF for Xof {
     }
 
     fn reseed(&mut self) {
-        // Use New to create a new one seeded with output from the old one.
         if self.key.len() < 128 {
             self.key = vec![0_u8; 128];
         } else {
@@ -101,14 +100,17 @@ impl xof::XOF for Xof {
         let mut k = self.key.clone();
         _ = self.read(&mut k);
         self.key = k;
+
+        // use new() to create a new one seeded with output from the old one.
         let y = Xof::new(Some(&self.key));
-        // Steal the XOF implementation, and put it inside of x.
+
+        // steal the XOF implementation, and put it inside of x.
         self.implementation = y.implementation;
     }
 }
 
 impl Xof {
-    /// New creates a new XOF using the Blake2b hash.
+    /// [`new()`] creates a new [`XOF`] using the `Blake3` hash.
     pub fn new(seed: Option<&[u8]>) -> Self {
         let mut b = blake3::Hasher::new();
         if let Some(s) = seed {
@@ -132,35 +134,3 @@ pub enum XOFError {
     #[error("dst too short")]
     ShortDestination,
 }
-
-// func (x *xof) Clone() kyber.XOF {
-// return &xof{impl: x.impl.Clone()}
-// }
-// func (x *xof) XORKeyStream(dst, src []byte) {
-// if len(dst) < len(src) {
-// panic("dst too short")
-// }
-// if len(x.key) < len(src) {
-// x.key = make([]byte, len(src))
-// } else {
-// x.key = x.key[0:len(src)]
-// }
-//
-// n, err := x.Read(x.key)
-// if err != nil {
-// panic("blake xof error: " + err.Error())
-// }
-// if n != len(src) {
-// panic("short read on key")
-// }
-//
-// for i := range src {
-// dst[i] = src[i] ^ x.key[i]
-// }
-// }
-
-// impl Default for XOF {
-//     fn default() -> Self {
-//         XOF { key: vec![] }
-//     }
-// }

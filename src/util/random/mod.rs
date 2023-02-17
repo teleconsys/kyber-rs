@@ -1,8 +1,8 @@
-pub(crate) mod random;
+pub(crate) mod random_stream;
 #[cfg(test)]
 mod random_test;
 
-pub use random::bits;
-pub use random::bytes;
-pub use random::random_int;
-pub use random::Randstream;
+pub use random_stream::bits;
+pub use random_stream::bytes;
+pub use random_stream::random_int;
+pub use random_stream::RandStream;

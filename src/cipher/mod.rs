@@ -1,4 +1,4 @@
-pub mod cipher;
+pub mod stream;
 
-pub use cipher::Stream;
-pub use cipher::StreamError;
+pub use stream::Stream;
+pub use stream::StreamError;

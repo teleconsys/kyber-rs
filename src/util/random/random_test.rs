@@ -3,8 +3,8 @@ use std::io::{Read, Write};
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 
 use crate::{
-    cipher::{cipher::Stream, StreamError},
-    util::random::random::Randstream,
+    cipher::{stream::Stream, StreamError},
+    util::random::random_stream::RandStream,
 };
 
 const SIZE: usize = 32;
@@ -14,7 +14,7 @@ fn test_mixed_entropy() {
     let r = "some io.Reader stream to be used for testing".as_bytes();
 
     let rng_core = Box::new(StdRng::from_entropy()) as Box<dyn RngCore>;
-    let mut cipher = Randstream::new(vec![Box::new(r), Box::new(rng_core) as Box<dyn Read>]);
+    let mut cipher = RandStream::new(vec![Box::new(r), Box::new(rng_core) as Box<dyn Read>]);
 
     let mut src = [0_u8; SIZE];
     let sb = "source buffer".as_bytes();
@@ -35,7 +35,7 @@ fn test_mixed_entropy() {
 #[test]
 fn test_empty_reader() {
     let r = "too small io.Reader".as_bytes();
-    let mut cipher = Randstream::new(vec![Box::new(r)]);
+    let mut cipher = RandStream::new(vec![Box::new(r)]);
     let mut src = [0_u8; SIZE];
     let b = "hello".as_bytes();
     src[..b.len()].copy_from_slice(b);
@@ -49,7 +49,7 @@ fn test_empty_reader() {
 
 #[test]
 fn test_crypto_only() {
-    let mut cipher = Randstream::new(vec![]);
+    let mut cipher = RandStream::new(vec![]);
     let mut src = [0_u8; SIZE];
     src.as_mut().write_all("hello".as_bytes()).unwrap();
     let mut dst1 = [0_u8; SIZE];
@@ -62,12 +62,12 @@ fn test_crypto_only() {
 #[test]
 fn test_user_only() {
     let seed = "some io.Reader stream to be used for testing".as_bytes();
-    let mut cipher1 = Randstream::new(vec![Box::new(seed)]);
+    let mut cipher1 = RandStream::new(vec![Box::new(seed)]);
     let mut src = [0_u8; SIZE];
     src.as_mut().write_all("hello".as_bytes()).unwrap();
     let mut dst1 = [0_u8; SIZE];
     cipher1.xor_key_stream(&mut dst1, &src).unwrap();
-    let mut cipher2 = Randstream::new(vec![Box::new(seed)]);
+    let mut cipher2 = RandStream::new(vec![Box::new(seed)]);
     let mut dst2 = [0_u8; SIZE];
     cipher2.xor_key_stream(&mut dst2, &src).unwrap();
     assert_eq!(dst1, dst2, "dst1/dst2 should be equal");
@@ -76,7 +76,7 @@ fn test_user_only() {
 #[test]
 fn test_incorrect_size() {
     let rng_core = Box::new(StdRng::from_entropy()) as Box<dyn RngCore>;
-    let mut cipher = Randstream::new(vec![Box::new(rng_core) as Box<dyn Read>]);
+    let mut cipher = RandStream::new(vec![Box::new(rng_core) as Box<dyn Read>]);
     let mut src = [0_u8; SIZE];
     src.as_mut().write_all("hello".as_bytes()).unwrap();
     let mut dst = [0_u8; SIZE + 1];

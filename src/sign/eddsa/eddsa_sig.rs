@@ -1,6 +1,5 @@
-// Package eddsa implements the EdDSA signature algorithm according to
-// RFC8032.
-
+/// module eddsa implements the EdDSA signature algorithm according to
+/// RFC8032.
 use digest::Digest;
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
@@ -13,13 +12,13 @@ use crate::sign::error::SignatureError;
 use crate::util::key::{KeyError, Pair};
 use crate::{Group, Point, Scalar};
 
-/// EdDSA is a structure holding the data necessary to make a series of
-/// EdDSA signatures.
+/// [`EdDSA`] is a structure holding the data necessary to make a series of
+/// `EdDSA signatures`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EdDSA<GROUP: Group> {
-    // Secret being already hashed + bit tweaked
+    /// `secret` being already hashed + bit tweaked
     pub secret: <GROUP::POINT as Point>::SCALAR,
-    // Public is the corresponding public key
+    /// `public` is the corresponding public key
     pub public: GROUP::POINT,
     pub seed: Vec<u8>,
     pub prefix: Vec<u8>,
@@ -28,7 +27,7 @@ pub struct EdDSA<GROUP: Group> {
 const GROUP: Curve = Curve::new();
 
 impl EdDSA<Curve> {
-    /// NewEdDSA will return a freshly generated key pair to use for generating
+    /// [`new()`] will return a freshly generated key pair to use for generating
     /// EdDSA signatures.
     pub fn new<S: crate::cipher::Stream>(stream: &mut S) -> Result<EdDSA<Curve>, KeyError> {
         let (secret, buffer, prefix) = GROUP.new_key_and_seed(stream)?;
@@ -73,7 +72,7 @@ impl PartialEq for EdDSA<Curve> {
 }
 
 impl BinaryUnmarshaler for EdDSA<Curve> {
-    /// UnmarshalBinary transforms a slice of bytes into a EdDSA signature.
+    /// [`unmarshal_binary()`] transforms a slice of bytes into a EdDSA signature.
     fn unmarshal_binary(&mut self, buff: &[u8]) -> Result<(), MarshallingError> {
         if buff.len() != 64 {
             return Err(MarshallingError::InvalidInput(
@@ -92,8 +91,8 @@ impl BinaryUnmarshaler for EdDSA<Curve> {
 }
 
 impl BinaryMarshaler for EdDSA<Curve> {
-    /// MarshalBinary will return the representation used by the reference
-    /// implementation of SUPERCOP ref10, which is "seed || Public".
+    /// [`marshal_binary()`] will return the representation used by the reference
+    /// implementation of `SUPERCOP ref10`, which is `"seed || Public"`.
     fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
         let p_buff = self.public.marshal_binary()?;
 
@@ -117,7 +116,7 @@ impl From<Pair<EdPoint>> for EdDSA<Curve> {
 }
 
 impl EdDSA<Curve> {
-    /// Sign will return a EdDSA signature of the message msg using Ed25519.
+    /// [`sign()`] will return a EdDSA signature of the message msg using Ed25519.
     pub fn sign(&self, msg: &[u8]) -> Result<[u8; 64], SignatureError> {
         let mut hash = Sha512::new();
         hash.update(self.prefix.clone());
@@ -153,11 +152,10 @@ impl EdDSA<Curve> {
     }
 }
 
-/// verify_with_checks uses a public key buffer, a message and a signature.
-/// It will return nil if sig is a valid signature for msg created by
-/// key public, or an error otherwise. Compared to `Verify`, it performs
-/// additional checks around the canonicality and ensures the public key
-/// does not have a small order.
+/// [`verify_with_checks()`] uses a `public key buffer`, a `message` and a `signature`.
+/// It will return an [`Error`](SignatureError) if the signature is not valid.
+/// Compared to [`verify()`], it performs additional checks around the `canonicality`
+/// and ensures the public key does not have a `small order`.
 pub fn verify_with_checks(public_key: &[u8], msg: &[u8], sig: &[u8]) -> Result<(), SignatureError> {
     let sig_len = sig.len();
     if sig_len != 64 {
@@ -205,7 +203,7 @@ pub fn verify_with_checks(public_key: &[u8], msg: &[u8], sig: &[u8]) -> Result<(
     let ha = GROUP.point().mul(&h, Some(&public));
     let rha = GROUP.point().add(&r, &ha);
 
-    if !rha.equal(&s) {
+    if !rha.eq(&s) {
         return Err(SignatureError::InvalidSignature(
             "reconstructed S is not equal to signature".to_owned(),
         ));
@@ -213,8 +211,8 @@ pub fn verify_with_checks(public_key: &[u8], msg: &[u8], sig: &[u8]) -> Result<(
     Ok(())
 }
 
-/// Verify uses a public key, a message and a signature. It will return nil if
-/// sig is a valid signature for msg created by key public, or an error otherwise.
+/// [`verify()`] verifies a given `Schnorr signature`. It returns an
+/// [`Error`](SignatureError) if the signature is invalid.
 pub fn verify<POINT: Point>(public: &POINT, msg: &[u8], sig: &[u8]) -> Result<(), SignatureError> {
     let p_buf = public.marshal_binary()?;
     verify_with_checks(&p_buf, msg, sig)

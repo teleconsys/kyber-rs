@@ -77,6 +77,7 @@ fn test_dkg_new_dist_key_generator() {
     assert!(!dkg.is_resharing);
 
     let (sec, _) = gen_pair();
+    // TODO: fix this check to get the specific error
     let dkg_res = new_dist_key_generator::<SuiteEd25519, &'static [u8]>(
         suite(),
         sec.clone(),
@@ -98,6 +99,7 @@ fn test_dkg_deal() {
     let mut dkgs = generate(DEFAULT_N, *DEFAULT_T).dkgs;
     let dkg = &mut dkgs[0];
 
+    // TODO: fix this check to get the specific error
     let dks_res = dkg.dist_key_share();
     assert!(dks_res.is_err());
 
@@ -126,6 +128,7 @@ fn test_dkg_process_deal() {
     // verifier don't find itself
     let good_p = rec.c.new_nodes.clone();
     rec.c.new_nodes = Vec::new();
+    // TODO: fix this check to get the specific error
     let resp_res = rec.process_deal(deal);
     assert!(resp_res.is_err());
     rec.c.new_nodes = good_p;
@@ -137,12 +140,14 @@ fn test_dkg_process_deal() {
     assert_eq!(0, resp.index);
 
     // duplicate
+    // TODO: fix this check to get the specific error
     let resp_res = rec.process_deal(deal);
     assert!(resp_res.is_err());
 
     // wrong index
     let good_idx = deal.index;
     deal.index = (DEFAULT_N + 1) as u32;
+    // TODO: fix this check to get the specific error
     let resp_res = rec.process_deal(deal);
     assert!(resp_res.is_err());
     deal.index = good_idx;
@@ -150,6 +155,7 @@ fn test_dkg_process_deal() {
     // wrong deal
     let good_sig = deal.deal.signature.clone();
     deal.deal.signature = random_bytes(deal.deal.signature.len());
+    // TODO: fix this check to get the specific error
     let resp_res = rec.process_deal(deal);
     assert!(resp_res.is_err());
     deal.deal.signature = good_sig;
@@ -184,6 +190,7 @@ fn test_dkg_process_response() {
     // no verifier tied to Response
     assert!(dkgs[0].verifiers.contains_key(&0));
     let v = dkgs[0].verifiers.remove(&0).unwrap();
+    // TODO: fix this check to get the specific error
     let res = dkgs[0].process_response(&resp);
     assert!(res.is_err());
     dkgs[0].verifiers.insert(0, v);
@@ -191,6 +198,7 @@ fn test_dkg_process_response() {
     // invalid response
     let good_sig = resp.response.signature.clone();
     resp.response.signature = random_bytes(good_sig.len());
+    // TODO: fix this check to get the specific error
     let res = dkgs[0].process_response(&resp);
     assert!(res.is_err());
     resp.response.signature = good_sig;
@@ -243,6 +251,7 @@ fn test_dkg_process_response() {
 
     // remove verifiers
     let v = dkgs[0].verifiers.remove(&j.index).unwrap();
+    // TODO: fix this check to get the specific error
     let res = dkgs[0].process_justification(&j);
     assert!(res.is_err());
     dkgs[0].verifiers.insert(j.index, v);
@@ -574,7 +583,7 @@ fn check_dks<SUITE: Suite>(dks1: &DistKeyShare<SUITE>, dks2: &DistKeyShare<SUITE
         return false;
     }
     for (i, p) in dks1.commits.iter().enumerate() {
-        if !p.equal(&dks2.commits[i]) {
+        if !p.eq(&dks2.commits[i]) {
             return false;
         }
     }

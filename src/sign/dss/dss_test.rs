@@ -64,6 +64,7 @@ fn test_dss_new() {
     )
     .unwrap();
 
+    // TODO: fix this check to get the specific error
     let res = new_dss(
         t.suite,
         &t.suite.scalar().zero(),
@@ -91,12 +92,14 @@ fn test_dss_partial_sigs() {
     // wrong index
     let good_i = ps0.partial.i;
     ps0.partial.i = 100;
+    // TODO: fix this check to get the specific error
     assert!(dss1.process_partial_sig(ps0.clone()).is_err());
     ps0.partial.i = good_i;
 
     // wrong Signature
     let good_sig = ps0.signature.clone();
     ps0.signature = random_bytes(ps0.signature.len());
+    // TODO: fix this check to get the specific error
     assert!(dss1.process_partial_sig(ps0.clone()).is_err());
     ps0.signature = good_sig.clone();
 

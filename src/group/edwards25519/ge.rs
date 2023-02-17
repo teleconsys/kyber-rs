@@ -1,12 +1,11 @@
-// Group elements are members of the elliptic curve -x^2 + y^2 = 1 + d * x^2 *
-// y^2 where d = -121665/121666.
-//
-// Several representations are used:
-//   projectiveGroupElement: (X:Y:Z) satisfying x=X/Z, y=Y/Z
-//   extendedGroupElement: (X:Y:Z:T) satisfying x=X/Z, y=Y/Z, XY=ZT
-//   completedGroupElement: ((X:Z),(Y:T)) satisfying x=X/Z, y=Y/T
-//   preComputedGroupElement: (y+x,y-x,2dxy)
-
+/// `Group elements` are members of the elliptic curve -x^2 + y^2 = 1 + d * x^2 *
+/// y^2 where d = -121665/121666.
+///
+/// Several representations are used:
+///   [`ProjectiveGroupElement`]: `(X:Y:Z)` satisfying `x=X/Z`, `y=Y/Z`
+///   [`ExtendedGroupElement`]: `(X:Y:Z:T)` satisfying `x=X/Z`, `y=Y/Z`, `XY=ZT`
+///   [`CompletedGroupElement`]: `((X:Z),(Y:T))` satisfying `x=X/Z`, `y=Y/T`
+///   [`PreComputedGroupElement`]: `(y+x,y-x,2dxy)`
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -355,12 +354,12 @@ impl CachedGroupElement {
     }
 }
 
-/// Expand the 32-byte (256-bit) exponent in slice a into
-/// a sequence of 256 multipliers, one per exponent bit position.
+/// [`slide()`] expands the 32-byte (256-bit) `exponent` in slice a into
+/// a sequence of 256 `multipliers`, one per exponent bit position.
 /// Clumps nearby 1 bits into multi-bit multipliers to reduce
 /// the total number of add/sub operations in a point multiply;
-/// each multiplier is either zero or an odd number between -15 and 15.
-/// Assumes the target array r has been preinitialized with zeros
+/// each multiplier is either `zero` or an `odd number` between `-15` and `15`.
+/// Assumes the target array `r` has been preinitialized with zeros
 /// in case the input slice a is less than 32 bytes.
 pub fn slide(r: &mut [i8; 256], a: &[u8; 32]) {
     // Explode the exponent a into a little-endian array, one bit per byte
@@ -404,14 +403,14 @@ pub fn slide(r: &mut [i8; 256], a: &[u8; 32]) {
     }
 }
 
-/// equal returns 1 if b == c and 0 otherwise.
+/// [`equal()`] returns `1` if `b == c` and `0` otherwise.
 fn equal(b: i32, c: i32) -> i32 {
     let mut x = (b ^ c) as u32;
     x = x.wrapping_sub(1);
     (x >> 31) as i32
 }
 
-// negative returns 1 if b < 0 and 0 otherwise.
+/// [`negative()`] returns `1` if `b < 0` and `0` otherwise.
 fn negative(b: i32) -> i32 {
     (b >> 31) & 1
 }
@@ -429,12 +428,12 @@ fn select_pre_computed(t: &mut PreComputedGroupElement, pos: usize, b: i32) {
     t.cmove(&minus_t, b_negative);
 }
 
-/// geScalarMultBase computes h = a*B, where
-///   a = a[0]+256*a[1]+...+256^31 a[31]
-///   B is the Ed25519 base point (x,4/5) with x positive.
+/// [`ge_scalar_mult_base()`] computes `h = a*B`, where
+///   `a = a[0]+256*a[1]+...+256^31 a[31]`
+///   `B` is the Ed25519 base point `(x,4/5)` with `x` positive.
 ///
 /// Preconditions:
-///   a[31] <= 127
+///   `a[31] <= 127`
 pub fn ge_scalar_mult_base(h: &mut ExtendedGroupElement, a: &mut [u8; 32]) {
     let mut e = [0_i8; 64];
 
@@ -495,16 +494,16 @@ fn select_cached(c: &mut CachedGroupElement, ai: &[CachedGroupElement; 8], b: i3
     c.cmove(&minus_c, b_negative)
 }
 
-/// geScalarMult computes h = a*B, where
-///   a = a[0]+256*a[1]+...+256^31 a[31]
-///   B is the Ed25519 base point (x,4/5) with x positive.
+/// [`ge_scalar_mult()`] computes `h = a*B`, where
+///   `a = a[0]+256*a[1]+...+256^31 a[31]`
+///   `B` is the Ed25519 base point `(x,4/5)` with `x` positive.
 ///
 /// Preconditions:
-///   a[31] <= 127
+///   `a[31] <= 127`
 pub fn ge_scalar_mult(
     h: &mut ExtendedGroupElement,
     a: &mut [u8; 32],
-    a_caps: &mut ExtendedGroupElement,
+    a_p: &mut ExtendedGroupElement,
 ) {
     let mut t = CompletedGroupElement::default();
     let mut u = ExtendedGroupElement::default();
@@ -531,9 +530,9 @@ pub fn ge_scalar_mult(
 
     // compute cached array of multiples of A from 1A through 8A
     let mut ai = [CachedGroupElement::default(); 8]; // A,1A,2A,3A,4A,5A,6A,7A
-    a_caps.to_cached(&mut ai[0]);
+    a_p.to_cached(&mut ai[0]);
     for i in 0..7 {
-        t.add(a_caps, &ai[i]);
+        t.add(a_p, &ai[i]);
         t.to_extended(&mut u);
         u.to_cached(&mut ai[i + 1]);
     }

@@ -4,7 +4,7 @@ use crate::dh::{AEAD, NONCE_SIZE};
 use crate::encoding::BinaryUnmarshaler;
 use crate::group::edwards25519::{Point, SuiteEd25519};
 use crate::util::key;
-use crate::util::random::random;
+use crate::util::random::random_stream;
 use crate::Random;
 
 use super::Dh;
@@ -159,7 +159,7 @@ fn test_aead_random() {
         let pub2 = keypair2.public;
 
         let mut message = [0u8; 64];
-        random::bytes(&mut message, &mut suite.random_stream()).unwrap();
+        random_stream::bytes(&mut message, &mut suite.random_stream()).unwrap();
 
         let nonce = [0u8; NONCE_SIZE];
 
@@ -173,8 +173,8 @@ fn test_aead_random() {
 
         let decrypted = gcm2
             .open(None, &nonce, &ciphertext, None)
-            .unwrap_or_else(|_| panic!("decryption failed at iteration {}", i));
+            .unwrap_or_else(|_| panic!("decryption failed at iteration {i}"));
 
-        assert_eq!(decrypted, message, "assertion failed at iteration {}", i);
+        assert_eq!(decrypted, message, "assertion failed at iteration {i}");
     }
 }

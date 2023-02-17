@@ -14,33 +14,42 @@ use super::{
 };
 
 lazy_static! {
-    /// prime modulus of underlying field = 2^255 - 19
+    /// [`PRIME`] is the prime modulus of underlying field
+    /// `= 2^255 - 19`
     pub static ref PRIME: BigInt = BigInt::from_str_radix(
     "57896044618658097711785492504343953926634992332820282019728792003956564819949", 10)
     .unwrap();
 
-    /// prime_order of base point = 2^252 + 27742317777372353535851937790883648493
+    /// [`PRIME_ORDER`] is the prime order of base point
+    /// `= 2^252 + 27742317777372353535851937790883648493`
     pub static ref PRIME_ORDER: BigInt = BigInt::from_str_radix(
     "7237005577332262213973186563042994240857116359379907606001950938285454250989", 10)
     .unwrap();
 
-    // `l_minus_2` is the order of base point minus two, i.e. 2^252 +
-    // 27742317777372353535851937790883648493 - 2, in little-endian form
-    // This is needed to compute constant time modular inversion of scalars.
+    /// [`L_MINUS2`] is the order of base point minus two, i.e. `2^252 +
+    /// 27742317777372353535851937790883648493 - 2`, in little-endian form
+    /// This is needed to compute constant time modular inversion of scalars.
     pub static ref L_MINUS2: BigInt = BigInt::from_str_radix("7237005577332262213973186563042994240857116359379907606001950938285454250987", 10)
     .unwrap();
 
-    // cofactor of the curve, as a ModInt
+    /// [`COFACTOR`] is cofactor of the curve,
+    /// as a [`BigInt`]
     pub static ref COFACTOR: BigInt = BigInt::from(8);
 
-    // order of the full group including the cofactor
+    /// [`FULL_ORDER`] is the order of the full group
+    /// including the [`COFACTOR`]
     pub static ref FULL_ORDER: BigInt = PRIME_ORDER.clone() * COFACTOR.clone();
 
-    // scalar versions of these, usable for multiplication
+    /// [`PRIME_ORDER_SCALAR`] is the scalar version of [`PRIME_ORDER`],
+    /// usable for multiplication
     pub static ref PRIME_ORDER_SCALAR: Scalar = new_scalar_int(PRIME_ORDER.clone());
+
+    /// [`COFACTOR_SCALAR`] is the scalar version of [`COFACTOR`],
+    /// usable for multiplication
     pub static ref COFACTOR_SCALAR: Scalar = new_scalar_int(COFACTOR.clone());
 
-    // identity point
+    /// [`NULL_POINT`] is the
+    /// identity point
     pub static ref NULL_POINT: EdPoint = EdPoint::default().null();
 }
 
@@ -3728,10 +3737,10 @@ pub const BASE: [[PreComputedGroupElement; 8]; 32] = [
     ],
 ];
 
-/// Ed25519 "weak keys"
+/// [`WEAK_KEYS`] are Ed25519 "weak keys".
 /// Copied from https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1130
-/// We did not consider `prime` and `prime+1` since they would be discarded because of `IsCanonical` checks
-/// TODO: is there a reference to the SUPERCOP ref10 implementation available?
+/// We did not consider `prime` and `prime+1` since they would be discarded because of [`is_canonical()`] checks
+// TODO: is there a reference to the SUPERCOP ref10 implementation available?
 pub const WEAK_KEYS: [[u8; 32]; 5] = [
     /* 0 (order 4) */
     [

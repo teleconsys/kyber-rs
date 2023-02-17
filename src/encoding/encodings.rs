@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::cipher::Stream;
 
-/// Marshaling is a basic interface representing fixed-length (or known-length)
+/// [`Marshaling`] is a basic interface representing fixed-length (or known-length)
 /// cryptographic objects or structures having a built-in binary encoding.
 /// Implementors must ensure that calls to these methods do not modify
 /// the underlying object so that other users of the object can access
@@ -13,36 +13,18 @@ pub trait Marshaling: BinaryMarshaler + BinaryUnmarshaler + ToString {
     /// Encoded length of this object in bytes.
     fn marshal_size(&self) -> usize;
 
-    /// Encode the contents of this object and write it to an io.Writer.
+    /// Encode the contents of this object and write it to an [`io::Write`].
     fn marshal_to(&self, w: &mut impl io::Write) -> Result<(), MarshallingError>;
 
-    /// Decode the content of this object by reading from an io.Reader.
-    /// If r is an XOF, it uses r to pick a valid object pseudo-randomly,
-    /// which may entail reading more than Len bytes due to retries.
-    /// UnmarshalFrom(r io.Reader) (int, error)
+    /// Decode the content of this object by reading from a [`io::Read`].
+    /// If `r` is an [`XOF`], it uses `r` to pick a valid object pseudo-randomly,
+    /// which may entail reading more than `len` bytes due to retries.
     fn unmarshal_from(&mut self, r: &mut impl io::Read) -> Result<(), MarshallingError>;
     fn unmarshal_from_random(&mut self, r: &mut (impl io::Read + Stream));
 
-    /// marshal_id returns the type tag used in encoding/decoding
+    /// [`marshal_id()`] returns the type tag used in encoding/decoding
     fn marshal_id(&self) -> [u8; 8];
 }
-
-// // Encoding represents an abstract interface to an encoding/decoding that can be
-// // used to marshal/unmarshal objects to and from streams. Different Encodings
-// // will have different constraints, of course. Two implementations are
-// // available:
-// //
-// //   1. The protobuf encoding using the variable length Google Protobuf encoding
-// //      scheme. The library is available at https://go.dedis.ch/protobuf
-// //   2. The fixbuf encoding, a fixed length binary encoding of arbitrary
-// //      structures. The library is available at https://go.dedis.ch/fixbuf.
-// type Encoding interface {
-// // Encode and write objects to an io.Writer.
-// Write(w io.Writer, objs ...interface{}) error
-//
-// // Read and decode objects from an io.Reader.
-// Read(r io.Reader, objs ...interface{}) error
-// }
 
 #[derive(Error, Debug)]
 pub enum MarshallingError {

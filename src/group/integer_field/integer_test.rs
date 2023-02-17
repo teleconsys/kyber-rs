@@ -5,8 +5,8 @@ mod test {
     use num_bigint::Sign::Plus;
     use num_bigint_dig as num_bigint;
 
-    use crate::group::integer_field::integer_field::ByteOrder::{BigEndian, LittleEndian};
-    use crate::group::integer_field::integer_field::Int;
+    use crate::group::integer_field::integer::ByteOrder::{BigEndian, LittleEndian};
+    use crate::group::integer_field::integer::Int;
 
     #[test]
     fn test_int_endianness() {

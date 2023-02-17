@@ -2,14 +2,15 @@ use rand::Rng;
 use vss::KEY_SIZE;
 
 use crate::{
-    dh::Dh,
+    dh::{Dh, DhError},
     encoding::BinaryMarshaler,
     group::edwards25519::{Point as EdPoint, Scalar as EdScalar, SuiteEd25519},
     share::vss::{
         rabin::vss::{self, find_pub, new_verifier, recover_secret, session_id, Response},
         suite::Suite,
+        VSSError,
     },
-    sign::schnorr,
+    sign::{error::SignatureError, schnorr},
     Group, Point, Random, Scalar,
 };
 
@@ -117,18 +118,16 @@ fn test_vss_dealer_new() {
     .unwrap();
 
     for bad_t in [0i32, 1, -4] {
-        assert!(
-            new_dealer(
-                test_data.suite,
-                test_data.dealer_sec.clone(),
-                test_data.secret.clone(),
-                &test_data.verifiers_pub,
-                bad_t as usize,
-            )
-            .is_err(),
-            "threshold {} should result in error",
-            bad_t
-        );
+        if let Err(VSSError::InvalidThreshold(_)) = new_dealer(
+            test_data.suite,
+            test_data.dealer_sec.clone(),
+            test_data.secret.clone(),
+            &test_data.verifiers_pub,
+            bad_t as usize,
+        ) {
+        } else {
+            panic!("threshold {bad_t} should result in error");
+        }
     }
 }
 
@@ -149,13 +148,15 @@ fn test_vss_verifier_new() {
         .suite
         .scalar()
         .pick(&mut test_data.suite.random_stream());
-    assert!(new_verifier(
+    if let Err(VSSError::PublicKeyNotFound) = new_verifier(
         &test_data.suite,
         &wrong_key,
         &test_data.dealer_pub,
-        &test_data.verifiers_pub
-    )
-    .is_err());
+        &test_data.verifiers_pub,
+    ) {
+    } else {
+        panic!("public key {wrong_key:?} should not be valid");
+    }
 }
 
 #[test]
@@ -312,24 +313,34 @@ fn test_vss_verifier_decrypt_deal() {
     assert_eq!(b1, b2);
 
     // wrong dh key
+    // TODO: fix this check
     let good_dh = enc_d.dhkey;
     enc_d.dhkey = test_data.suite.point();
-    let dec_d = v.decrypt_deal(&enc_d);
-    assert!(dec_d.is_err());
+    if let Err(VSSError::SignatureError(SignatureError::InvalidSignature(_))) =
+        v.decrypt_deal(&enc_d)
+    {
+    } else {
+        panic!("dh key should be invalid")
+    };
     enc_d.dhkey = good_dh;
 
     // wrong signature
+    // TODO: fix this check
     let good_sig = enc_d.signature;
     enc_d.signature = random_bytes(32);
-    let dec_d = v.decrypt_deal(&enc_d);
-    assert!(dec_d.is_err());
+    if v.decrypt_deal(&enc_d).is_err() {
+    } else {
+        panic!("signature should be wrong")
+    };
     enc_d.signature = good_sig;
 
     // wrong ciphertext
     let good_cipher = enc_d.cipher;
     enc_d.cipher = random_bytes(good_cipher.len());
-    let dec_d = v.decrypt_deal(&enc_d);
-    assert!(dec_d.is_err());
+    if let Err(VSSError::DhError(DhError::DecryptionFailed(_))) = v.decrypt_deal(&enc_d) {
+    } else {
+        panic!("decryption should fail")
+    };
     enc_d.cipher = good_cipher;
 }
 
@@ -357,10 +368,13 @@ fn test_vss_verifier_receive_deal() {
     assert_eq!(v.responses[&((v.index) as u32)], resp);
 
     // wrong encryption
+    // TODO: fix this check
     let good_sig = enc_d.signature;
     enc_d.signature = random_bytes(32);
-    let resp = v.process_encrypted_deal(&enc_d);
-    assert!(resp.is_err());
+    if v.process_encrypted_deal(&enc_d).is_err() {
+    } else {
+        panic!("encryption should be invalid")
+    };
     enc_d.signature = good_sig;
 
     let d = &mut dealer.deals[0];
@@ -369,28 +383,35 @@ fn test_vss_verifier_receive_deal() {
     let good_idx = d.sec_share.i;
     d.sec_share.i = (good_idx - 1) % NB_VERIFIERS;
     let enc_d = dealer.encrypted_deal(0).unwrap();
-    let resp = v.process_encrypted_deal(&enc_d);
-    assert!(resp.is_err());
+    if let Err(VSSError::DealWrongIndex) = v.process_encrypted_deal(&enc_d) {
+    } else {
+        panic!("deal's index should be wrong")
+    };
 
     let d = &mut dealer.deals[0];
     d.sec_share.i = good_idx;
 
     // wrong commitments
+    // TODO: fix this check
     let good_commit = d.commitments[0].clone();
     d.commitments[0] = test_data
         .suite
         .point()
         .pick(&mut test_data.suite.random_stream());
     let enc_d = dealer.encrypted_deal(0).unwrap();
-    let resp = v.process_encrypted_deal(&enc_d);
-    assert!(resp.is_err());
+    if v.process_encrypted_deal(&enc_d).is_err() {
+    } else {
+        panic!("commitments should be wrong")
+    };
 
     let d = &mut dealer.deals[0];
     d.commitments[0] = good_commit.clone();
 
     // already seen twice
-    let resp = v.process_encrypted_deal(&enc_d);
-    assert!(resp.is_err());
+    if let Err(VSSError::DealAlreadyProcessed) = v.process_encrypted_deal(&enc_d) {
+    } else {
+        panic!("signature length should be invalid")
+    };
     let mut v_aggr = v.aggregator.clone().unwrap();
     v_aggr.deal = None;
 
@@ -407,8 +428,10 @@ fn test_vss_verifier_receive_deal() {
         .point()
         .pick(&mut test_data.suite.random_stream());
     v.aggregator = Some(v_aggr.clone());
-    let resp = v.process_encrypted_deal(&enc_d);
-    assert!(resp.is_err());
+    if let Err(VSSError::ResponseAlreadyExisting) = v.process_encrypted_deal(&enc_d) {
+    } else {
+        panic!("response should already exitst")
+    };
     d.commitments[0] = good_commit;
 
     // valid complaint
@@ -447,12 +470,11 @@ fn test_vss_aggregator_verify_justification() {
     // invalid deal justified
     let good_v = j.deal.sec_share.v;
     j.deal.sec_share.v = wrong_v;
-    let result = v.process_justification(&j);
-    assert!(result.is_err());
-    match &v.aggregator {
-        Some(a) => assert!(a.bad_dealer),
-        None => panic!("missing aggregator"),
-    }
+    if let Err(VSSError::DealDoesNotVerify) = v.process_justification(&j) {
+        assert!(v.clone().aggregator.unwrap().bad_dealer)
+    } else {
+        panic!("justified deal should be invalid")
+    };
 
     j.deal.sec_share.v = good_v;
     match &mut v.aggregator {
@@ -465,8 +487,10 @@ fn test_vss_aggregator_verify_justification() {
 
     // invalid complaint
     resp.session_id = random_bytes(resp.session_id.len());
-    let bad_j = dealer.process_response(&resp);
-    assert!(bad_j.is_err());
+    if let Err(VSSError::ResponseInconsistentSessionId) = dealer.process_response(&resp) {
+    } else {
+        panic!("complaint should be invalid")
+    };
     resp.session_id = dealer.sid.clone();
 
     // no complaints for this justification before
@@ -476,7 +500,10 @@ fn test_vss_aggregator_verify_justification() {
         }
         None => panic!("missing aggregator"),
     }
-    assert!(v.process_justification(&j).is_err());
+    if let Err(VSSError::JustificationNoComplaints) = v.process_justification(&j) {
+    } else {
+        panic!("justification should not have complaints")
+    };
     match &mut v.aggregator {
         Some(a) => {
             a.responses.insert(v.index as u32, resp);
@@ -508,8 +535,10 @@ fn test_vss_aggregator_verify_response_duplicate() {
         None => panic!("missing aggregator"),
     }
 
-    let result = verifiers[0].process_response(&resp2);
-    assert!(result.is_err());
+    if let Err(VSSError::ResponseAlreadyExisting) = verifiers[0].process_response(&resp2) {
+    } else {
+        panic!("should be already existing")
+    };
 
     let v1_idx = verifiers[1].index as u32;
     match &mut verifiers[0].aggregator {
@@ -525,8 +554,10 @@ fn test_vss_aggregator_verify_response_duplicate() {
         }
         None => panic!("missing aggregator"),
     }
-    let result = verifiers[0].process_response(&resp2);
-    assert!(result.is_err());
+    if let Err(VSSError::ResponseAlreadyExisting) = verifiers[0].process_response(&resp2) {
+    } else {
+        panic!("should be already existing")
+    };
 }
 
 #[test]
@@ -558,20 +589,29 @@ fn test_vss_aggregator_verify_response() {
     )
     .unwrap();
     resp.signature = sig;
-    assert!(aggr.verify_response(&resp).is_err());
+    if let Err(VSSError::ResponseIndexOutOfBounds) = aggr.verify_response(&resp) {
+    } else {
+        panic!("should be wrong index")
+    };
     resp.index = 0;
 
     // wrong signature
     let good_sig = resp.signature;
     resp.signature = random_bytes(good_sig.len());
-    assert!(aggr.verify_response(&resp).is_err());
+    if let Err(VSSError::SignatureError(_)) = aggr.verify_response(&resp) {
+    } else {
+        panic!("signature should not be valid")
+    };
     resp.signature = good_sig;
 
     // wrongID
     let wrong_id = random_bytes(resp.session_id.len());
     let good_id = resp.session_id;
     resp.session_id = wrong_id;
-    assert!(aggr.verify_response(&resp).is_err());
+    if let Err(VSSError::ResponseInconsistentSessionId) = aggr.verify_response(&resp) {
+    } else {
+        panic!("id should be wrong")
+    };
     resp.session_id = good_id;
 }
 
@@ -588,37 +628,60 @@ fn test_vss_aggregator_verify_deal() {
     assert!(aggr.deal.is_some());
 
     // already received deal
-    assert!(aggr.verify_deal(deal, true).is_err());
+    if let Err(VSSError::DealAlreadyProcessed) = aggr.verify_deal(deal, true) {
+    } else {
+        panic!("deal should be already processed")
+    };
 
     // wrong T
     let wrong_t = 1u32;
     let good_t = deal.t;
     deal.t = wrong_t as usize;
-    assert!(aggr.verify_deal(deal, false).is_err());
+    if let Err(VSSError::DealInvalidThreshold) = aggr.verify_deal(deal, false) {
+    } else {
+        panic!("threshold should be invalid")
+    };
     deal.t = good_t;
 
     // wrong SessionID
     let good_sid = deal.session_id.clone();
     deal.session_id = vec![0u8; 32];
-    assert!(aggr.verify_deal(deal, false).is_err());
+    if let Err(VSSError::DealInvalidSessionId) = aggr.verify_deal(deal, false) {
+    } else {
+        panic!("session id should be invalid")
+    };
     deal.session_id = good_sid;
 
     // index different in one share
     let good_i = deal.rnd_share.i;
     deal.rnd_share.i = good_i + 1;
-    assert!(aggr.verify_deal(deal, false).is_err());
+    if let Err(VSSError::DealInconsistentIndex) = aggr.verify_deal(deal, false) {
+    } else {
+        panic!("session id should be invalid")
+    };
     deal.rnd_share.i = good_i;
 
     // index not in bounds
+    //TODO: fix this check
     deal.sec_share.i = usize::MAX;
-    assert!(aggr.verify_deal(deal, false).is_err());
+    if aggr.verify_deal(deal, false).is_err() {
+    } else {
+        panic!("index should not be in bounds")
+    };
     deal.sec_share.i = test_data.verifiers_pub.len();
-    assert!(aggr.verify_deal(deal, false).is_err());
+    if aggr.verify_deal(deal, false).is_err() {
+    } else {
+        panic!("index should not be in bounds")
+    };
 
     // shares invalid in respect to the commitments
+    //TODO: fix this check
     let (wrong_sec, _): (EdScalar, EdPoint) = gen_pair();
     deal.sec_share.v = wrong_sec;
-    assert!(aggr.verify_deal(deal, false).is_err());
+    if aggr.verify_deal(deal, false).is_err() {
+    } else {
+        panic!("shares should be invalid")
+    };
 }
 
 #[test]
@@ -638,7 +701,10 @@ fn test_vss_aggregator_add_complaint() {
     assert_eq!(aggr.responses[&idx], c);
 
     // response already there
-    assert!(aggr.add_response(&c).is_err());
+    if let Err(VSSError::ResponseAlreadyExisting) = aggr.add_response(&c) {
+    } else {
+        panic!("response should already be there")
+    };
     aggr.responses.remove(&idx);
 }
 

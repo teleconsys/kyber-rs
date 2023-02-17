@@ -24,7 +24,7 @@ lazy_static! {
     ]);
 }
 
-/// SimpleCTScalar implements the scalar operations only using `ScMulAdd` by
+/// [`SimpleCTScalar`] implements the scalar operations only using [`sc_mul_add()`] by
 /// playing with the parameters.
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct SimpleCTScalar {
@@ -159,8 +159,8 @@ impl ScalarTrait for SimpleCTScalar {
     }
 }
 
-/// FactoredScalar implements the scalar operations using a factored version or
-/// `ScReduce` at the end of each operations.
+/// [`FactoredScalar`] implements the scalar operations using a factored version or
+/// [`sc_reduce_limbs()`] at the end of each operations.
 #[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct FactoredScalar {
     s: Scalar,
