@@ -37,7 +37,7 @@ The following table shows the already implemented features in compared with the 
 | Keccak XOF                                                            |      🔶      |         |             |      |
 | Blake2 XOF                                                            |      🔶      |         |             |      |
 
-This first release's task is to provide DKG APIs intended to be used with Ed25519 Signature Scheme.
+This first release's task is to provide DKG APIs intended to be used with Ed25519 Signature Scheme in a pure Rust implementation.
 
 Using the module
 ----------------
