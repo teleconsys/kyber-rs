@@ -40,27 +40,6 @@ struct Node<SUITE: Suite> {
 fn test_example_dkg() {
     let suite = SuiteEd25519::new_blake3_sha256_ed25519();
 
-    // DKG scales exponentially, the following command prints the duration [ns]
-    // of this test case with an increasing number of nodes. The resulting plot
-    // should illustrate an exponential growth.
-    //
-    // for (( i=1; i<30; i++ )); do
-    //   start=`gdate +%s%N`
-    //   NUM_NODES=$i go test -run Test_Example_DKG >/dev/null
-    //   duration=$(( `gdate +%s%N` - start ))
-    //   echo $duration
-    // done
-    //
-
-    // var nStr = os.Getenv("NUM_NODES")
-    // if nStr == "" {
-    // 	default number of node for this test
-    // 	nStr = "7"
-    // }
-
-    // n, err := strconv.Atoi(nStr)
-    // require.NoError(t, err)
-
     let n = 7;
 
     let mut nodes = Vec::with_capacity(n);
@@ -158,7 +137,7 @@ fn test_example_dkg() {
         public_key = distr_key.public();
         node.secret_share = distr_key.pri_share();
         node.distributed_public_key = public_key.clone();
-        println!("new distributed public key {:?}", public_key);
+        println!("new distributed public key {public_key:?}");
     }
 
     // 8. Variant A - Encrypt a secret with the public key and decrypt it with
@@ -259,14 +238,14 @@ fn test_example_dkg() {
         }));
     }
 
-    let r_caps = share::poly::recover_commit(suite, &pub_shares, n, n).unwrap(); // R = f(V1, V2, ...Vi)
+    let r_p = share::poly::recover_commit(suite, &pub_shares, n, n).unwrap(); // R = f(V1, V2, ...Vi)
 
     let decrypted_point = suite.point().sub(
         // C - (R - pA)
         &c,
         &suite.point().sub(
             // R - pA
-            &r_caps,
+            &r_p,
             &suite.point().mul(&p, Some(&a)), // pA
         ),
     );

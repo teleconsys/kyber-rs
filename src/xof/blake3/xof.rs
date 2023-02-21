@@ -1,10 +1,11 @@
 use std::io::{Read, Write};
 
-use anyhow::Error;
+use thiserror::Error;
 
-use crate::cipher::cipher::Stream;
+use crate::cipher::stream::Stream;
+use crate::cipher::StreamError;
 
-use crate::xof::xof;
+use crate::xof::traits;
 
 #[derive(Clone)]
 enum HashState {
@@ -15,15 +16,15 @@ enum HashState {
 pub struct Xof {
     implementation: HashState,
 
-    // key is here to not make excess garbage during repeated calls
-    // to XORKeyStream.
+    /// `key` is here to not make excess garbage during repeated calls
+    /// to [`xor_key_stream()`].
     key: Vec<u8>,
 }
 
 impl Stream for Xof {
-    fn xor_key_stream(&mut self, dst: &mut [u8], src: &[u8]) -> Result<(), Error> {
+    fn xor_key_stream(&mut self, dst: &mut [u8], src: &[u8]) -> Result<(), StreamError> {
         if dst.len() < src.len() {
-            return Err(Error::msg("dst too short"));
+            return Err(StreamError::XOFError(XOFError::ShortDestination));
         }
         if self.key.len() < src.len() {
             self.key = vec![0; src.len()];
@@ -32,9 +33,9 @@ impl Stream for Xof {
         }
 
         let mut new_key = self.key.clone();
-        let n = self.read(&mut new_key).expect("blake xof error");
+        let n = self.read(&mut new_key).expect("xor key stream read error");
         if n != src.len() {
-            return Err(Error::msg("short read on key"));
+            return Err(StreamError::XOFError(XOFError::ShortRead));
         }
         self.key = new_key;
 
@@ -47,7 +48,7 @@ impl Stream for Xof {
 }
 
 impl std::io::Write for Xof {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
         match &mut self.implementation {
             HashState::Readable { reader: _ } => Err(std::io::Error::new(
                 std::io::ErrorKind::Interrupted,
@@ -57,7 +58,7 @@ impl std::io::Write for Xof {
         }
     }
 
-    fn flush(&mut self) -> std::io::Result<()> {
+    fn flush(&mut self) -> Result<(), std::io::Error> {
         match &mut self.implementation {
             HashState::Readable { reader: _ } => {
                 todo!()
@@ -69,7 +70,7 @@ impl std::io::Write for Xof {
     }
 }
 impl std::io::Read for Xof {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
         match &mut self.implementation {
             HashState::Readable { reader } => reader.read(buf),
             HashState::Writeable { writer } => {
@@ -82,8 +83,8 @@ impl std::io::Read for Xof {
     }
 }
 
-impl xof::XOF for Xof {
-    fn clone(&self) -> Box<dyn xof::XOF> {
+impl traits::XOF for Xof {
+    fn clone(&self) -> Box<dyn traits::XOF> {
         Box::new(Xof {
             implementation: self.implementation.clone(),
             key: self.key.clone(),
@@ -91,7 +92,6 @@ impl xof::XOF for Xof {
     }
 
     fn reseed(&mut self) {
-        // Use New to create a new one seeded with output from the old one.
         if self.key.len() < 128 {
             self.key = vec![0_u8; 128];
         } else {
@@ -100,14 +100,17 @@ impl xof::XOF for Xof {
         let mut k = self.key.clone();
         _ = self.read(&mut k);
         self.key = k;
+
+        // use new() to create a new one seeded with output from the old one.
         let y = Xof::new(Some(&self.key));
-        // Steal the XOF implementation, and put it inside of x.
+
+        // steal the XOF implementation, and put it inside of x.
         self.implementation = y.implementation;
     }
 }
 
 impl Xof {
-    /// New creates a new XOF using the Blake2b hash.
+    /// [`new()`] creates a new [`XOF`] using the `Blake3` hash.
     pub fn new(seed: Option<&[u8]>) -> Self {
         let mut b = blake3::Hasher::new();
         if let Some(s) = seed {
@@ -122,34 +125,12 @@ impl Xof {
     }
 }
 
-// func (x *xof) Clone() kyber.XOF {
-// return &xof{impl: x.impl.Clone()}
-// }
-// func (x *xof) XORKeyStream(dst, src []byte) {
-// if len(dst) < len(src) {
-// panic("dst too short")
-// }
-// if len(x.key) < len(src) {
-// x.key = make([]byte, len(src))
-// } else {
-// x.key = x.key[0:len(src)]
-// }
-//
-// n, err := x.Read(x.key)
-// if err != nil {
-// panic("blake xof error: " + err.Error())
-// }
-// if n != len(src) {
-// panic("short read on key")
-// }
-//
-// for i := range src {
-// dst[i] = src[i] ^ x.key[i]
-// }
-// }
-
-// impl Default for XOF {
-//     fn default() -> Self {
-//         XOF { key: vec![] }
-//     }
-// }
+#[derive(Debug, Error)]
+pub enum XOFError {
+    #[error("io error")]
+    IoError(#[from] std::io::Error),
+    #[error("short read on key")]
+    ShortRead,
+    #[error("dst too short")]
+    ShortDestination,
+}

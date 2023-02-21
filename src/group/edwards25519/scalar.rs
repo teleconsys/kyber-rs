@@ -1,18 +1,17 @@
-use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling};
+use crate::encoding::{BinaryMarshaler, BinaryUnmarshaler, Marshaling, MarshallingError};
 use crate::group::internal::marshalling;
 use crate::group::{self, integer_field, ScalarCanCheckCanonical};
 use crate::util::random;
-use anyhow::bail;
 use num_bigint::BigInt;
 use num_bigint_dig as num_bigint;
 use serde::{Deserialize, Serialize};
 
-use crate::cipher::cipher::Stream;
+use crate::cipher::stream::Stream;
 use crate::group::edwards25519::constants;
 use crate::group::edwards25519::constants::PRIME_ORDER;
 use crate::group::edwards25519::fe::{load3, load4};
-use crate::group::integer_field::integer_field::ByteOrder::LittleEndian;
-use crate::group::integer_field::integer_field::Int;
+use crate::group::integer_field::integer::ByteOrder::LittleEndian;
+use crate::group::integer_field::integer::Int;
 use subtle::ConstantTimeEq;
 
 use super::constants::{FULL_ORDER, L_MINUS2};
@@ -30,20 +29,22 @@ impl Scalar {
     }
 
     fn set_int(mut self, i: &mut Int) -> Self {
-        let b = i.little_endian(32, 32);
+        let b = i
+            .little_endian(32, 32)
+            .unwrap_or(Self::default().v.to_vec());
         self.v.as_mut_slice()[0..b.len()].copy_from_slice(b.as_ref());
         self
     }
 }
 
 impl ScalarCanCheckCanonical for Scalar {
-    /// IsCanonical whether the scalar in sb is in the range 0<=s<L as required by RFC8032, Section 5.1.7.
+    /// [`is_canonical()`] checks whether the [`Scalar`] in sb is in the range `0<=s<L` as required by `RFC8032`, Section 5.1.7.
     /// Also provides Strong Unforgeability under Chosen Message Attacks (SUF-CMA)
     /// See paper https://eprint.iacr.org/2020/823.pdf for definitions and theorems
     /// See https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L2568
     /// for a reference.
-    /// The method accepts a buffer instead of calling `MarshalBinary` on the receiver since that
-    /// always returns values modulo `primeOrder`.
+    /// The method accepts a buffer instead of calling [`marshal_binary()`] on the receiver since that
+    /// always returns values modulo [`PRIME_ORDER`].
     fn is_canonical(&self, sb: &[u8]) -> bool {
         if sb.len() != 32 {
             return false;
@@ -69,14 +70,14 @@ impl ScalarCanCheckCanonical for Scalar {
 }
 
 impl PartialEq for Scalar {
-    /// Equality test for two Scalars derived from the same Group
+    /// [`eq()`] is an equality test for two [`scalars`](Scalar) on the same [`Group`]
     fn eq(&self, other: &Self) -> bool {
         bool::from(self.v.ct_eq(other.v.as_ref()))
     }
 }
 
 impl BinaryMarshaler for Scalar {
-    fn marshal_binary(&self) -> anyhow::Result<Vec<u8>> {
+    fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
         let mut b = self.to_int().marshal_binary()?;
         b.resize(32, 0);
 
@@ -85,9 +86,11 @@ impl BinaryMarshaler for Scalar {
 }
 
 impl BinaryUnmarshaler for Scalar {
-    fn unmarshal_binary(&mut self, data: &[u8]) -> anyhow::Result<()> {
+    fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError> {
         if data.len() != 32 {
-            bail!("wrong size buffer")
+            return Err(MarshallingError::InvalidInput(
+                "wrong size buffer".to_owned(),
+            ));
         }
         self.v.copy_from_slice(data);
         Ok(())
@@ -116,13 +119,13 @@ impl_op_ex!(+|a: &Scalar, b: &Scalar| -> Scalar {
 });
 
 impl group::Scalar for Scalar {
-    /// Set equal to another scalar a
+    /// [`set()`] sets [`self`] equal to another [`Scalar`] `a`
     fn set(mut self, a: &Self) -> Self {
         self.v = a.v;
         self
     }
 
-    /// set_int64 sets the scalar to a small integer value.
+    /// [`set_int64()`] sets [`self`] the [`Scalar`] to a small integer value.
     fn set_int64(self, v: i64) -> Self {
         self.set_int(&mut Int::new_int64(v, constants::PRIME_ORDER.clone()))
     }
@@ -132,14 +135,14 @@ impl group::Scalar for Scalar {
         self
     }
 
-    /// Set to the modular difference a - b
+    /// [`sub()`] sets [`self`] to the modular difference `a - b`
     fn sub(mut self, a: &Self, b: &Self) -> Self {
         sc_sub(&mut self.v, &a.v, &b.v);
         self
     }
 
     fn pick(self, rand: &mut impl Stream) -> Self {
-        let mut i = integer_field::integer_field::Int::new_int(
+        let mut i = integer_field::integer::Int::new_int(
             random::random_int(&PRIME_ORDER, rand),
             PRIME_ORDER.clone(),
         );
@@ -196,7 +199,7 @@ impl group::Scalar for Scalar {
 }
 
 impl Marshaling for Scalar {
-    fn marshal_to(&self, w: &mut impl std::io::Write) -> anyhow::Result<()> {
+    fn marshal_to(&self, w: &mut impl std::io::Write) -> Result<(), MarshallingError> {
         marshalling::scalar_marshal_to(self, w)
     }
 
@@ -204,7 +207,7 @@ impl Marshaling for Scalar {
         32
     }
 
-    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> anyhow::Result<()> {
+    fn unmarshal_from(&mut self, r: &mut impl std::io::Read) -> Result<(), MarshallingError> {
         marshalling::scalar_unmarshal_from(self, r)
     }
 
@@ -238,13 +241,18 @@ fn get_bits(bytes: &[u8]) -> Vec<bool> {
 }
 
 /// Input:
-///   a[0]+256*a[1]+...+256^31*a[31] = a
-///   b[0]+256*b[1]+...+256^31*b[31] = b
-///   c[0]+256*c[1]+...+256^31*c[31] = c
+///
+///   `a[0]+256*a[1]+...+256^31*a[31] = a`
+///
+///   `b[0]+256*b[1]+...+256^31*b[31] = b`
+///
+///   `c[0]+256*c[1]+...+256^31*c[31] = c`
 ///
 /// Output:
-///   s[0]+256*s[1]+...+256^31*s[31] = (ab+c) mod l
-///   where l = 2^252 + 27742317777372353535851937790883648493.
+///
+///   `s[0]+256*s[1]+...+256^31*s[31] = (ab+c) mod l`
+///
+///   where `l = 2^252 + 27742317777372353535851937790883648493`.
 pub fn sc_mul_add(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32], c: &[u8; 32]) {
     let a0 = 2097151 & load3(&a[..]);
     let a1 = 2097151 & (load4(&a[2..]) >> 5);
@@ -712,15 +720,19 @@ pub fn sc_mul_add(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32], c: &[u8; 32]) {
     s[31] = (s11 >> 17) as u8;
 }
 
-/// Hacky sc_add cobbled together rather sub-optimally from scMulAdd.
+/// Hacky [`sc_add()`] cobbled together rather sub-optimally from [`sc_mul_add()`].
 ///
 /// Input:
-///   a[0]+256*a[1]+...+256^31*a[31] = a
-///   c[0]+256*c[1]+...+256^31*c[31] = c
+///
+///   `a[0]+256*a[1]+...+256^31*a[31] = a`
+///
+///   `c[0]+256*c[1]+...+256^31*c[31] = c`
 ///
 /// Output:
-///   s[0]+256*s[1]+...+256^31*s[31] = (a+c) mod l
-///   where l = 2^252 + 27742317777372353535851937790883648493.
+///
+///   `s[0]+256*s[1]+...+256^31*s[31] = (a+c) mod l`
+///
+///   where `l = 2^252 + 27742317777372353535851937790883648493`.
 fn sc_add(s: &mut [u8; 32], a: &[u8; 32], c: &[u8; 32]) {
     let a0 = 2097151 & load3(&a[..]);
     let a1 = 2097151 & (load4(&a[2..]) >> 5);
@@ -1136,15 +1148,19 @@ fn sc_add(s: &mut [u8; 32], a: &[u8; 32], c: &[u8; 32]) {
     s[31] = (s11 >> 17) as u8;
 }
 
-/// Hacky scSub cobbled together rather sub-optimally from scMulAdd.
+/// Hacky [`sc_sub()`] cobbled together rather sub-optimally from [`sc_mul_add()`].
 ///
 /// Input:
-///   a[0]+256*a[1]+...+256^31*a[31] = a
-///   c[0]+256*c[1]+...+256^31*c[31] = c
+///
+///   `a[0]+256*a[1]+...+256^31*a[31] = a`
+///
+///   `c[0]+256*c[1]+...+256^31*c[31] = c`
 ///
 /// Output:
-///   s[0]+256*s[1]+...+256^31*s[31] = (a-c) mod l
-///   where l = 2^252 + 27742317777372353535851937790883648493.
+///
+///   `s[0]+256*s[1]+...+256^31*s[31] = (a-c) mod l`
+///
+///   where `l = 2^252 + 27742317777372353535851937790883648493`.
 fn sc_sub(s: &mut [u8; 32], a: &[u8; 32], c: &[u8; 32]) {
     let a0 = 2097151 & load3(&a[..]);
     let a1 = 2097151 & (load4(&a[2..]) >> 5);
@@ -1541,15 +1557,19 @@ fn sc_sub(s: &mut [u8; 32], a: &[u8; 32], c: &[u8; 32]) {
     s[31] = (s11 >> 17) as u8;
 }
 
-/// Hacky sc_mul cobbled together rather sub-optimally from scMulAdd.
+/// Hacky [`sc_mul()`] cobbled together rather sub-optimally from [`sc_mul_add()`].
 ///
 /// Input:
-///   a[0]+256*a[1]+...+256^31*a[31] = a
-///   b[0]+256*b[1]+...+256^31*b[31] = b
+///
+///   `a[0]+256*a[1]+...+256^31*a[31] = a`
+///
+///   `b[0]+256*b[1]+...+256^31*b[31] = b`
 ///
 /// Output:
-///   s[0]+256*s[1]+...+256^31*s[31] = (ab) mod l
-///   where l = 2^252 + 27742317777372353535851937790883648493.
+///
+///   `s[0]+256*s[1]+...+256^31*s[31] = (ab) mod l`
+///
+///   where `l = 2^252 + 27742317777372353535851937790883648493`.
 fn sc_mul(s: &mut [u8; 32], a: &[u8; 32], b: &[u8; 32]) {
     let a0 = 2097151 & load3(&a[..]);
     let a1 = 2097151 & (load4(&a[2..]) >> 5);

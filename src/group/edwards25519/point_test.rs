@@ -1,54 +1,67 @@
-// func TestPoint_Marshal(t *testing.T) {
-// 	p := point{}
-// 	require.Equal(t, "ed.point", fmt.Sprintf("%s", p.MarshalID()))
-// }
+use crate::{
+    encoding::{BinaryUnmarshaler, Marshaling},
+    group::{
+        edwards25519::{constants::WEAK_KEYS, Point},
+        PointCanCheckCanonicalAndSmallOrder,
+    },
+};
 
-// // TestPoint_HasSmallOrder ensures weakKeys are considered to have
-// // a small order
-// func TestPoint_HasSmallOrder(t *testing.T) {
-// 	for _, key := range weakKeys {
-// 		p := point{}
-// 		err := p.UnmarshalBinary(key)
-// 		require.Nil(t, err)
-// 		require.True(t, p.HasSmallOrder(), fmt.Sprintf("%s should be considered to have a small order", hex.EncodeToString(key)))
-// 	}
-// }
+#[test]
+fn test_point_marshal() {
+    let p = Point::default();
 
-// // Test_PointIsCanonical ensures that elements >= p are considered
-// // non canonical
-// func Test_PointIsCanonical(t *testing.T) {
+    assert_eq!("ed.point", std::str::from_utf8(&p.marshal_id()).unwrap());
+}
 
-// 	// buffer stores the candidate points (in little endian) that we'll test
-// 	// against, starting with `prime`
-// 	buffer := prime.Bytes()
-// 	for i, j := 0, len(buffer)-1; i < j; i, j = i+1, j-1 {
-// 		buffer[i], buffer[j] = buffer[j], buffer[i]
-// 	}
+/// [`test_point_has_small_order()`] ensures [`WEAK_KEYS`] are considered to have
+/// a small order
+#[test]
+fn test_point_has_small_order() {
+    for key in WEAK_KEYS {
+        let mut p = Point::default();
+        p.unmarshal_binary(&key).unwrap();
+        assert!(p.has_small_order(), "weak keys should have a small order")
+    }
+}
 
-// 	// Iterate over the 19*2 finite field elements
-// 	point := point{}
-// 	actualNonCanonicalCount := 0
-// 	expectedNonCanonicalCount := 24
-// 	for i := 0; i < 19; i++ {
-// 		buffer[0] = byte(237 + i)
-// 		buffer[31] = byte(127)
+// TODO: fix this test
+//use super::constants::PRIME;
+// /// [`test_point_is_canonical()`] ensures that elements `>= p` are considered
+// /// non canonical
+// #[test]
+// fn test_point_is_canonical() {
+//     // buffer stores the candidate points (in little endian) that we'll test
+//     // against, starting with `PRIME`
+//     let mut buffer = PRIME.to_bytes_le().1;
 
-// 		// Check if it's a valid point on the curve that's
-// 		// not canonical
-// 		err := point.UnmarshalBinary(buffer)
-// 		if err == nil && !point.IsCanonical(buffer) {
-// 			actualNonCanonicalCount++
-// 		}
+//     // Iterate over the 19*2 finite field elements
+//     let mut p = Point::default();
+//     let mut actual_non_canonical_count = 0;
+//     let expected_non_canonical_count = 24;
+//     for i in 0..19 {
+//         buffer[0] = (237 + i) as u8;
+//         buffer[31] = 127_u8;
 
-// 		// flip bit
-// 		buffer[31] |= 128
+//         // Check if it's a valid point on the curve that's
+//         // not canonical
+//         match p.unmarshal_binary(&buffer) {
+//             Ok(_) => (),
+//             Err(_) => if !p.is_canonical(&buffer) {
+//                 actual_non_canonical_count += 1;
+//             },
+//         }
 
-// 		// Check if it's a valid point on the curve that's
-// 		// not canonical
-// 		err = point.UnmarshalBinary(buffer)
-// 		if err == nil && !point.IsCanonical(buffer) {
-// 			actualNonCanonicalCount++
-// 		}
-// 	}
-// 	require.Equal(t, expectedNonCanonicalCount, actualNonCanonicalCount, "Incorrect number of non canonical points detected")
+//         // flip bit
+//     	buffer[31] |= 128;
+
+//         // Check if it's a valid point on the curve that's
+//         // not canonical
+//         match p.unmarshal_binary(&buffer) {
+//             Ok(_) => (),
+//             Err(_) => if !p.is_canonical(&buffer) {
+//                 actual_non_canonical_count += 1;
+//             },
+//         }
+//     }
+//     assert_eq!(expected_non_canonical_count, actual_non_canonical_count, "incorrect number of non canonical points detected")
 // }

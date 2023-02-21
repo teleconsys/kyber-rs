@@ -10,7 +10,7 @@ use crate::{
         edwards25519::{scalar_test_types::ONE, Scalar},
         ScalarCanCheckCanonical,
     },
-    util::random::random,
+    util::random::random_stream,
 };
 
 #[test]
@@ -87,7 +87,7 @@ fn test_simple<T: ScalarTrait>(new: fn() -> T) {
     let mut s1 = new();
     let mut s2 = new();
     s1 = s1.set_int64(2);
-    s2 = s2.pick(&mut random::Randstream::default());
+    s2 = s2.pick(&mut random_stream::RandStream::default());
 
     let s22 = s2.clone() + s2.clone();
 
@@ -109,8 +109,7 @@ fn test_scalar_is_canonical() {
         assert_eq!(
             expected[i],
             Scalar::default().is_canonical(&candidate_buf),
-            "`lMinus2 + {}` does not pass canonicality test",
-            i
+            "`lMinus2 + {i}` does not pass canonicality test"
         );
         candidate_buf[0] += 1;
     });

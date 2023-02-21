@@ -3,7 +3,7 @@ use scanner_rust::Scanner;
 use std::fs::File;
 
 use kyber_rs::{
-    cipher::cipher,
+    cipher::{stream, StreamError},
     encoding::BinaryMarshaler,
     group::edwards25519::SuiteEd25519,
     sign::eddsa::{verify, EdDSA},
@@ -52,7 +52,7 @@ fn test_golden() {
 
         let parts: Vec<&str> = line.split(':').collect();
         if parts.len() != 5 {
-            panic!("bad number of parts on line {}", line_no)
+            panic!("bad number of parts on line {line_no}")
         }
 
         let priv_bytes = hex::decode(parts[0]).unwrap();
@@ -80,19 +80,13 @@ fn test_golden() {
 
         let data = ed.public.marshal_binary().unwrap();
         if data != pub_key {
-            panic!(
-                "Public not equal on line {}: {:?} vs {:?}",
-                line_no, pub_key, data
-            )
+            panic!("Public not equal on line {line_no}: {pub_key:?} vs {data:?}")
         }
 
         let sig2 = ed.sign(&msg).unwrap();
 
         if sig != sig2 {
-            panic!(
-                "different signature result on line {}: {:?} vs {:?}",
-                line_no, sig, sig2
-            )
+            panic!("different signature result on line {line_no}: {sig:?} vs {sig2:?}")
         }
 
         verify(&ed.public, &msg, &sig2).unwrap();
@@ -103,16 +97,16 @@ pub struct ConstantStream {
     pub seed: Vec<u8>,
 }
 
-impl cipher::Stream for ConstantStream {
-    fn xor_key_stream(&mut self, dst: &mut [u8], _: &[u8]) -> Result<()> {
+impl stream::Stream for ConstantStream {
+    fn xor_key_stream(&mut self, dst: &mut [u8], _: &[u8]) -> Result<(), StreamError> {
         dst.copy_from_slice(&self.seed);
         Ok(())
     }
 }
 
-// ConstantStream is a cipher.Stream which always returns
-// the same value.
-pub fn constant_stream(buff: Vec<u8>) -> Box<dyn cipher::Stream> {
+/// [`constant_stream()`] is a [`cipher::Stream`] which always returns
+/// the same value.
+pub fn constant_stream(buff: Vec<u8>) -> Box<dyn stream::Stream> {
     Box::new(ConstantStream {
         seed: buff[..32].to_vec(),
     })

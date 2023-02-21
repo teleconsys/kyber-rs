@@ -5,8 +5,8 @@ mod test {
     use num_bigint::Sign::Plus;
     use num_bigint_dig as num_bigint;
 
-    use crate::group::integer_field::integer_field::ByteOrder::{BigEndian, LittleEndian};
-    use crate::group::integer_field::integer_field::Int;
+    use crate::group::integer_field::integer::ByteOrder::{BigEndian, LittleEndian};
+    use crate::group::integer_field::integer::Int;
 
     #[test]
     fn test_int_endianness() {
@@ -28,11 +28,11 @@ mod test {
         assert_ne!(buff2, buff3);
 
         // let's try little_endian function
-        let buff4 = i.little_endian(0, 32);
+        let buff4 = i.little_endian(0, 32).unwrap();
         assert_eq!(buff3, buff4);
         // set endianess but using littleendian should not change anything
         i.bo = BigEndian;
-        assert_eq!(buff4, i.little_endian(0, 32));
+        assert_eq!(buff4, i.little_endian(0, 32).unwrap());
 
         // Try to reconstruct the int from the buffer
         i = Int::default().init64(v, modulo.clone());
@@ -60,7 +60,7 @@ mod test {
         let i = Int::default().init_bytes(v.as_ref(), &modulo_i, BigEndian);
 
         assert_eq!(2, i.marshal_size());
-        i.little_endian(2, 2);
+        i.little_endian(2, 2).unwrap();
     }
 
     #[test]
