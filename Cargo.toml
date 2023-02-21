@@ -1,6 +1,6 @@
 [package]
 name = "kyber-rs"
-version = "0.1.0-alpha"
+version = "0.1.0-alpha.1"
 edition = "2021"
 description = "A toolbox of advanced cryptographic primitives for Rust"
 license-file = "LICENSE"
