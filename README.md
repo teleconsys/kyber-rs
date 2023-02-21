@@ -6,7 +6,7 @@ This library is a partial porting of [DEDIS kyber](https://github.com/dedis/kybe
 This library provides a toolbox of advanced cryptographic primitives for Rust,
 that need more than straightforward signing and encryption.
 Please see the
-[Rust crate documentation for this package](...)
+[Rust crate documentation for this package](https://docs.rs/kyber-rs/0.1.0-alpha/kyber_rs)
 for details on the library's purpose and API functionality.
 
 The following table shows the already implemented features in compared with the [DEDIS](https://github.com/dedis/kyber)' library.
