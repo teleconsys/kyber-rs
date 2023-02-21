@@ -1,9 +1,9 @@
 [package]
 name = "kyber-rs"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 edition = "2021"
 description = "A toolbox of advanced cryptographic primitives for Rust"
-license-file = "LICENSE"
+license = "MPL-2.0"
 repository = "https://github.com/teleconsys/kyber-rs"
 
 [profile.dev]
