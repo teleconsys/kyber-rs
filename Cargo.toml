@@ -2,6 +2,9 @@
 name = "kyber-rs"
 version = "0.1.0-alpha"
 edition = "2021"
+description = "A toolbox of advanced cryptographic primitives for Rust"
+license-file = "LICENSE"
+repository = "https://github.com/teleconsys/kyber-rs"
 
 [profile.dev]
 overflow-checks = false
