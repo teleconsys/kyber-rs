@@ -1,6 +1,8 @@
+use core::fmt;
 use lazy_static::lazy_static;
 use num_bigint_dig as num_bigint;
 use std::cmp::Ordering::{self, Equal, Greater};
+use std::fmt::{Display, Formatter};
 use thiserror::Error;
 
 use num_bigint::algorithms::jacobi;
@@ -67,7 +69,7 @@ impl From<bool> for ByteOrder {
 /// target objects, and receive the modulus of the first operand.
 /// For efficiency the modulus field m is a pointer,
 /// whose target is assumed never to change.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Eq, Debug, Serialize, Deserialize)]
 pub struct Int {
     /// integer value from `0` through `m-1`
     pub(crate) v: BigInt,
@@ -201,9 +203,27 @@ impl Int {
     }
 }
 
+impl Display for Int {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(self.v.to_bytes_be().1))
+    }
+}
+
 impl PartialEq for Int {
     fn eq(&self, other: &Self) -> bool {
         self.equal(other)
+    }
+}
+
+impl Ord for Int {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.cmpr(other)
+    }
+}
+
+impl PartialOrd for Int {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmpr(other))
     }
 }
 
@@ -279,12 +299,6 @@ impl Marshaling for Int {
 
     fn marshal_id(&self) -> [u8; 8] {
         MARSHAL_INT_ID
-    }
-}
-
-impl ToString for Int {
-    fn to_string(&self) -> String {
-        hex::encode(self.v.to_bytes_be().1)
     }
 }
 

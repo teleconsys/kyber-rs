@@ -2,7 +2,7 @@
 /// "Non-Interactive and Information-Theoretic Secure Verifiable Secret Sharing"
 /// by Torben Pryds Pedersen.
 /// https://link.springer.com/content/pdf/10.1007/3-540-46766-1_9.pdf
-use core::{fmt, ops::Deref};
+use core::ops::Deref;
 use std::{collections::HashMap, io::Write, ops::DerefMut};
 
 use byteorder::{LittleEndian, WriteBytesExt};

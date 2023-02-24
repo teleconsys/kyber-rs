@@ -28,13 +28,13 @@ fn test_string() {
     // Create a scalar that would trigger #262.
     let mut s = Scalar::default();
     s = s.set_int64(0x100);
-    s = s + ONE.clone();
+    s = s + *ONE;
     let _z = s.to_string();
     assert_eq!(
         s.to_string(),
         "0101000000000000000000000000000000000000000000000000000000000000",
         "unexpected result from string(): {}",
-        s.to_string()
+        s
     );
 }
 
@@ -47,7 +47,7 @@ fn test_negative_big_int() {
         s.to_string(),
         "ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010",
         "unexpected result: {}",
-        s.to_string()
+        s
     );
 }
 
@@ -60,7 +60,7 @@ fn test_positive_big_int() {
         s.to_string(),
         "0100000000000000000000000000000000000000000000000000000000000000",
         "unexpected result: {}",
-        s.to_string()
+        s
     );
 }
 
@@ -79,7 +79,7 @@ fn test_set_bytes_le() {
         s.to_string(),
         "0001020300000000000000000000000000000000000000000000000000000000",
         "unexpected result from string(): {}",
-        s.to_string()
+        s
     );
 }
 

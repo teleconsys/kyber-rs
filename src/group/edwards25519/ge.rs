@@ -70,7 +70,9 @@ fn test_from_bytes() {
     assert!(el.from_bytes(&arr));
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, Default)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default, Serialize, Deserialize,
+)]
 pub struct ExtendedGroupElement {
     pub x: FieldElement,
     pub y: FieldElement,

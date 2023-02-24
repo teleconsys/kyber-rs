@@ -38,7 +38,7 @@ fn test_example_dkg() {
     for _ in 0..NUM_NODES {
         let priv_key = suite.scalar().pick(&mut suite.random_stream());
         let pub_key = suite.point().mul(&priv_key, None);
-        pub_keys.push(pub_key.clone());
+        pub_keys.push(pub_key);
         nodes.push(Node::<SuiteEd25519> {
             dkg: Default::default(),
             _pub_key: pub_key,
