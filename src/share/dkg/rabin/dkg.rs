@@ -184,7 +184,7 @@ impl<SUITE: Suite> ComplaintCommits<SUITE> {
 
 /// [`ReconstructCommits`] holds the information given by a participant who reveals
 /// the deal received from a peer that has received a Complaint Commits.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct ReconstructCommits<SUITE: Suite> {
     /// `id` of the session
     pub session_id: Vec<u8>,
@@ -212,7 +212,7 @@ impl<SUITE: Suite> ReconstructCommits<SUITE> {
 }
 
 /// [`DistKeyGenerator`] is the struct that runs the DKG protocol.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct DistKeyGenerator<SUITE: Suite> {
     pub suite: SUITE,
 
@@ -238,21 +238,15 @@ pub struct DistKeyGenerator<SUITE: Suite> {
     pub reconstructed: HashMap<u32, bool>,
 }
 
-impl<SUITE: Suite> Default for DistKeyGenerator<SUITE> {
-    fn default() -> Self {
-        Self {
-            suite: Default::default(),
-            index: Default::default(),
-            long: Default::default(),
-            pubb: Default::default(),
-            participants: Default::default(),
-            t: Default::default(),
-            dealer: Default::default(),
-            verifiers: Default::default(),
-            commitments: Default::default(),
-            pending_reconstruct: Default::default(),
-            reconstructed: Default::default(),
-        }
+impl<T: Suite> Display for DistKeyGenerator<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "DistKeyGenerator( index: {}, threshold: {}, participants: {} )",
+            self.index,
+            self.t,
+            self.participants.len(),
+        )
     }
 }
 

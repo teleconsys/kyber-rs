@@ -47,7 +47,7 @@ use std::ops::{Deref, DerefMut};
 
 /// [`Dealer`] encapsulates for creating and distributing the shares and for
 /// replying to any [`responses`](Response).
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct Dealer<SUITE: Suite> {
     suite: SUITE,
     // reader: STREAM,
@@ -67,24 +67,6 @@ pub struct Dealer<SUITE: Suite> {
     pub(crate) aggregator: Aggregator<SUITE>,
 }
 
-impl<SUITE: Suite> Default for Dealer<SUITE> {
-    fn default() -> Self {
-        Self {
-            suite: Default::default(),
-            long: Default::default(),
-            pubb: Default::default(),
-            secret: Default::default(),
-            secret_commits: Default::default(),
-            verifiers: Default::default(),
-            hkdf_context: Default::default(),
-            t: Default::default(),
-            session_id: Default::default(),
-            deals: Default::default(),
-            aggregator: Default::default(),
-        }
-    }
-}
-
 impl<SUITE: Suite> Deref for Dealer<SUITE> {
     type Target = Aggregator<SUITE>;
 
@@ -100,7 +82,7 @@ impl<SUITE: Suite> DerefMut for Dealer<SUITE> {
 }
 
 /// [`Deal`] encapsulates the verifiable secret share and is sent by the dealer to a verifier.
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct Deal<SUITE: Suite> {
     /// Unique session identifier for this protocol run
     pub(crate) session_id: Vec<u8>,
@@ -112,18 +94,6 @@ pub struct Deal<SUITE: Suite> {
     pub(crate) t: usize,
     /// Commitments are the coefficients used to verify the shares against
     pub(crate) commitments: Vec<SUITE::POINT>,
-}
-
-impl<SUITE: Suite> Default for Deal<SUITE> {
-    fn default() -> Self {
-        Self {
-            session_id: Default::default(),
-            sec_share: Default::default(),
-            rnd_share: Default::default(),
-            t: Default::default(),
-            commitments: Default::default(),
-        }
-    }
 }
 
 impl<SUITE: Suite> Deal<SUITE> {
@@ -419,7 +389,7 @@ where
 
 /// [`Verifier`] receives a [`Deal`] from a Dealer, can reply with a Complaint, and can
 /// collaborate with other Verifiers to reconstruct a secret.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct Verifier<SUITE: Suite> {
     suite: SUITE,
     pub(crate) longterm: <SUITE::POINT as Point>::SCALAR,
@@ -641,7 +611,7 @@ where
 
 /// [`Aggregator`] is used to collect all [`deals`](Deal), and [`responses`](Response) for one protocol run.
 /// It brings common functionalities for both [`Dealer`] and [`Verifier`] structs.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct Aggregator<SUITE: Suite> {
     suite: SUITE,
     dealer: SUITE::POINT,
@@ -653,22 +623,6 @@ pub struct Aggregator<SUITE: Suite> {
     pub(crate) deal: Option<Deal<SUITE>>,
     pub(crate) t: usize,
     pub(crate) bad_dealer: bool,
-}
-
-impl<SUITE: Suite> Default for Aggregator<SUITE> {
-    fn default() -> Self {
-        Self {
-            suite: Default::default(),
-            dealer: Default::default(),
-            verifiers: Default::default(),
-            commits: Default::default(),
-            responses: Default::default(),
-            sid: Default::default(),
-            deal: Default::default(),
-            t: Default::default(),
-            bad_dealer: Default::default(),
-        }
-    }
 }
 
 fn new_aggregator<SUITE: Suite>(

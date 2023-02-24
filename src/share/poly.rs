@@ -381,7 +381,7 @@ impl<POINT: Point> PubShare<POINT> {
 }
 
 /// [`PubPoly`] represents a public commitment polynomial to a secret sharing polynomial.
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct PubPoly<GROUP: Group> {
     /// Cryptographic [`Group`]
     g: GROUP,
@@ -389,16 +389,6 @@ pub struct PubPoly<GROUP: Group> {
     b: Option<GROUP::POINT>,
     /// Commitments to coefficients of the secret sharing polynomial
     commits: Vec<GROUP::POINT>,
-}
-
-impl<GROUP: Group> Default for PubPoly<GROUP> {
-    fn default() -> Self {
-        Self {
-            g: Default::default(),
-            b: Default::default(),
-            commits: Default::default(),
-        }
-    }
 }
 
 impl<GROUP: Group> PubPoly<GROUP> {
