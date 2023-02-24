@@ -33,7 +33,7 @@
 ///    must be broadcasted to all the QUAL participant.
 ///   7. At this point, every QUAL participant can issue the distributed key by
 ///    calling [`dist_key_share()`].
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use digest::Digest;
@@ -55,12 +55,22 @@ use crate::{
 };
 
 /// [`DistKeyShare`] holds the share of a distributed key for a participant.
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct DistKeyShare<SUITE: Suite> {
     /// `Coefficients` of the public polynomial holding the public key
     pub commits: Vec<SUITE::POINT>,
     /// `Share` of the distributed secret
     pub share: PriShare<<SUITE::POINT as Point>::SCALAR>,
+}
+
+impl<T: Suite> Display for DistKeyShare<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "DistKeyShare(commits: {:?}, share: {})",
+            self.commits, self.share
+        )
+    }
 }
 
 impl<SUITE: Suite> DistKeyShare<SUITE> {

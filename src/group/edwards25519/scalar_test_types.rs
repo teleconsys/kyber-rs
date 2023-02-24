@@ -2,7 +2,10 @@ use super::{Scalar, SuiteEd25519};
 use crate::{encoding::MarshallingError, Group, Scalar as ScalarTrait, XOFFactory};
 use criterion::{measurement::WallTime, BenchmarkGroup, Criterion};
 use lazy_static::lazy_static;
-use std::ops::Deref;
+use std::{
+    fmt::{Display, Formatter},
+    ops::Deref,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -26,9 +29,15 @@ lazy_static! {
 
 /// [`SimpleCTScalar`] implements the scalar operations only using [`sc_mul_add()`] by
 /// playing with the parameters.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Copy, Clone, Eq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct SimpleCTScalar {
     s: Scalar,
+}
+
+impl Display for SimpleCTScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SimpleCTScalar({})", self.s)
+    }
 }
 
 impl PartialEq for SimpleCTScalar {
@@ -68,12 +77,6 @@ impl BinaryMarshaler for SimpleCTScalar {
 impl BinaryUnmarshaler for SimpleCTScalar {
     fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError> {
         encoding::unmarshal_binary(self, data)
-    }
-}
-
-impl ToString for SimpleCTScalar {
-    fn to_string(&self) -> String {
-        self.s.to_string()
     }
 }
 
@@ -161,9 +164,15 @@ impl ScalarTrait for SimpleCTScalar {
 
 /// [`FactoredScalar`] implements the scalar operations using a factored version or
 /// [`sc_reduce_limbs()`] at the end of each operations.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Copy, Clone, Eq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct FactoredScalar {
     s: Scalar,
+}
+
+impl Display for FactoredScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FactoredScalar({})", self.s)
+    }
 }
 
 impl PartialEq for FactoredScalar {
@@ -203,12 +212,6 @@ impl BinaryMarshaler for FactoredScalar {
 impl BinaryUnmarshaler for FactoredScalar {
     fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError> {
         encoding::unmarshal_binary(self, data)
-    }
-}
-
-impl ToString for FactoredScalar {
-    fn to_string(&self) -> String {
-        self.s.to_string()
     }
 }
 

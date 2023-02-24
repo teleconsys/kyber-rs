@@ -15,6 +15,7 @@ use serde::Serialize;
 use thiserror::Error;
 
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::vec;
 
 use crate::encoding::BinaryMarshaler;
@@ -30,7 +31,7 @@ type ScalarMap<GROUP> = HashMap<usize, <<GROUP as Group>::POINT as Point>::SCALA
 type PointMap<GROUP> = HashMap<usize, <GROUP as Group>::POINT>;
 
 /// [`PriShare`] represents a private share.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct PriShare<SCALAR> {
     /// Index of the private share
     pub i: usize,
@@ -38,12 +39,9 @@ pub struct PriShare<SCALAR> {
     pub v: SCALAR,
 }
 
-impl<SCALAR: Scalar> Default for PriShare<SCALAR> {
-    fn default() -> Self {
-        Self {
-            i: Default::default(),
-            v: Default::default(),
-        }
+impl<T: Display> Display for PriShare<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PriShare(i: {}, v: {}", self.i, self.v)
     }
 }
 

@@ -18,7 +18,7 @@ use super::constants::{FULL_ORDER, L_MINUS2};
 
 const MARSHAL_SCALAR_ID: [u8; 8] = [b'e', b'd', b'.', b's', b'c', b'a', b'l', b'a'];
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Copy, Clone, Eq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct Scalar {
     pub v: [u8; 32],
 }
@@ -76,6 +76,14 @@ impl PartialEq for Scalar {
     }
 }
 
+impl Display for Scalar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut b = self.to_int().marshal_binary().unwrap().to_vec();
+        b.resize(32, 0);
+        write!(f, "{}", hex::encode(b))
+    }
+}
+
 impl BinaryMarshaler for Scalar {
     fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
         let mut b = self.to_int().marshal_binary()?;
@@ -97,14 +105,7 @@ impl BinaryUnmarshaler for Scalar {
     }
 }
 
-impl ToString for Scalar {
-    fn to_string(&self) -> String {
-        let mut b = self.to_int().marshal_binary().unwrap().to_vec();
-        b.resize(32, 0);
-        hex::encode(b)
-    }
-}
-
+use std::fmt::Display;
 use std::ops;
 impl_op_ex!(*|a: &Scalar, b: &Scalar| -> Scalar {
     let mut v = [0_u8; 32];
