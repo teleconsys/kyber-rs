@@ -50,7 +50,7 @@ fn generate(n: usize, t: usize) -> TestData<SuiteEd25519> {
     }
     let mut dkgs = Vec::with_capacity(n);
     (0..n).for_each(|i| {
-        let dkg = new_dist_key_generator(suite(), part_sec[i].clone(), &part_pubs, t).unwrap();
+        let dkg = new_dist_key_generator(suite(), part_sec[i], &part_pubs, t).unwrap();
         dkgs.push(dkg);
     });
     TestData {
@@ -66,7 +66,7 @@ fn test_dkg_new_dist_key_generator() {
     let part_pubs = test_data.part_pubs;
     let part_sec = test_data.part_sec;
 
-    let long = part_sec[0].clone();
+    let long = part_sec[0];
     let dkg: DistKeyGenerator<SuiteEd25519, &'static [u8]> =
         new_dist_key_generator(suite(), long, &part_pubs, *DEFAULT_T).unwrap();
     assert!(dkg.can_issue);
@@ -78,12 +78,8 @@ fn test_dkg_new_dist_key_generator() {
 
     let (sec, _) = gen_pair();
     // TODO: fix this check to get the specific error
-    let dkg_res = new_dist_key_generator::<SuiteEd25519, &'static [u8]>(
-        suite(),
-        sec.clone(),
-        &part_pubs,
-        *DEFAULT_T,
-    );
+    let dkg_res =
+        new_dist_key_generator::<SuiteEd25519, &'static [u8]>(suite(), sec, &part_pubs, *DEFAULT_T);
     assert!(dkg_res.is_err());
 
     let dkg_res =
@@ -171,13 +167,7 @@ fn test_dkg_process_response() {
     let idx_rec = 1;
 
     // give a wrong deal
-    let good_secret = dkgs[0]
-        .dealer
-        .plaintext_deal(idx_rec)
-        .unwrap()
-        .sec_share
-        .v
-        .clone();
+    let good_secret = dkgs[0].dealer.plaintext_deal(idx_rec).unwrap().sec_share.v;
     dkgs[0].dealer.plaintext_deal(idx_rec).unwrap().sec_share.v = suite().scalar().zero();
     let dd = dkgs[0].deals().unwrap();
     let enc_d = dd.get(&idx_rec).unwrap();
@@ -211,13 +201,7 @@ fn test_dkg_process_response() {
     // fake a wrong deal
     //deal20, err := dkg2.dealer.PlaintextDeal(0)
     //require.Nil(t, err)
-    let good_rnd_2_1 = dkgs[2]
-        .dealer
-        .plaintext_deal(1)
-        .unwrap()
-        .sec_share
-        .v
-        .clone();
+    let good_rnd_2_1 = dkgs[2].dealer.plaintext_deal(1).unwrap().sec_share.v;
     dkgs[2].dealer.plaintext_deal(1).unwrap().sec_share.v = suite().scalar().zero();
     let mut deals_2 = dkgs[2].deals().unwrap();
 
@@ -280,7 +264,7 @@ fn test_dkg_resharing_threshold() {
 
     let mut new_pubs = Vec::with_capacity(new_n);
     for dkg in dkgs.iter() {
-        new_pubs.push(dkg.pubb.clone());
+        new_pubs.push(dkg.pubb);
     }
     let (new_priv, new_pub) = gen_pair();
     new_pubs.push(new_pub);
@@ -288,7 +272,7 @@ fn test_dkg_resharing_threshold() {
     for (i, _) in dkgs.iter().enumerate() {
         let c = Config {
             suite: suite(),
-            longterm: dkgs[i].c.longterm.clone(),
+            longterm: dkgs[i].c.longterm,
             old_nodes: publics.clone(),
             new_nodes: new_pubs.clone(),
             share: Some(shares[i].clone()),
@@ -550,7 +534,7 @@ fn test_dist_key_share() {
             dks.share.i,
             0
         );
-        shares.push(Some(dks.share.clone()));
+        shares.push(Some(dks.share));
     }
 
     let secret = share::poly::recover_secret(suite(), &shares, DEFAULT_N, DEFAULT_N).unwrap();
@@ -650,7 +634,7 @@ fn test_dkg_resharing() {
     let mut sshares = Vec::with_capacity(dkgs.len());
     for dkg in dkgs.iter() {
         let share = dkg.dist_key_share().unwrap();
-        sshares.push(Some(share.share.clone()));
+        sshares.push(Some(share.share));
         shares.push(share);
     }
     // start resharing within the same group
@@ -658,7 +642,7 @@ fn test_dkg_resharing() {
     for (i, _) in dkgs.iter().enumerate() {
         let c = Config {
             suite: suite(),
-            longterm: secrets[i].clone(),
+            longterm: secrets[i],
             old_nodes: publics.clone(),
             new_nodes: publics.clone(),
             share: Some(shares[i].clone()),
@@ -675,7 +659,7 @@ fn test_dkg_resharing() {
     let mut new_sshares = Vec::with_capacity(dkgs.len());
     for dkg in new_dkgs {
         let dks = dkg.dist_key_share().unwrap();
-        new_sshares.push(Some(dks.share.clone()));
+        new_sshares.push(Some(dks.share));
         new_shares.push(dks);
     }
     // check
@@ -709,7 +693,7 @@ fn test_dkg_resharing_remove_node() {
     let mut sshares = Vec::with_capacity(dkgs.len());
     for dkg in dkgs.iter() {
         let share = dkg.dist_key_share().unwrap();
-        sshares.push(Some(share.share.clone()));
+        sshares.push(Some(share.share));
         shares.push(share);
     }
 
@@ -718,7 +702,7 @@ fn test_dkg_resharing_remove_node() {
     for (i, _) in dkgs.iter().enumerate() {
         let c = Config {
             suite: suite(),
-            longterm: secrets[i].clone(),
+            longterm: secrets[i],
             old_nodes: publics.clone(),
             new_nodes: publics[..new_n].to_vec(),
             share: Some(shares[i].clone()),
@@ -735,7 +719,7 @@ fn test_dkg_resharing_remove_node() {
     let mut new_sshares = Vec::with_capacity(dkgs.len() - 1);
     for dkg in new_dkgs[..new_n].iter() {
         let dks = dkg.dist_key_share().unwrap();
-        new_sshares.push(Some(dks.share.clone()));
+        new_sshares.push(Some(dks.share));
         new_shares.push(dks);
     }
 
@@ -771,7 +755,7 @@ fn test_dkg_resharing_new_nodes_threshold() {
     let mut sshares = Vec::with_capacity(dkgs.len());
     for dkg in dkgs.iter() {
         let share = dkg.dist_key_share().unwrap();
-        sshares.push(Some(share.share.clone()));
+        sshares.push(Some(share.share));
         shares.push(share);
     }
     // start resharing to a different group
@@ -791,7 +775,7 @@ fn test_dkg_resharing_new_nodes_threshold() {
     for i in 0..old_n {
         let c = Config {
             suite: suite(),
-            longterm: old_privs[i].clone(),
+            longterm: old_privs[i],
             old_nodes: old_pubs.clone(),
             new_nodes: new_pubs.clone(),
             share: Some(shares[i].clone()),
@@ -812,7 +796,7 @@ fn test_dkg_resharing_new_nodes_threshold() {
     for i in 0..new_n {
         let c = Config {
             suite: suite(),
-            longterm: new_privs[i].clone(),
+            longterm: new_privs[i],
             old_nodes: old_pubs.clone(),
             new_nodes: new_pubs.clone(),
             share: None,
@@ -923,7 +907,7 @@ fn test_dkg_resharing_new_nodes_threshold() {
     let mut new_sshares = Vec::with_capacity(new_n);
     for dkg in new_dkgs.iter() {
         let dks = dkg.dist_key_share().unwrap();
-        new_sshares.push(Some(dks.share.clone()));
+        new_sshares.push(Some(dks.share));
         new_shares.push(dks);
     }
 
@@ -946,7 +930,7 @@ fn test_dkg_resharing_new_nodes() {
     let mut sshares = Vec::with_capacity(dkgs.len());
     for dkg in dkgs.iter() {
         let share = dkg.dist_key_share().unwrap();
-        sshares.push(Some(share.share.clone()));
+        sshares.push(Some(share.share));
         shares.push(share);
     }
 
@@ -960,10 +944,10 @@ fn test_dkg_resharing_new_nodes() {
     let mut new_pubs = Vec::with_capacity(new_n);
 
     // new[0], new[1] = old[-1], old[-2]
-    new_privs.push(old_privs[old_n - 1].clone());
-    new_pubs.push(old_pubs[old_n - 1].clone());
-    new_privs.push(old_privs[old_n - 2].clone());
-    new_pubs.push(old_pubs[old_n - 2].clone());
+    new_privs.push(old_privs[old_n - 1]);
+    new_pubs.push(old_pubs[old_n - 1]);
+    new_privs.push(old_privs[old_n - 2]);
+    new_pubs.push(old_pubs[old_n - 2]);
 
     for _ in 2..new_n {
         let (new_priv, new_pub) = gen_pair();
@@ -977,7 +961,7 @@ fn test_dkg_resharing_new_nodes() {
     for i in 0..old_n {
         let c = Config {
             suite: suite(),
-            longterm: old_privs[i].clone(),
+            longterm: old_privs[i],
             old_nodes: old_pubs.clone(),
             new_nodes: new_pubs.clone(),
             share: Some(shares[i].clone()),
@@ -1018,7 +1002,7 @@ fn test_dkg_resharing_new_nodes() {
     for i in 2..new_n {
         let c = Config {
             suite: suite(),
-            longterm: new_privs[i].clone(),
+            longterm: new_privs[i],
             old_nodes: old_pubs.clone(),
             new_nodes: new_pubs.clone(),
             share: None,
@@ -1155,7 +1139,7 @@ fn test_dkg_resharing_new_nodes() {
     let mut new_sshares = Vec::with_capacity(new_n);
     for dkg in new_dkgs.iter() {
         let dks = dkg.dist_key_share().unwrap();
-        new_sshares.push(Some(dks.share.clone()));
+        new_sshares.push(Some(dks.share));
         new_shares.push(dks);
     }
 
@@ -1177,7 +1161,7 @@ fn test_dkg_resharing_partial_new_nodes() {
     let mut sshares = Vec::with_capacity(dkgs.len());
     for dkg in dkgs.iter() {
         let share = dkg.dist_key_share().unwrap();
-        sshares.push(Some(share.share.clone()));
+        sshares.push(Some(share.share));
         shares.push(share);
     }
 
@@ -1192,10 +1176,10 @@ fn test_dkg_resharing_partial_new_nodes() {
     let mut new_privs = Vec::with_capacity(new_n);
     let mut new_pubs = Vec::with_capacity(new_n);
     for privv in old_privs[1..].iter() {
-        new_privs.push(privv.clone());
+        new_privs.push(*privv);
     }
     for pubb in old_pubs[1..].iter() {
-        new_pubs.push(pubb.clone());
+        new_pubs.push(*pubb);
     }
 
     // add two new nodes
@@ -1211,7 +1195,7 @@ fn test_dkg_resharing_partial_new_nodes() {
     for i in 0..old_n {
         let c = Config {
             suite: suite(),
-            longterm: old_privs[i].clone(),
+            longterm: old_privs[i],
             old_nodes: old_pubs.clone(),
             new_nodes: new_pubs.clone(),
             share: Some(shares[i].clone()),
@@ -1246,7 +1230,7 @@ fn test_dkg_resharing_partial_new_nodes() {
         let new_idx = i - old_n + new_offset;
         let c = Config {
             suite: suite(),
-            longterm: new_privs[new_idx].clone(),
+            longterm: new_privs[new_idx],
             old_nodes: old_pubs.clone(),
             new_nodes: new_pubs.clone(),
             share: None,
@@ -1364,7 +1348,7 @@ fn test_dkg_resharing_partial_new_nodes() {
     let mut new_sshares = Vec::with_capacity(new_n);
     for dkg in new_dkgs.iter() {
         let dks = dkg.dist_key_share().unwrap();
-        new_sshares.push(Some(dks.share.clone()));
+        new_sshares.push(Some(dks.share));
         new_shares.push(dks);
     }
 
@@ -1380,7 +1364,7 @@ fn test_reader_mixed_entropy() {
     let test_data = generate(DEFAULT_N, *DEFAULT_T);
     let part_pubs = test_data.part_pubs;
     let part_sec = test_data.part_sec;
-    let long = part_sec[0].clone();
+    let long = part_sec[0];
     let r = seed.as_bytes();
     let c = Config {
         suite: suite(),
@@ -1403,12 +1387,12 @@ fn test_user_only_flag_true_behavior() {
     let test_data = generate(DEFAULT_N, *DEFAULT_T);
     let part_pubs = test_data.part_pubs;
     let part_sec = test_data.part_sec;
-    let long = part_sec[0].clone();
+    let long = part_sec[0];
 
     let r1 = seed.as_bytes();
     let c1 = Config {
         suite: suite(),
-        longterm: long.clone(),
+        longterm: long,
         new_nodes: part_pubs.clone(),
         threshold: *DEFAULT_T,
         reader: Some(r1),
@@ -1447,12 +1431,12 @@ fn test_user_only_flag_false_behavior() {
     let test_data = generate(DEFAULT_N, *DEFAULT_T);
     let part_pubs = test_data.part_pubs;
     let part_sec = test_data.part_sec;
-    let long = part_sec[0].clone();
+    let long = part_sec[0];
 
     let r1 = seed.as_bytes();
     let c1 = Config {
         suite: suite(),
-        longterm: long.clone(),
+        longterm: long,
         new_nodes: part_pubs.clone(),
         threshold: *DEFAULT_T,
         reader: Some(r1),

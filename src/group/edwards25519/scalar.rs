@@ -24,14 +24,14 @@ pub struct Scalar {
 }
 
 impl Scalar {
-    fn to_int(&self) -> Int {
+    fn as_int(&self) -> Int {
         Int::new_int_bytes(&self.v, &PRIME_ORDER, LittleEndian)
     }
 
     fn set_int(mut self, i: &mut Int) -> Self {
         let b = i
             .little_endian(32, 32)
-            .unwrap_or(Self::default().v.to_vec());
+            .unwrap_or_else(|_| Self::default().v.to_vec());
         self.v.as_mut_slice()[0..b.len()].copy_from_slice(b.as_ref());
         self
     }
@@ -78,7 +78,7 @@ impl PartialEq for Scalar {
 
 impl Display for Scalar {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut b = self.to_int().marshal_binary().unwrap().to_vec();
+        let mut b = self.as_int().marshal_binary().unwrap().to_vec();
         b.resize(32, 0);
         write!(f, "{}", hex::encode(b))
     }
@@ -86,7 +86,7 @@ impl Display for Scalar {
 
 impl BinaryMarshaler for Scalar {
     fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
-        let mut b = self.to_int().marshal_binary()?;
+        let mut b = self.as_int().marshal_binary()?;
         b.resize(32, 0);
 
         Ok(b)

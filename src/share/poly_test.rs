@@ -316,17 +316,17 @@ fn test_pri_poly_mul() {
         assert_ne!(nul.to_string(), c.to_string());
     }
 
-    let a0 = a.coeffs[0].clone();
-    let b0 = b.coeffs[0].clone();
+    let a0 = a.coeffs[0];
+    let b0 = b.coeffs[0];
     let mut mul = b0 * a0;
-    let c0 = c.coeffs[0].clone();
+    let c0 = c.coeffs[0];
 
     assert_eq!(c0.to_string(), mul.to_string());
 
-    let at = a.coeffs[a.coeffs.len() - 1].clone();
-    let bt = b.coeffs[b.coeffs.len() - 1].clone();
+    let at = a.coeffs[a.coeffs.len() - 1];
+    let bt = b.coeffs[b.coeffs.len() - 1];
     mul = at * bt;
-    let ct = c.coeffs[c.coeffs.len() - 1].clone();
+    let ct = c.coeffs[c.coeffs.len() - 1];
     assert_eq!(ct.to_string(), mul.to_string());
 }
 
@@ -389,7 +389,7 @@ fn test_refresh_dkg() {
     // Verify VSS shares
     for i in 0..n {
         for j in 0..n {
-            let sij = pri_shares[i][j].clone().unwrap();
+            let sij = pri_shares[i][j].unwrap();
             // s_ij * G
             let mut sij_g = g.point().base();
             sij_g = sij_g.mul(&sij.v, None);
@@ -403,7 +403,7 @@ fn test_refresh_dkg() {
         let mut acc = g.scalar().zero();
         (0..n).for_each(|j| {
             // assuming all participants are in the qualified set
-            acc = acc.clone() + pri_shares[j][i].clone().unwrap().v;
+            acc = acc + pri_shares[j][i].unwrap().v;
         });
         dkg_shares.push(PriShare { i, v: acc });
     }
@@ -415,8 +415,8 @@ fn test_refresh_dkg() {
         (0..n).for_each(|i| {
             // assuming all participants are in the qualified set
             let (_, coeff) = pub_polys[i].info();
-            let acc_clone = acc.clone();
-            acc = acc.clone().add(&acc_clone, &coeff[k]);
+            let acc_clone = acc;
+            acc = acc.add(&acc_clone, &coeff[k]);
         });
         dkg_commits.push(acc);
     }
@@ -435,19 +435,13 @@ fn test_refresh_dkg() {
 
     // Create subshares and subpolys
     for i in 0..n {
-        sub_pri_polys.push(new_pri_poly(
-            g,
-            t,
-            Some(dkg_shares[i].clone().v),
-            g.random_stream(),
-        ));
+        sub_pri_polys.push(new_pri_poly(g, t, Some(dkg_shares[i].v), g.random_stream()));
         sub_pri_shares.push(sub_pri_polys[i].shares(n));
         sub_pub_polys.push(sub_pri_polys[i].commit(None));
         sub_pub_shares.push(sub_pub_polys[i].shares(n));
 
         assert_eq!(
-            g.point()
-                .mul(&sub_pri_shares[i][0].clone().unwrap().v, None),
+            g.point().mul(&sub_pri_shares[i][0].unwrap().v, None),
             sub_pub_shares[i][0].as_ref().unwrap().v
         )
     }
@@ -462,11 +456,11 @@ fn test_refresh_dkg() {
             // is correct by evaluating the public commitment vector
             tmp_pri_shares.push(Some(PriShare {
                 i: j,
-                v: sub_pri_shares[j][i].clone().unwrap().v,
+                v: sub_pri_shares[j][i].unwrap().v,
             })); // Shares that participant i gets from j
             assert!(g
                 .point()
-                .mul(&tmp_pri_shares[j].clone().unwrap().v, None)
+                .mul(&tmp_pri_shares[j].unwrap().v, None)
                 .eq(&sub_pub_polys[j].eval(i).v));
 
             // Check 2: Verify that the received sub public shares are
@@ -494,10 +488,7 @@ fn test_refresh_dkg() {
         let mut pub_shares = Vec::with_capacity(n);
         (0..n).for_each(|j| {
             let (_, c) = sub_pub_polys[j].info();
-            pub_shares.push(Some(PubShare {
-                i: j,
-                v: c[i].clone(),
-            }));
+            pub_shares.push(Some(PubShare { i: j, v: c[i] }));
         });
         let com = recover_commit(g, &pub_shares, t, n).unwrap();
         new_dkg_commits.push(com);
@@ -508,13 +499,13 @@ fn test_refresh_dkg() {
 
     // Check that the old and new DKG private shares are different
     for i in 0..n {
-        assert_ne!(dkg_shares[i].v, new_dkg_shares[i].clone().unwrap().v);
+        assert_ne!(dkg_shares[i].v, new_dkg_shares[i].unwrap().v);
     }
 
     // Check that the refreshed private DKG shares verify against the refreshed public DKG commits
     let q = PubPoly::new(&g, None, &new_dkg_commits);
     (0..n).for_each(|i| {
-        assert!(q.check(&new_dkg_shares[i].clone().unwrap()));
+        assert!(q.check(&new_dkg_shares[i].unwrap()));
     });
 
     // Recover the private polynomial

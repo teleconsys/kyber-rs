@@ -49,7 +49,7 @@ fn test_example_dkg() {
     for _ in 0..n {
         let priv_key = suite.scalar().pick(&mut suite.random_stream());
         let pub_key = suite.point().mul(&priv_key, None);
-        pub_keys.push(pub_key.clone());
+        pub_keys.push(pub_key);
         nodes.push(Node::<SuiteEd25519> {
             _pub_key: pub_key,
             priv_key,
@@ -63,8 +63,8 @@ fn test_example_dkg() {
 
     // 2. Create the DKGs on each node
     for node in nodes.iter_mut() {
-        let dkg = dkg::pedersen::new_dist_key_generator(suite, node.priv_key.clone(), &pub_keys, n)
-            .unwrap();
+        let dkg =
+            dkg::pedersen::new_dist_key_generator(suite, node.priv_key, &pub_keys, n).unwrap();
         node.dkg = dkg;
     }
 
@@ -136,7 +136,7 @@ fn test_example_dkg() {
         shares.push(Some(distr_key.pri_share()));
         public_key = distr_key.public();
         node.secret_share = distr_key.pri_share();
-        node.distributed_public_key = public_key.clone();
+        node.distributed_public_key = public_key;
         println!("new distributed public key {public_key:?}");
     }
 
@@ -151,7 +151,7 @@ fn test_example_dkg() {
     let secret_key = share::poly::recover_secret(suite, &shares, n, n).unwrap();
     let (k, c, remainder) = el_gamal_encrypt(suite, &public_key, message);
     assert_eq!(remainder.len(), 0);
-    let decrypted_message = el_gamal_decrypt(suite, &secret_key, k.clone(), c.clone()).unwrap();
+    let decrypted_message = el_gamal_decrypt(suite, &secret_key, k, c).unwrap();
     assert_eq!(message.to_vec(), decrypted_message);
 
     // 8. Variant B - Each node provide only a partial decryption by sending its
@@ -161,11 +161,8 @@ fn test_example_dkg() {
     let mut pub_shares = Vec::with_capacity(n);
     for (i, node) in nodes.iter().enumerate() {
         let s = suite.point().mul(&node.secret_share.v, Some(&k));
-        partials.push(suite.point().sub(&c.clone(), &s).clone());
-        pub_shares.push(Some(share::poly::PubShare {
-            i,
-            v: partials[i].clone(),
-        }));
+        partials.push(suite.point().sub(&c, &s));
+        pub_shares.push(Some(share::poly::PubShare { i, v: partials[i] }));
     }
 
     // Reconstruct the public commitment, which contains the decrypted message
@@ -232,10 +229,7 @@ fn test_example_dkg() {
             &suite.point().mul(&node.secret_share.v, Some(&q)), // oQ
         );
         partials.push(v);
-        pub_shares.push(Some(share::poly::PubShare {
-            i,
-            v: partials[i].clone(),
-        }));
+        pub_shares.push(Some(share::poly::PubShare { i, v: partials[i] }));
     }
 
     let r_p = share::poly::recover_commit(suite, &pub_shares, n, n).unwrap(); // R = f(V1, V2, ...Vi)
@@ -260,7 +254,7 @@ fn test_example_dkg() {
         let share = node.dkg.dist_key_share().unwrap();
         let c = Config {
             suite,
-            longterm: node.priv_key.clone(),
+            longterm: node.priv_key,
             old_nodes: pub_keys.clone(),
             new_nodes: pub_keys.clone(),
             share: Some(share),

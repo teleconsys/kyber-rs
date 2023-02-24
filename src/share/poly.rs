@@ -55,7 +55,7 @@ impl<SCALAR: Scalar> PriShare<SCALAR> {
     }
 
     pub fn string(&self) -> String {
-        format!("{{{}:{}}}", self.i, self.v.to_string())
+        format!("{{{}:{}}}", self.i, self.v)
     }
 }
 

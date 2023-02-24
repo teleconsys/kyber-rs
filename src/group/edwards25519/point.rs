@@ -85,7 +85,7 @@ impl group::Point for Point {
 
     fn set(&mut self, p: &Self) -> Self {
         self.ge = p.ge;
-        self.clone()
+        *self
     }
 
     fn embed_len(&self) -> usize {
@@ -192,7 +192,7 @@ impl group::Point for Point {
 
     fn neg(&mut self, a: &Self) -> Self {
         self.ge.neg(&a.ge);
-        self.clone()
+        *self
     }
 
     /// [`mul()`] multiplies [`Point`] `p` by [`Scalar`] `s` using the repeated doubling method.
@@ -205,9 +205,9 @@ impl group::Point for Point {
             }
             Some(a_p) => {
                 if self.var_time {
-                    ge_scalar_mult_vartime(&mut self.ge, &mut a, &mut a_p.clone().ge);
+                    ge_scalar_mult_vartime(&mut self.ge, &mut a, &mut a_p.ge.clone());
                 } else {
-                    ge_scalar_mult(&mut self.ge, &mut a, &mut a_p.clone().ge);
+                    ge_scalar_mult(&mut self.ge, &mut a, &mut a_p.ge.clone());
                 }
             }
         }
