@@ -245,10 +245,10 @@ impl PointCanCheckCanonicalAndSmallOrder for Point {
     ///
     /// Provides resilience against malicious key substitution attacks (M-S-UEO)
     /// and message bound security (MSB) even for malicious keys
-    /// See paper https://eprint.iacr.org/2020/823.pdf for definitions and theorems
+    /// See paper <https://eprint.iacr.org/2020/823.pdf> for definitions and theorems
     ///
     /// This is the same code as in
-    /// https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1170
+    /// <https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1170>
     fn has_small_order(&self) -> bool {
         let s = match self.marshal_binary() {
             Ok(v) => v,
@@ -278,10 +278,10 @@ impl PointCanCheckCanonicalAndSmallOrder for Point {
     /// [`is_canonical()`] determines whether the group element is canonical
     ///
     /// Checks whether group element s is less than p, according to RFC8032§5.1.3.1
-    /// https://tools.ietf.org/html/rfc8032#section-5.1.3
+    /// <https://tools.ietf.org/html/rfc8032#section-5.1.3>
     ///
     /// Taken from
-    /// https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1113
+    /// <https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1113>
     ///
     /// The method accepts a buffer instead of calling `marshal_binary()` on the receiver
     /// because that always returns a value modulo `prime`.
