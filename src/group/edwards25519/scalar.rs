@@ -105,7 +105,15 @@ impl LowerHex for Scalar {
     }
 }
 
-use std::fmt::LowerHex;
+impl UpperHex for Scalar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let prefix = if f.alternate() { "0X" } else { "" };
+        let encoded = hex::encode_upper(self.v);
+        write!(f, "{prefix}{encoded}")
+    }
+}
+
+use std::fmt::{LowerHex, UpperHex};
 use std::ops;
 impl_op_ex!(*|a: &Scalar, b: &Scalar| -> Scalar {
     let mut v = [0_u8; 32];

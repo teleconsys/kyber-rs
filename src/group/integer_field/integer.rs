@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use num_bigint_dig as num_bigint;
 use std::cmp::Ordering::{self, Equal, Greater};
-use std::fmt::LowerHex;
+use std::fmt::{LowerHex, UpperHex};
 use thiserror::Error;
 
 use num_bigint::algorithms::jacobi;
@@ -287,6 +287,14 @@ impl LowerHex for Int {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let prefix = if f.alternate() { "0x" } else { "" };
         let encoded = hex::encode(self.v.to_bytes_be().1);
+        write!(f, "{prefix}{encoded}")
+    }
+}
+
+impl UpperHex for Int {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let prefix = if f.alternate() { "0X" } else { "" };
+        let encoded = hex::encode_upper(self.v.to_bytes_be().1);
         write!(f, "{prefix}{encoded}")
     }
 }

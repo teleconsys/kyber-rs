@@ -28,13 +28,13 @@ pub fn ge_scalar_mult_vartime(
     // in addition-ready cached group element form.
     // We only need odd multiples of A because slide()
     // produces only odd-multiple clumps of bits.
-    a_p.to_cached(&mut ai[0]);
+    a_p.get_cached(&mut ai[0]);
     a_p.double(&mut t);
     t.to_extended(&mut a2);
     for i in 0..7 {
         t.add(&a2, &ai[i]);
         t.to_extended(&mut u);
-        u.to_cached(&mut ai[i + 1]);
+        u.get_cached(&mut ai[i + 1]);
     }
 
     // Process the multiplications from most-significant bit downward

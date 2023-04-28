@@ -10,7 +10,7 @@ use thiserror::Error;
 use crate::cipher::stream::Stream;
 use crate::dh::{Dh, HmacCompatible};
 use crate::encoding::Marshaling;
-use std::fmt::{Debug, LowerHex};
+use std::fmt::{Debug, LowerHex, UpperHex};
 use std::io::Write;
 use std::ops::{Add, Mul};
 
@@ -30,6 +30,7 @@ pub trait Scalar:
     + Serialize
     + DeserializeOwned
     + LowerHex
+    + UpperHex
 {
     /// [`set()`] sets the receiver equal to another scalar `a`.
     fn set(self, a: &Self) -> Self;
@@ -89,6 +90,7 @@ pub trait Point:
     + Debug
     + PartialEq
     + LowerHex
+    + UpperHex
 {
     type SCALAR: Scalar;
 
