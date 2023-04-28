@@ -18,20 +18,20 @@ use super::constants::{FULL_ORDER, L_MINUS2};
 
 const MARSHAL_SCALAR_ID: [u8; 8] = [b'e', b'd', b'.', b's', b'c', b'a', b'l', b'a'];
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Copy, Clone, Eq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct Scalar {
     pub v: [u8; 32],
 }
 
 impl Scalar {
-    fn to_int(&self) -> Int {
+    fn as_int(&self) -> Int {
         Int::new_int_bytes(&self.v, &PRIME_ORDER, LittleEndian)
     }
 
     fn set_int(mut self, i: &mut Int) -> Self {
         let b = i
             .little_endian(32, 32)
-            .unwrap_or(Self::default().v.to_vec());
+            .unwrap_or_else(|_| Self::default().v.to_vec());
         self.v.as_mut_slice()[0..b.len()].copy_from_slice(b.as_ref());
         self
     }
@@ -40,8 +40,8 @@ impl Scalar {
 impl ScalarCanCheckCanonical for Scalar {
     /// [`is_canonical()`] checks whether the [`Scalar`] in sb is in the range `0<=s<L` as required by `RFC8032`, Section 5.1.7.
     /// Also provides Strong Unforgeability under Chosen Message Attacks (SUF-CMA)
-    /// See paper https://eprint.iacr.org/2020/823.pdf for definitions and theorems
-    /// See https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L2568
+    /// See paper <https://eprint.iacr.org/2020/823.pdf> for definitions and theorems
+    /// See <https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L2568>
     /// for a reference.
     /// The method accepts a buffer instead of calling [`marshal_binary()`] on the receiver since that
     /// always returns values modulo [`PRIME_ORDER`].
@@ -76,10 +76,18 @@ impl PartialEq for Scalar {
     }
 }
 
+impl Display for Scalar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Ed25519Scalar({self:#x})")
+    }
+}
+
 impl BinaryMarshaler for Scalar {
     fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
-        let mut b = self.to_int().marshal_binary()?;
+        let mut b = self.as_int().marshal_binary()?;
         b.resize(32, 0);
+
+        //TODO: should not self.v.to_vec() be enough?
 
         Ok(b)
     }
@@ -113,7 +121,7 @@ impl UpperHex for Scalar {
     }
 }
 
-use std::fmt::{LowerHex, UpperHex};
+use std::fmt::{Display, LowerHex, UpperHex};
 use std::ops;
 impl_op_ex!(*|a: &Scalar, b: &Scalar| -> Scalar {
     let mut v = [0_u8; 32];

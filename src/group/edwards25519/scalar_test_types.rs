@@ -3,7 +3,7 @@ use crate::{encoding::MarshallingError, Group, Scalar as ScalarTrait, XOFFactory
 use criterion::{measurement::WallTime, BenchmarkGroup, Criterion};
 use lazy_static::lazy_static;
 use std::{
-    fmt::{LowerHex, UpperHex},
+    fmt::{Display, Formatter, LowerHex, UpperHex},
     ops::Deref,
 };
 
@@ -29,9 +29,15 @@ lazy_static! {
 
 /// [`SimpleCTScalar`] implements the scalar operations only using [`sc_mul_add()`] by
 /// playing with the parameters.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Copy, Clone, Eq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct SimpleCTScalar {
     s: Scalar,
+}
+
+impl Display for SimpleCTScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SimpleCTScalar({})", self.s)
+    }
 }
 
 impl PartialEq for SimpleCTScalar {
@@ -174,9 +180,15 @@ impl ScalarTrait for SimpleCTScalar {
 
 /// [`FactoredScalar`] implements the scalar operations using a factored version or
 /// [`sc_reduce_limbs()`] at the end of each operations.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Copy, Clone, Eq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct FactoredScalar {
     s: Scalar,
+}
+
+impl Display for FactoredScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FactoredScalar({})", self.s)
+    }
 }
 
 impl PartialEq for FactoredScalar {

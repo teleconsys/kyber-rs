@@ -10,7 +10,7 @@ use thiserror::Error;
 use crate::cipher::stream::Stream;
 use crate::dh::{Dh, HmacCompatible};
 use crate::encoding::Marshaling;
-use std::fmt::{Debug, LowerHex, UpperHex};
+use std::fmt::{Debug, Display};
 use std::io::Write;
 use std::ops::{Add, Mul};
 
@@ -22,15 +22,17 @@ use std::ops::{Add, Mul};
 pub trait Scalar:
     Marshaling
     + Clone
+    + Eq
     + PartialEq
+    + Ord
+    + PartialOrd
     + Debug
     + Add<Self, Output = Self>
     + Mul<Self, Output = Self>
     + Default
     + Serialize
     + DeserializeOwned
-    + LowerHex
-    + UpperHex
+    + Display
 {
     /// [`set()`] sets the receiver equal to another scalar `a`.
     fn set(self, a: &Self) -> Self;
@@ -83,14 +85,17 @@ pub trait PointCanCheckCanonicalAndSmallOrder {
 pub trait Point:
     Marshaling
     + Clone
+    + Eq
     + PartialEq
+    + Ord
+    + PartialOrd
+    + Debug
     + Default
     + Serialize
     + DeserializeOwned
     + Debug
     + PartialEq
-    + LowerHex
-    + UpperHex
+    + Display
 {
     type SCALAR: Scalar;
 

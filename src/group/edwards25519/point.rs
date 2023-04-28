@@ -1,4 +1,4 @@
-use std::fmt::{LowerHex, UpperHex};
+use std::fmt::{Display, LowerHex, UpperHex};
 
 use serde::{Deserialize, Serialize};
 
@@ -20,7 +20,7 @@ use super::{
 
 const MARSHAL_POINT_ID: [u8; 8] = [b'e', b'd', b'.', b'p', b'o', b'i', b'n', b't'];
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Copy, Clone, Eq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct Point {
     ge: ExtendedGroupElement,
     var_time: bool,
@@ -87,7 +87,7 @@ impl group::Point for Point {
 
     fn set(&mut self, p: &Self) -> Self {
         self.ge = p.ge;
-        self.clone()
+        *self
     }
 
     fn embed_len(&self) -> usize {
@@ -194,7 +194,7 @@ impl group::Point for Point {
 
     fn neg(&mut self, a: &Self) -> Self {
         self.ge.neg(&a.ge);
-        self.clone()
+        *self
     }
 
     /// [`mul()`] multiplies [`Point`] `p` by [`Scalar`] `s` using the repeated doubling method.
@@ -207,9 +207,9 @@ impl group::Point for Point {
             }
             Some(a_p) => {
                 if self.var_time {
-                    ge_scalar_mult_vartime(&mut self.ge, &mut a, &mut a_p.clone().ge);
+                    ge_scalar_mult_vartime(&mut self.ge, &mut a, &mut a_p.ge.clone());
                 } else {
-                    ge_scalar_mult(&mut self.ge, &mut a, &mut a_p.clone().ge);
+                    ge_scalar_mult(&mut self.ge, &mut a, &mut a_p.ge.clone());
                 }
             }
         }
@@ -231,6 +231,12 @@ impl PartialEq for Point {
             }
         }
         true
+    }
+}
+
+impl Display for Point {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Ed25519Point({self:#x})")
     }
 }
 
@@ -259,10 +265,10 @@ impl PointCanCheckCanonicalAndSmallOrder for Point {
     ///
     /// Provides resilience against malicious key substitution attacks (M-S-UEO)
     /// and message bound security (MSB) even for malicious keys
-    /// See paper https://eprint.iacr.org/2020/823.pdf for definitions and theorems
+    /// See paper <https://eprint.iacr.org/2020/823.pdf> for definitions and theorems
     ///
     /// This is the same code as in
-    /// https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1170
+    /// <https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1170>
     fn has_small_order(&self) -> bool {
         let s = match self.marshal_binary() {
             Ok(v) => v,
@@ -292,10 +298,10 @@ impl PointCanCheckCanonicalAndSmallOrder for Point {
     /// [`is_canonical()`] determines whether the group element is canonical
     ///
     /// Checks whether group element s is less than p, according to RFC8032§5.1.3.1
-    /// https://tools.ietf.org/html/rfc8032#section-5.1.3
+    /// <https://tools.ietf.org/html/rfc8032#section-5.1.3>
     ///
     /// Taken from
-    /// https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1113
+    /// <https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1113>
     ///
     /// The method accepts a buffer instead of calling `marshal_binary()` on the receiver
     /// because that always returns a value modulo `prime`.

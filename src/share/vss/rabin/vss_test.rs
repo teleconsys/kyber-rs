@@ -110,8 +110,8 @@ fn test_vss_dealer_new() {
     let good_t = minimum_t(test_data.nb_verifiers);
     new_dealer(
         test_data.suite,
-        test_data.dealer_sec.clone(),
-        test_data.secret.clone(),
+        test_data.dealer_sec,
+        test_data.secret,
         &test_data.verifiers_pub,
         good_t,
     )
@@ -120,8 +120,8 @@ fn test_vss_dealer_new() {
     for bad_t in [0i32, 1, -4] {
         if let Err(VSSError::InvalidThreshold(_)) = new_dealer(
             test_data.suite,
-            test_data.dealer_sec.clone(),
-            test_data.secret.clone(),
+            test_data.dealer_sec,
+            test_data.secret,
             &test_data.verifiers_pub,
             bad_t as usize,
         ) {
@@ -393,7 +393,7 @@ fn test_vss_verifier_receive_deal() {
 
     // wrong commitments
     // TODO: fix this check
-    let good_commit = d.commitments[0].clone();
+    let good_commit = d.commitments[0];
     d.commitments[0] = test_data
         .suite
         .point()
@@ -405,7 +405,7 @@ fn test_vss_verifier_receive_deal() {
     };
 
     let d = &mut dealer.deals[0];
-    d.commitments[0] = good_commit.clone();
+    d.commitments[0] = good_commit;
 
     // already seen twice
     if let Err(VSSError::DealAlreadyProcessed) = v.process_encrypted_deal(&enc_d) {
@@ -454,8 +454,8 @@ fn test_vss_aggregator_verify_justification() {
         .suite
         .scalar()
         .pick(&mut test_data.suite.random_stream());
-    let good_v = d.sec_share.v.clone();
-    d.sec_share.v = wrong_v.clone();
+    let good_v = d.sec_share.v;
+    d.sec_share.v = wrong_v;
     let enc_d = dealer.encrypted_deal(0).unwrap();
     let mut resp = v.process_encrypted_deal(&enc_d).unwrap();
     assert!(!resp.approved);
@@ -793,8 +793,8 @@ fn test_vss_session_id() {
     let test_data = new_test_data();
     let dealer = new_dealer(
         test_data.suite,
-        test_data.dealer_sec.clone(),
-        test_data.secret.clone(),
+        test_data.dealer_sec,
+        test_data.secret,
         &test_data.verifiers_pub,
         test_data.vss_threshold,
     )
@@ -853,7 +853,7 @@ fn test_vss_dhexchange() {
         .suite
         .scalar()
         .pick(&mut test_data.suite.random_stream());
-    let point = SuiteEd25519::dh_exchange(test_data.suite, privv.clone(), pubb.clone());
+    let point = SuiteEd25519::dh_exchange(test_data.suite, privv, pubb);
     assert_eq!(pubb.mul(&privv, None), point);
 }
 

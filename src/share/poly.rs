@@ -15,6 +15,7 @@ use serde::Serialize;
 use thiserror::Error;
 
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::vec;
 
 use crate::encoding::BinaryMarshaler;
@@ -30,7 +31,7 @@ type ScalarMap<GROUP> = HashMap<usize, <<GROUP as Group>::POINT as Point>::SCALA
 type PointMap<GROUP> = HashMap<usize, <GROUP as Group>::POINT>;
 
 /// [`PriShare`] represents a private share.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct PriShare<SCALAR> {
     /// Index of the private share
     pub i: usize,
@@ -38,12 +39,9 @@ pub struct PriShare<SCALAR> {
     pub v: SCALAR,
 }
 
-impl<SCALAR: Scalar> Default for PriShare<SCALAR> {
-    fn default() -> Self {
-        Self {
-            i: Default::default(),
-            v: Default::default(),
-        }
+impl<T: Display> Display for PriShare<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PriShare(i: {}, v: {}", self.i, self.v)
     }
 }
 
@@ -57,7 +55,7 @@ impl<SCALAR: Scalar> PriShare<SCALAR> {
     }
 
     pub fn string(&self) -> String {
-        format!("{{{}:{:x}}}", self.i, self.v)
+        format!("{{{}:{}}}", self.i, self.v)
     }
 }
 
@@ -358,7 +356,7 @@ impl<GROUP: Group> PriPoly<GROUP> {
     pub fn string(&self) -> String {
         let mut strs = Vec::with_capacity(self.coeffs.len());
         for c in self.coeffs.clone() {
-            strs.push(format!("{c:x}"));
+            strs.push(format!("{c}"));
         }
         "[ ".to_string() + &strs.join(", ") + " ]"
     }
@@ -383,7 +381,7 @@ impl<POINT: Point> PubShare<POINT> {
 }
 
 /// [`PubPoly`] represents a public commitment polynomial to a secret sharing polynomial.
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct PubPoly<GROUP: Group> {
     /// Cryptographic [`Group`]
     g: GROUP,
@@ -391,16 +389,6 @@ pub struct PubPoly<GROUP: Group> {
     b: Option<GROUP::POINT>,
     /// Commitments to coefficients of the secret sharing polynomial
     commits: Vec<GROUP::POINT>,
-}
-
-impl<GROUP: Group> Default for PubPoly<GROUP> {
-    fn default() -> Self {
-        Self {
-            g: Default::default(),
-            b: Default::default(),
-            commits: Default::default(),
-        }
-    }
 }
 
 impl<GROUP: Group> PubPoly<GROUP> {

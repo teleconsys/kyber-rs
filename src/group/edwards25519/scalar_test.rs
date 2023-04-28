@@ -28,7 +28,7 @@ fn test_string() {
     // Create a scalar that would trigger #262.
     let mut s = Scalar::default();
     s = s.set_int64(0x100);
-    s = s + ONE.clone();
+    s = s + *ONE;
     assert_eq!(
         format!("{s:x}"),
         "0101000000000000000000000000000000000000000000000000000000000000",

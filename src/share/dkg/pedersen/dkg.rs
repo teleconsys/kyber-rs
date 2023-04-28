@@ -950,10 +950,10 @@ where
         let dealer_list = c.old_nodes;
         let mut verifiers = HashMap::new();
         for (i, pubb) in dealer_list.iter().enumerate() {
-            if already_taken.contains_key(&format! {"{pubb:x}"}) {
+            if already_taken.contains_key(&format! {"{pubb}"}) {
                 return Err(DKGError::DuplicatePublicKeyInNewList);
             }
-            already_taken.insert(format! {"{pubb:x}"}, true);
+            already_taken.insert(format! {"{pubb}"}, true);
             let mut ver = vss::new_verifier(c.suite, &c.longterm, pubb, &verifier_list)?;
             // set that the number of approval for this deal must be at the given
             // threshold regarding the new nodes. (see config.
