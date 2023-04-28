@@ -1034,6 +1034,7 @@ pub fn fe_pow22523(out: &mut FieldElement, z: &FieldElement) {
     fe_mul(out, &t0, z);
 }
 
+#[allow(dead_code)]
 pub fn fe_string(fe: FieldElement) -> String {
     let mut s = "fieldElement{".to_owned();
     for (i, _) in fe.iter().enumerate() {

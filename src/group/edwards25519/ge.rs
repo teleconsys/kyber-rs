@@ -25,6 +25,7 @@ pub struct ProjectiveGroupElement {
 }
 
 impl ProjectiveGroupElement {
+    #[allow(dead_code)]
     fn zero(&mut self) {
         fe_zero(&mut self.x);
         fe_one(&mut self.y);
@@ -47,6 +48,7 @@ impl ProjectiveGroupElement {
         fe_sub(&mut r.t, &r_t, &r.z);
     }
 
+    #[allow(dead_code)]
     pub fn to_bytes(&self, s: &mut [u8; 32]) {
         let mut recip = FieldElement::default();
         let mut x = FieldElement::default();
@@ -177,6 +179,7 @@ impl ExtendedGroupElement {
         true
     }
 
+    #[allow(dead_code)]
     pub fn string(&self) -> String {
         "extendedGroupElement{\n\t".to_owned()
             + &format!("{:?}", self.x)
@@ -250,6 +253,7 @@ impl CompletedGroupElement {
         fe_add(&mut self.t, &t0, &self_t);
     }
 
+    #[allow(dead_code)]
     pub fn mixed_sub(&mut self, p: ExtendedGroupElement, q: PreComputedGroupElement) {
         let mut t0 = FieldElement::default();
 
