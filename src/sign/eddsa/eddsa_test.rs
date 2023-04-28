@@ -55,7 +55,7 @@ fn test_eddsa_marshalling() {
         let mut stream = constant_stream(seed);
         let eddsa = EdDSA::new(&mut stream).unwrap();
 
-        assert_eq!(eddsa.public.to_string(), vec.public);
+        assert_eq!(format! {"{:x}", eddsa.public}, vec.public);
 
         let marshalled = eddsa.marshal_binary().unwrap();
         assert_ne!([0u8; 64].to_vec(), marshalled);

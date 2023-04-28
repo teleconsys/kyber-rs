@@ -2,7 +2,7 @@
 /// "Non-Interactive and Information-Theoretic Secure Verifiable Secret Sharing"
 /// by Torben Pryds Pedersen.
 /// https://link.springer.com/content/pdf/10.1007/3-540-46766-1_9.pdf
-use core::{fmt, ops::Deref};
+use core::ops::Deref;
 use std::{collections::HashMap, io::Write, ops::DerefMut};
 
 use byteorder::{LittleEndian, WriteBytesExt};
@@ -37,7 +37,7 @@ pub struct Dealer<SUITE: Suite> {
     pub(crate) verifiers: Vec<SUITE::POINT>,
     hkdf_context: Vec<u8>,
     /// `threshold` of shares that is needed to reconstruct the secret
-    t: usize,
+    pub t: usize,
     /// `session_id` is a unique identifier for the whole session of the scheme
     session_id: Vec<u8>,
     /// list of `deals` this Dealer has generated
@@ -236,7 +236,7 @@ pub fn new_dealer<SUITE: Suite>(
         });
     }
 
-    let hkdf_context = context(&suite, &d_pubb, verifiers).to_vec();
+    let hkdf_context = context(suite, &d_pubb, verifiers).to_vec();
     Ok(Dealer {
         suite,
         long: longterm,
@@ -408,7 +408,7 @@ pub struct Verifier<SUITE: Suite> {
 /// a default safe value. If a different t value is required, it is possible to set
 /// it with [`verifier.set_t()`].
 pub fn new_verifier<SUITE: Suite>(
-    suite: &SUITE,
+    suite: SUITE,
     longterm: &<SUITE::POINT as Point>::SCALAR,
     dealer_key: &SUITE::POINT,
     verifiers: &[SUITE::POINT],
@@ -428,14 +428,14 @@ pub fn new_verifier<SUITE: Suite>(
     }
     let c = context(suite, dealer_key, verifiers);
     Ok(Verifier {
-        suite: *suite,
+        suite,
         longterm: longterm.clone(),
         dealer: dealer_key.clone(),
         verifiers: verifiers.to_vec(),
         pubb,
         index,
         hkdf_context: c,
-        aggregator: Some(new_empty_aggregator(*suite, verifiers)),
+        aggregator: Some(new_empty_aggregator(suite, verifiers)),
     })
 }
 
@@ -641,7 +641,7 @@ pub fn recover_secret<SUITE: Suite>(
 #[derive(Clone)]
 pub struct Aggregator<SUITE: Suite> {
     pub suite: SUITE,
-    dealer: SUITE::POINT,
+    pub dealer: SUITE::POINT,
     pub verifiers: Vec<SUITE::POINT>,
     commits: Vec<SUITE::POINT>,
 
@@ -932,7 +932,7 @@ pub(crate) fn session_id<SUITE: Suite>(
 
 /// [`context()`] returns the context slice to be used when encrypting a share
 pub fn context<SUITE: Suite>(
-    suite: &SUITE,
+    suite: SUITE,
     dealer: &SUITE::POINT,
     verifiers: &[SUITE::POINT],
 ) -> Vec<u8> {

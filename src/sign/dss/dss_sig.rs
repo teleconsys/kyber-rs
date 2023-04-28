@@ -40,6 +40,7 @@ pub trait DistKeyShare<GROUP: Group>: Clone {
 
 /// [`DSS`] holds the information used to issue partial signatures as well as to
 /// compute the distributed schnorr signature.
+#[derive(Clone)]
 pub struct DSS<SUITE: Suite, DKS: DistKeyShare<SUITE>> {
     suite: SUITE,
     pub(crate) secret: <SUITE::POINT as Point>::SCALAR,

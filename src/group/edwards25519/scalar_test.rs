@@ -29,12 +29,10 @@ fn test_string() {
     let mut s = Scalar::default();
     s = s.set_int64(0x100);
     s = s + ONE.clone();
-    let _z = s.to_string();
     assert_eq!(
-        s.to_string(),
+        format!("{s:x}"),
         "0101000000000000000000000000000000000000000000000000000000000000",
-        "unexpected result from string(): {}",
-        s.to_string()
+        "unexpected result from string(): {s:x}"
     );
 }
 
@@ -44,10 +42,9 @@ fn test_negative_big_int() {
     let mut s = Scalar::default();
     s = s.set_int64(-1);
     assert_eq!(
-        s.to_string(),
+        format!("{s:x}"),
         "ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010",
-        "unexpected result: {}",
-        s.to_string()
+        "unexpected result: {s:x}"
     );
 }
 
@@ -57,10 +54,9 @@ fn test_positive_big_int() {
     let mut s = Scalar::default();
     s = s.set_int64(1);
     assert_eq!(
-        s.to_string(),
+        format!("{s:x}"),
         "0100000000000000000000000000000000000000000000000000000000000000",
-        "unexpected result: {}",
-        s.to_string()
+        "unexpected result: {s:x}"
     );
 }
 
@@ -76,10 +72,9 @@ fn test_set_bytes_le() {
     let mut s = Scalar::default();
     s = s.set_bytes(&[0, 1, 2, 3]);
     assert_eq!(
-        s.to_string(),
+        format!("{s:x}"),
         "0001020300000000000000000000000000000000000000000000000000000000",
-        "unexpected result from string(): {}",
-        s.to_string()
+        "unexpected result from string(): {s:x}"
     );
 }
 

@@ -97,14 +97,15 @@ impl BinaryUnmarshaler for Scalar {
     }
 }
 
-impl ToString for Scalar {
-    fn to_string(&self) -> String {
-        let mut b = self.to_int().marshal_binary().unwrap().to_vec();
-        b.resize(32, 0);
-        hex::encode(b)
+impl LowerHex for Scalar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let prefix = if f.alternate() { "0x" } else { "" };
+        let encoded = hex::encode(self.v);
+        write!(f, "{prefix}{encoded}")
     }
 }
 
+use std::fmt::LowerHex;
 use std::ops;
 impl_op_ex!(*|a: &Scalar, b: &Scalar| -> Scalar {
     let mut v = [0_u8; 32];

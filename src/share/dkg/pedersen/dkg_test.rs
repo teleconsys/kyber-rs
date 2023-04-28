@@ -320,11 +320,11 @@ fn test_dkg_resharing_threshold() {
     let mut selected = HashMap::new();
     // add the new node
     selected_dkgs.push(new_dkgs[dkgs.len()].clone());
-    selected.insert(selected_dkgs[0].long.to_string(), true);
+    selected.insert(format!("{:x}", selected_dkgs[0].long), true);
     // select a subset of the new group
     while selected.len() < new_t + 1 {
         let idx = rand::thread_rng().gen_range(0..new_dkgs.len());
-        let str = new_dkgs[idx].long.to_string();
+        let str = format!("{:x}", new_dkgs[idx].long);
         if selected.contains_key(&str) {
             continue;
         }
@@ -405,13 +405,13 @@ fn test_dkg_resharing_threshold() {
 
     for new_dks in dkss.iter() {
         for old_dks in shares.iter() {
-            assert_ne!(new_dks.share.v.to_string(), old_dks.share.v.to_string())
+            assert_ne!(new_dks.share.v, old_dks.share.v)
         }
     }
     //// 2.
     let old_secret = share::poly::recover_secret(suite(), &sshares, old_t, n).unwrap();
     let new_secret = share::poly::recover_secret(suite(), &new_shares, new_t, new_n).unwrap();
-    assert_eq!(old_secret.to_string(), new_secret.to_string());
+    assert_eq!(old_secret, new_secret);
 }
 
 /// TestDKGThreshold tests the "threshold dkg" where only a subset of nodes succeed
@@ -556,10 +556,10 @@ fn test_dist_key_share() {
     let secret = share::poly::recover_secret(suite(), &shares, DEFAULT_N, DEFAULT_N).unwrap();
 
     let secret_coeffs = poly.unwrap().coefficients();
-    assert_eq!(secret.to_string(), secret_coeffs[0].to_string());
+    assert_eq!(secret, secret_coeffs[0]);
 
     let commit_secret = suite().point().mul(&secret, None);
-    assert_eq!(dkss[0].public().to_string(), commit_secret.to_string());
+    assert_eq!(dkss[0].public(), commit_secret);
 }
 
 fn gen_pair() -> (EdScalar, EdPoint) {
@@ -691,7 +691,7 @@ fn test_dkg_resharing() {
     // 2.
     let old_secret = share::poly::recover_secret(suite(), &sshares, thr, DEFAULT_N).unwrap();
     let new_secret = share::poly::recover_secret(suite(), &new_sshares, thr, DEFAULT_N).unwrap();
-    assert_eq!(old_secret.to_string(), new_secret.to_string());
+    assert_eq!(old_secret, new_secret);
 }
 
 /// Test resharing functionality with one node less
@@ -752,7 +752,7 @@ fn test_dkg_resharing_remove_node() {
     // 2.
     let old_secret = share::poly::recover_secret(suite(), &sshares[..new_n], thr, new_n).unwrap();
     let new_secret = share::poly::recover_secret(suite(), &new_sshares, thr, new_n).unwrap();
-    assert_eq!(old_secret.to_string(), new_secret.to_string());
+    assert_eq!(old_secret, new_secret);
 }
 
 /// Test to reshare to a different set of nodes with only a threshold of the old
@@ -837,7 +837,7 @@ fn test_dkg_resharing_new_nodes_threshold() {
     let mut selected = HashMap::new();
     while selected.len() < alive {
         let i = rand::thread_rng().gen_range(0..old_dkgs.len());
-        let str = old_dkgs[i].pubb.to_string();
+        let str = format! {"{:x}", old_dkgs[i].pubb};
         if selected.contains_key(&str) {
             continue;
         }
@@ -930,7 +930,7 @@ fn test_dkg_resharing_new_nodes_threshold() {
     // check shares reconstruct to the same secret
     let old_secret = share::poly::recover_secret(suite(), &sshares, old_t, old_n).unwrap();
     let new_secret = share::poly::recover_secret(suite(), &new_sshares, new_t, new_n).unwrap();
-    assert_eq!(old_secret.to_string(), new_secret.to_string());
+    assert_eq!(old_secret, new_secret);
 }
 
 /// Test resharing to a different set of nodes with two common.
@@ -1162,7 +1162,7 @@ fn test_dkg_resharing_new_nodes() {
     // check shares reconstruct to the same secret
     let old_secret = share::poly::recover_secret(suite(), &sshares, old_t, old_n).unwrap();
     let new_secret = share::poly::recover_secret(suite(), &new_sshares, new_t, new_n).unwrap();
-    assert_eq!(old_secret.to_string(), new_secret.to_string());
+    assert_eq!(old_secret, new_secret);
 }
 
 #[test]
@@ -1371,7 +1371,7 @@ fn test_dkg_resharing_partial_new_nodes() {
     // check shares reconstruct to the same secret
     let old_secret = share::poly::recover_secret(suite(), &sshares, old_t, old_n).unwrap();
     let new_secret = share::poly::recover_secret(suite(), &new_sshares, new_t, new_n).unwrap();
-    assert_eq!(old_secret.to_string(), new_secret.to_string());
+    assert_eq!(old_secret, new_secret);
 }
 
 #[test]

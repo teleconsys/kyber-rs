@@ -57,7 +57,7 @@ impl<SCALAR: Scalar> PriShare<SCALAR> {
     }
 
     pub fn string(&self) -> String {
-        format!("{{{}:{}}}", self.i, self.v.to_string())
+        format!("{{{}:{:x}}}", self.i, self.v)
     }
 }
 
@@ -358,7 +358,7 @@ impl<GROUP: Group> PriPoly<GROUP> {
     pub fn string(&self) -> String {
         let mut strs = Vec::with_capacity(self.coeffs.len());
         for c in self.coeffs.clone() {
-            strs.push(c.to_string());
+            strs.push(format!("{c:x}"));
         }
         "[ ".to_string() + &strs.join(", ") + " ]"
     }

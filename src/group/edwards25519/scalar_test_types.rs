@@ -2,7 +2,7 @@ use super::{Scalar, SuiteEd25519};
 use crate::{encoding::MarshallingError, Group, Scalar as ScalarTrait, XOFFactory};
 use criterion::{measurement::WallTime, BenchmarkGroup, Criterion};
 use lazy_static::lazy_static;
-use std::ops::Deref;
+use std::{fmt::LowerHex, ops::Deref};
 
 use serde::{Deserialize, Serialize};
 
@@ -71,9 +71,11 @@ impl BinaryUnmarshaler for SimpleCTScalar {
     }
 }
 
-impl ToString for SimpleCTScalar {
-    fn to_string(&self) -> String {
-        self.s.to_string()
+impl LowerHex for SimpleCTScalar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let prefix = if f.alternate() { "0x" } else { "" };
+        let scalar_hex = format! {"{:x}", self.s};
+        write!(f, "{prefix}{scalar_hex}")
     }
 }
 
@@ -206,9 +208,11 @@ impl BinaryUnmarshaler for FactoredScalar {
     }
 }
 
-impl ToString for FactoredScalar {
-    fn to_string(&self) -> String {
-        self.s.to_string()
+impl LowerHex for FactoredScalar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let prefix = if f.alternate() { "0x" } else { "" };
+        let scalar_hex = format! {"{:x}", self.s};
+        write!(f, "{prefix}{scalar_hex}")
     }
 }
 

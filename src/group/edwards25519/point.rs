@@ -1,3 +1,5 @@
+use std::fmt::LowerHex;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -232,11 +234,13 @@ impl PartialEq for Point {
     }
 }
 
-impl ToString for Point {
-    fn to_string(&self) -> String {
+impl LowerHex for Point {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let prefix = if f.alternate() { "0x" } else { "" };
         let mut b = [0u8; 32];
         self.ge.to_bytes(&mut b);
-        hex::encode(b)
+        let encoded = hex::encode(b);
+        write!(f, "{prefix}{encoded}")
     }
 }
 

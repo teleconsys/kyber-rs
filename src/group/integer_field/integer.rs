@@ -1,6 +1,7 @@
 use lazy_static::lazy_static;
 use num_bigint_dig as num_bigint;
 use std::cmp::Ordering::{self, Equal, Greater};
+use std::fmt::LowerHex;
 use thiserror::Error;
 
 use num_bigint::algorithms::jacobi;
@@ -282,9 +283,11 @@ impl Marshaling for Int {
     }
 }
 
-impl ToString for Int {
-    fn to_string(&self) -> String {
-        hex::encode(self.v.to_bytes_be().1)
+impl LowerHex for Int {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let prefix = if f.alternate() { "0x" } else { "" };
+        let encoded = hex::encode(self.v.to_bytes_be().1);
+        write!(f, "{prefix}{encoded}")
     }
 }
 

@@ -313,7 +313,7 @@ fn test_pri_poly_mul() {
     assert_eq!(a.coeffs.len() + b.coeffs.len() - 1, c.coeffs.len());
     let nul = suite.scalar().zero();
     for c in c.coeffs.clone() {
-        assert_ne!(nul.to_string(), c.to_string());
+        assert_ne!(nul, c);
     }
 
     let a0 = a.coeffs[0].clone();
@@ -321,13 +321,13 @@ fn test_pri_poly_mul() {
     let mut mul = b0 * a0;
     let c0 = c.coeffs[0].clone();
 
-    assert_eq!(c0.to_string(), mul.to_string());
+    assert_eq!(c0, mul);
 
     let at = a.coeffs[a.coeffs.len() - 1].clone();
     let bt = b.coeffs[b.coeffs.len() - 1].clone();
     mul = at * bt;
     let ct = c.coeffs[c.coeffs.len() - 1].clone();
-    assert_eq!(ct.to_string(), mul.to_string());
+    assert_eq!(ct, mul);
 }
 
 #[test]
@@ -346,11 +346,8 @@ fn test_recover_pri_poly() {
     let reverse_recovered = recover_pri_poly(&suite, &reverses, t, n).unwrap();
 
     for i in 0..t {
-        assert_eq!(recovered.eval(i).v.to_string(), a.eval(i).v.to_string());
-        assert_eq!(
-            reverse_recovered.eval(i).v.to_string(),
-            a.eval(i).v.to_string()
-        );
+        assert_eq!(recovered.eval(i).v, a.eval(i).v);
+        assert_eq!(reverse_recovered.eval(i).v, a.eval(i).v);
     }
 }
 

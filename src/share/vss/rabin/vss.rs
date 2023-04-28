@@ -59,7 +59,7 @@ pub struct Dealer<SUITE: Suite> {
     pub(crate) verifiers: Vec<SUITE::POINT>,
     hkdf_context: Vec<u8>,
     /// threshold of shares that is needed to reconstruct the secret
-    t: usize,
+    pub t: usize,
     /// sessionID is a unique identifier for the whole session of the scheme
     session_id: Vec<u8>,
     /// list of deals this Dealer has generated
@@ -644,7 +644,7 @@ where
 #[derive(Clone)]
 pub struct Aggregator<SUITE: Suite> {
     suite: SUITE,
-    dealer: SUITE::POINT,
+    pub dealer: SUITE::POINT,
     verifiers: Vec<SUITE::POINT>,
     commits: Vec<SUITE::POINT>,
 

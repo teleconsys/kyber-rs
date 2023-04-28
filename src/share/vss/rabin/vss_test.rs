@@ -101,7 +101,7 @@ fn test_vss_whole() {
     )
     .unwrap();
 
-    assert_eq!(dealer.secret.to_string(), sec.to_string());
+    assert_eq!(dealer.secret, sec);
 }
 
 #[test]
@@ -854,7 +854,7 @@ fn test_vss_dhexchange() {
         .scalar()
         .pick(&mut test_data.suite.random_stream());
     let point = SuiteEd25519::dh_exchange(test_data.suite, privv.clone(), pubb.clone());
-    assert_eq!(pubb.mul(&privv, None).to_string(), point.to_string());
+    assert_eq!(pubb.mul(&privv, None), point);
 }
 
 #[test]
