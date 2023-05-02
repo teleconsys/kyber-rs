@@ -40,7 +40,7 @@ pub trait DistKeyShare<GROUP: Group>: Clone {
 
 /// [`DSS`] holds the information used to issue partial signatures as well as to
 /// compute the distributed schnorr signature.
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct DSS<SUITE: Suite, DKS: DistKeyShare<SUITE>> {
     suite: SUITE,
     pub(crate) secret: <SUITE::POINT as Point>::SCALAR,
@@ -61,7 +61,7 @@ pub struct DSS<SUITE: Suite, DKS: DistKeyShare<SUITE>> {
 
 /// [`PartialSig`] is partial representation of the final distributed signature. It
 /// must be sent to each of the other participants.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct PartialSig<SUITE: Suite> {
     pub partial: PriShare<<SUITE::POINT as Point>::SCALAR>,
     pub session_id: Vec<u8>,

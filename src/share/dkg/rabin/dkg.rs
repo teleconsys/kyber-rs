@@ -98,7 +98,7 @@ impl<SUITE: Suite> dss::DistKeyShare<SUITE> for DistKeyShare<SUITE> {
 /// Dealer.
 ///  NOTE: Doing that in vss module would be possible but then the Dealer is always
 ///  assumed to be a member of the participants. It's only the case here.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct Deal<POINT: Point> {
     /// `Index` of the Dealer in the list of participants
     pub index: u32,
@@ -109,7 +109,7 @@ pub struct Deal<POINT: Point> {
 
 /// [`Response`] holds the Response from another participant as well as the index of
 /// the target Dealer.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct Response {
     /// `Index` of the Dealer for which this response is for
     pub index: u32,
@@ -119,7 +119,7 @@ pub struct Response {
 
 /// [`Justification`] holds the Justification from a Dealer as well as the index of
 /// the Dealer in question.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct Justification<SUITE: Suite> {
     /// Index of the Dealer who answered with this Justification
     pub index: u32,
@@ -129,7 +129,7 @@ pub struct Justification<SUITE: Suite> {
 
 /// [`SecretCommits`] is sent during the distributed public key reconstruction phase,
 /// basically a Feldman VSS scheme.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct SecretCommits<SUITE: Suite> {
     /// Index of the Dealer in the list of participants
     pub index: u32,
@@ -156,7 +156,7 @@ impl<SUITE: Suite> SecretCommits<SUITE> {
 
 /// [`ComplaintCommits`] is sent if the secret commitments revealed by a peer are not
 /// valid.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct ComplaintCommits<SUITE: Suite> {
     /// `index` of the Verifier issuing the Complaint Commit
     pub index: u32,

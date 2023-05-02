@@ -16,7 +16,7 @@ pub trait Suite: Group + Random {}
 
 /// [`Pair`] represents a public/private keypair together with the
 /// [`ciphersuite`](Suite) the key was generated from.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Pair<POINT: Point> {
     pub public: POINT,          // Public key
     pub private: POINT::SCALAR, // Private key
@@ -48,15 +48,6 @@ impl<POINT: Point> Pair<POINT> {
         };
         self.public = suite.point().mul(&self.private, None);
         Ok(())
-    }
-}
-
-impl<POINT: Point> Default for Pair<POINT> {
-    fn default() -> Self {
-        Pair {
-            private: POINT::SCALAR::default(),
-            public: POINT::default(),
-        }
     }
 }
 

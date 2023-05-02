@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     encoding::{self, BinaryMarshaler, MarshallingError},
@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// [`DistKeyShare`] holds the share of a distributed key for a participant.
-#[derive(Clone)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct DistKeyShare<SUITE: Suite> {
     /// `coefficients of the public polynomial` holding the public key.
     pub commits: Vec<SUITE::POINT>,
@@ -24,6 +24,16 @@ pub struct DistKeyShare<SUITE: Suite> {
     /// `share`. The final distributed polynomial is the sum of all these
     /// individual polynomials, but it is never computed.
     pub private_poly: Vec<<SUITE::POINT as Point>::SCALAR>,
+}
+
+impl<T: Suite> core::fmt::Display for DistKeyShare<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "DistKeyShare(commits: {:?}, share: {})",
+            self.commits, self.share
+        )
+    }
 }
 
 impl<SUITE: Suite> DistKeyShare<SUITE> {

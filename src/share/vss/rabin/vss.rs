@@ -114,7 +114,7 @@ impl<SUITE: Suite> BinaryMarshaler for Deal<SUITE> {
 /// correct recipient. The encryption is performed in a similar manner as what is
 /// done in TLS. The dealer generates a temporary key pair, signs it with its
 /// longterm secret key.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Default, Debug)]
 pub struct EncryptedDeal<POINT: Point + Serialize> {
     /// Ephemeral Diffie Hellman key
     #[serde(deserialize_with = "POINT::deserialize")]
@@ -135,7 +135,7 @@ impl<POINT: Point + Serialize + DeserializeOwned> BinaryMarshaler for EncryptedD
 
 /// [`Response`] is sent by the verifiers to all participants and holds each
 /// individual validation or refusal of a [`Deal`].
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Response {
     /// SessionID related to this run of the protocol
     pub session_id: Vec<u8>,
@@ -162,7 +162,7 @@ impl Response {
 /// [`Justification`] is a message that is broadcasted by the Dealer in response to
 /// a Complaint. It contains the original complaint as well as the shares
 /// distributed to the complainer.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Default, Debug)]
 pub struct Justification<SUITE: Suite> {
     /// SessionID related to the current run of the protocol
     session_id: Vec<u8>,

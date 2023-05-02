@@ -60,21 +60,12 @@ impl<SCALAR: Scalar> PriShare<SCALAR> {
 }
 
 /// [`PriPoly`] represents a secret sharing polynomial.
-#[derive(Clone)]
+#[derive(Clone, Default, Debug)]
 pub struct PriPoly<GROUP: Group> {
     /// Cryptographic [`Group`]
     g: GROUP,
     /// Coefficients of the polynomial
     pub coeffs: Vec<<GROUP::POINT as Point>::SCALAR>,
-}
-
-impl<GROUP: Group> Default for PriPoly<GROUP> {
-    fn default() -> Self {
-        Self {
-            g: Default::default(),
-            coeffs: Default::default(),
-        }
-    }
 }
 
 /// [`new_pri_poly()`] creates a new secret sharing polynomial using the provided

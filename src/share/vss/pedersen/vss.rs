@@ -24,7 +24,7 @@ use crate::{
 
 /// [`Dealer`] encapsulates for creating and distributing the shares and for
 /// replying to any Responses.
-#[derive(Clone)]
+#[derive(Clone, Default, Debug)]
 pub struct Dealer<SUITE: Suite> {
     suite: SUITE,
     // reader: STREAM,
@@ -59,27 +59,8 @@ impl<SUITE: Suite> DerefMut for Dealer<SUITE> {
     }
 }
 
-impl<SUITE: Suite> Default for Dealer<SUITE> {
-    fn default() -> Self {
-        Self {
-            suite: Default::default(),
-            long: Default::default(),
-            pubb: Default::default(),
-            secret: Default::default(),
-            secret_commits: Default::default(),
-            secret_poly: Default::default(),
-            verifiers: Default::default(),
-            hkdf_context: Default::default(),
-            t: Default::default(),
-            session_id: Default::default(),
-            deals: Default::default(),
-            aggregator: Default::default(),
-        }
-    }
-}
-
 /// [`Deal`] encapsulates the verifiable secret share and is sent by the dealer to a verifier.
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Default, Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Deal<SUITE: Suite> {
     /// Unique session identifier for this protocol run
     pub(crate) session_id: Vec<u8>,
@@ -89,17 +70,6 @@ pub struct Deal<SUITE: Suite> {
     pub(crate) t: usize,
     // Commitments are the coefficients used to verify the shares against
     pub(crate) commitments: Vec<SUITE::POINT>,
-}
-
-impl<SUITE: Suite> Default for Deal<SUITE> {
-    fn default() -> Self {
-        Self {
-            session_id: Default::default(),
-            sec_share: Default::default(),
-            t: Default::default(),
-            commitments: Default::default(),
-        }
-    }
 }
 
 impl<SUITE: Suite> Deal<SUITE> {
@@ -120,7 +90,7 @@ impl<SUITE: Suite> BinaryMarshaler for Deal<SUITE> {
 /// correct recipient. The encryption is performed in a similar manner as what is
 /// done in TLS. The dealer generates a temporary key pair, signs it with its
 /// longterm secret key.
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Debug, Default)]
 pub struct EncryptedDeal<POINT: Point> {
     /// Ephemeral Diffie Hellman key
     pub(crate) dhkey: POINT,
@@ -134,7 +104,7 @@ pub struct EncryptedDeal<POINT: Point> {
 
 /// [`Response`] is sent by the verifiers to all participants and holds each
 /// individual validation or refusal of a [`Deal`].
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Response {
     /// SessionID related to this run of the protocol
     pub session_id: Vec<u8>,
@@ -168,7 +138,7 @@ pub const STATUS_APPROVAL: bool = true;
 /// [`Justification`] is a message that is broadcasted by the Dealer in response to
 /// a Complaint. It contains the original Complaint as well as the shares
 /// distributed to the complainer.
-#[derive(Clone)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Justification<SUITE: Suite> {
     /// SessionID related to the current run of the protocol
     pub(crate) session_id: Vec<u8>,
@@ -387,7 +357,7 @@ where
 
 /// [`Verifier`] receives a [`Deal`] from a [`Dealer`], can reply with a Complaint, and can
 /// collaborate with other Verifiers to reconstruct a secret.
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct Verifier<SUITE: Suite> {
     suite: SUITE,
     pub(crate) longterm: <SUITE::POINT as Point>::SCALAR,
@@ -638,7 +608,7 @@ pub fn recover_secret<SUITE: Suite>(
 
 /// [`Aggregator`] is used to collect all [`deals`](Deal), and responses for one protocol run.
 /// It brings common functionalities for both [`Dealer`] and [`Verifier`] structs.
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct Aggregator<SUITE: Suite> {
     pub suite: SUITE,
     pub dealer: SUITE::POINT,
@@ -672,23 +642,6 @@ fn new_aggregator<SUITE: Suite>(
         deal: None,
         bad_dealer: false,
         timeout: false,
-    }
-}
-
-impl<SUITE: Suite> Default for Aggregator<SUITE> {
-    fn default() -> Self {
-        Self {
-            suite: Default::default(),
-            dealer: Default::default(),
-            verifiers: Default::default(),
-            commits: Default::default(),
-            responses: Default::default(),
-            sid: Default::default(),
-            deal: Default::default(),
-            t: Default::default(),
-            bad_dealer: Default::default(),
-            timeout: Default::default(),
-        }
     }
 }
 

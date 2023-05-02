@@ -36,7 +36,7 @@ use super::structs::{Deal, DistKeyShare, Justification, Response};
 /// with the current share of the node. If the node using this config is a new
 /// addition and thus has no current share, the `public_coeffs` field be must be
 /// filled in.
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct Config<SUITE: Suite, READ: Read + Clone> {
     pub suite: SUITE,
 
@@ -95,46 +95,29 @@ pub struct Config<SUITE: Suite, READ: Read + Clone> {
     pub user_reader_only: bool,
 }
 
-impl<SUITE: Suite, READ: Read + Clone> Default for Config<SUITE, READ> {
-    fn default() -> Self {
-        Self {
-            suite: Default::default(),
-            longterm: Default::default(),
-            old_nodes: Default::default(),
-            public_coeffs: Default::default(),
-            new_nodes: Default::default(),
-            share: Default::default(),
-            threshold: Default::default(),
-            old_threshold: Default::default(),
-            reader: Default::default(),
-            user_reader_only: Default::default(),
-        }
-    }
-}
-
 /// [`DistKeyGenerator`] is the struct that runs the DKG protocol.
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct DistKeyGenerator<SUITE: Suite, READ: Read + Clone> {
     /// `config` driving the behavior of DistKeyGenerator
     pub c: Config<SUITE, READ>,
-    suite: SUITE,
+    pub suite: SUITE,
 
     pub long: <SUITE::POINT as Point>::SCALAR,
     pub pubb: SUITE::POINT,
-    dpub: share::poly::PubPoly<SUITE>,
+    pub dpub: share::poly::PubPoly<SUITE>,
     pub dealer: vss::Dealer<SUITE>,
     /// `verifiers` indexed by dealer index
     pub verifiers: HashMap<u32, vss::Verifier<SUITE>>,
     /// performs the part of the response verification for `old nodes`
-    old_aggregators: HashMap<u32, vss::Aggregator<SUITE>>,
+    pub old_aggregators: HashMap<u32, vss::Aggregator<SUITE>>,
     /// `index` in the old list of nodes
     pub oidx: usize,
     /// `index` in the new list of nodes
     pub nidx: usize,
     /// `old threshold` used in the previous DKG
-    old_t: usize,
+    pub old_t: usize,
     /// `new threshold` to use in this round
-    new_t: usize,
+    pub new_t: usize,
     /// indicates whether we are in the re-sharing protocol or basic DKG
     pub is_resharing: bool,
     /// indicates whether we are able to issue shares or not
@@ -146,35 +129,9 @@ pub struct DistKeyGenerator<SUITE: Suite, READ: Read + Clone> {
     /// indicates whether the node is present in the old list
     pub old_present: bool,
     /// already processed our own deal
-    processed: bool,
+    pub processed: bool,
     /// did the timeout / period / already occured or not
-    timeout: bool,
-}
-
-impl<SUITE: Suite, READ: Read + Clone> Default for DistKeyGenerator<SUITE, READ> {
-    fn default() -> Self {
-        Self {
-            c: Default::default(),
-            suite: Default::default(),
-            long: Default::default(),
-            pubb: Default::default(),
-            dpub: Default::default(),
-            dealer: Default::default(),
-            verifiers: Default::default(),
-            old_aggregators: Default::default(),
-            oidx: Default::default(),
-            nidx: Default::default(),
-            old_t: Default::default(),
-            new_t: Default::default(),
-            is_resharing: Default::default(),
-            can_issue: Default::default(),
-            can_receive: Default::default(),
-            new_present: Default::default(),
-            old_present: Default::default(),
-            processed: Default::default(),
-            timeout: Default::default(),
-        }
-    }
+    pub timeout: bool,
 }
 
 /// [`new_dist_key_handler()`] takes a [`Config`] and returns a [`DistKeyGenerator`] that is able
