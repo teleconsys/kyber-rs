@@ -240,9 +240,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
     let mut p1 = g.point().add(&gen, &gen);
     let mut p2 = g.point().mul(&stmp.clone().set_int64(2), None);
     if p1 != p2 {
-        bail!(
-            "multiply by two doesn't work: {p1} == {gen} (+) {gen} != {gen} (x) 2 == {p2}"
-        )
+        bail!("multiply by two doesn't work: {p1} == {gen} (+) {gen} != {gen} (x) 2 == {p2}")
     }
     p1 = p1.clone().add(&p1, &p1);
     p2 = p2.mul(&stmp.clone().set_int64(4), None);
@@ -281,8 +279,7 @@ fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GRO
                 "generator multiplicative identity doesn't work:\n{} (x) {} = {}\n%{} (x) {} = {}",
                 ptmp.clone().base(),
                 stmp.clone().set_int64(2),
-                ptmp.clone()
-                    .mul(&stmp.clone().set_int64(2), None),
+                ptmp.clone().mul(&stmp.clone().set_int64(2), None),
                 stmp.clone().inv(&stmp),
                 stmp.clone().inv(&stmp),
                 ptmp.clone()

@@ -92,24 +92,24 @@ impl ExtendedGroupElement {
 
     pub fn double(&mut self, r: &mut CompletedGroupElement) {
         let mut q = ProjectiveGroupElement::default();
-        self.get_projective(&mut q);
+        self.write_projective(&mut q);
         q.double(r);
     }
 
-    pub fn get_cached(&self, r: &mut CachedGroupElement) {
+    pub fn write_cached(&self, r: &mut CachedGroupElement) {
         fe_add(&mut r.y_plus_x, &self.y, &self.x);
         fe_sub(&mut r.y_minus_x, &self.y, &self.x);
         fe_copy(&mut r.z, &self.z);
         fe_mul(&mut r.t2d, &self.t, &D2);
     }
 
-    fn get_projective(&self, r: &mut ProjectiveGroupElement) {
+    fn write_projective(&self, r: &mut ProjectiveGroupElement) {
         fe_copy(&mut r.x, &self.x);
         fe_copy(&mut r.y, &self.y);
         fe_copy(&mut r.z, &self.z);
     }
 
-    pub fn get_bytes(&self, s: &mut [u8; 32]) {
+    pub fn write_bytes(&self, s: &mut [u8; 32]) {
         let mut recip = FieldElement::default();
         let mut x = FieldElement::default();
         let mut y = FieldElement::default();
@@ -122,7 +122,6 @@ impl ExtendedGroupElement {
     }
 
     pub fn set_bytes(&mut self, s: &[u8]) -> bool {
-        // println!("{:#?}", s);
         let mut u = FieldElement::default();
         let mut v = FieldElement::default();
         let mut v3 = FieldElement::default();
@@ -536,11 +535,11 @@ pub fn ge_scalar_mult(
 
     // compute cached array of multiples of A from 1A through 8A
     let mut ai = [CachedGroupElement::default(); 8]; // A,1A,2A,3A,4A,5A,6A,7A
-    a_p.get_cached(&mut ai[0]);
+    a_p.write_cached(&mut ai[0]);
     for i in 0..7 {
         t.add(a_p, &ai[i]);
         t.to_extended(&mut u);
-        u.get_cached(&mut ai[i + 1]);
+        u.write_cached(&mut ai[i + 1]);
     }
 
     // special case for exponent nybble i == 63

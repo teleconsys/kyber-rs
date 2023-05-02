@@ -41,13 +41,13 @@ use crate::Scalar;
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use digest::Digest;
-use serde::de::DeserializeOwned;
+
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 
 /// [`Dealer`] encapsulates for creating and distributing the shares and for
 /// replying to any [`responses`](Response).
-#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
 pub struct Dealer<SUITE: Suite> {
     suite: SUITE,
     // reader: STREAM,
@@ -65,6 +65,25 @@ pub struct Dealer<SUITE: Suite> {
     /// list of deals this Dealer has generated
     pub(crate) deals: Vec<Deal<SUITE>>,
     pub(crate) aggregator: Aggregator<SUITE>,
+}
+
+impl<SUITE: Suite + core::fmt::Debug> core::fmt::Display for Dealer<SUITE> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write! {f, "Dealer( longterm: {}, public_key: {}, secret: {},
+            secret_commits: {:?}, verifiers: {:?}, hkdf_context: {:?}, 
+            threshold: {}, session_id: {:?}, deals: {:?}, aggregator: {} )",
+            self.long,
+            self.pubb,
+            self.secret,
+            self.secret_commits.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+            self.verifiers.iter().map(|v| v.to_string()).collect::<Vec<_>>(),
+            self.hkdf_context,
+            self.t,
+            self.session_id,
+            self.deals,
+            self.aggregator
+        }
+    }
 }
 
 impl<SUITE: Suite> Deref for Dealer<SUITE> {
@@ -96,6 +115,18 @@ pub struct Deal<SUITE: Suite> {
     pub(crate) commitments: Vec<SUITE::POINT>,
 }
 
+impl<SUITE: Suite> core::fmt::Display for Deal<SUITE> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write! {f, "Deal( session_id: {:?}, sec_share: {}, rnd_share: {}, threshold: {}, commitments: {:?} )",
+            self.session_id,
+            self.sec_share,
+            self.rnd_share,
+            self.t,
+            self.commitments.iter().map(|c| c.to_string()).collect::<Vec<_>>()
+        }
+    }
+}
+
 impl<SUITE: Suite> Deal<SUITE> {
     fn decode(buff: &[u8]) -> Result<Deal<SUITE>, VSSError> {
         let mut d = Deal::default();
@@ -114,7 +145,7 @@ impl<SUITE: Suite> BinaryMarshaler for Deal<SUITE> {
 /// correct recipient. The encryption is performed in a similar manner as what is
 /// done in TLS. The dealer generates a temporary key pair, signs it with its
 /// longterm secret key.
-#[derive(Clone, Serialize, Deserialize, Default, Debug)]
+#[derive(Clone, Serialize, Deserialize, Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EncryptedDeal<POINT: Point + Serialize> {
     /// Ephemeral Diffie Hellman key
     #[serde(deserialize_with = "POINT::deserialize")]
@@ -127,7 +158,18 @@ pub struct EncryptedDeal<POINT: Point + Serialize> {
     pub(crate) cipher: Vec<u8>,
 }
 
-impl<POINT: Point + Serialize + DeserializeOwned> BinaryMarshaler for EncryptedDeal<POINT> {
+impl<POINT: Point> core::fmt::Display for EncryptedDeal<POINT> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write! {f, "EncyptedDeal( dh_key: {}, signature: {:?}, nonce: {:?}, cipher: {:?} )",
+            self.dhkey,
+            self.signature,
+            self.nonce,
+            self.cipher,
+        }
+    }
+}
+
+impl<POINT: Point> BinaryMarshaler for EncryptedDeal<POINT> {
     fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
         encoding::marshal_binary(self)
     }
@@ -135,7 +177,7 @@ impl<POINT: Point + Serialize + DeserializeOwned> BinaryMarshaler for EncryptedD
 
 /// [`Response`] is sent by the verifiers to all participants and holds each
 /// individual validation or refusal of a [`Deal`].
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default, PartialOrd, Ord)]
 pub struct Response {
     /// SessionID related to this run of the protocol
     pub session_id: Vec<u8>,
@@ -145,6 +187,17 @@ pub struct Response {
     pub approved: bool,
     /// Signature over the whole packet
     pub signature: Vec<u8>,
+}
+
+impl core::fmt::Display for Response {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write! {f, "Response( session_id: {:?}, index: {}, approved: {}, signature: {:?} )",
+        self.session_id,
+        self.index,
+        self.approved,
+        self.signature
+        }
+    }
 }
 
 impl Response {
@@ -162,7 +215,7 @@ impl Response {
 /// [`Justification`] is a message that is broadcasted by the Dealer in response to
 /// a Complaint. It contains the original complaint as well as the shares
 /// distributed to the complainer.
-#[derive(Clone, Serialize, Deserialize, Default, Debug)]
+#[derive(Clone, Serialize, Deserialize, Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Justification<SUITE: Suite> {
     /// SessionID related to the current run of the protocol
     session_id: Vec<u8>,
@@ -172,6 +225,17 @@ pub struct Justification<SUITE: Suite> {
     pub(crate) deal: Deal<SUITE>,
     /// Signature over the whole packet
     signature: Vec<u8>,
+}
+
+impl<SUITE: Suite> core::fmt::Display for Justification<SUITE> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write! {f, "Justification( session_id: {:?}, index: {}, deal: {}, signature: {:?} )",
+        self.session_id,
+        self.index,
+        self.deal,
+        self.signature
+        }
+    }
 }
 
 impl<SUITE: Suite> Justification<SUITE> {
@@ -389,7 +453,7 @@ where
 
 /// [`Verifier`] receives a [`Deal`] from a Dealer, can reply with a Complaint, and can
 /// collaborate with other Verifiers to reconstruct a secret.
-#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize, Eq)]
 pub struct Verifier<SUITE: Suite> {
     suite: SUITE,
     pub(crate) longterm: <SUITE::POINT as Point>::SCALAR,
@@ -399,6 +463,21 @@ pub struct Verifier<SUITE: Suite> {
     verifiers: Vec<SUITE::POINT>,
     hkdf_context: Vec<u8>,
     pub(crate) aggregator: Option<Aggregator<SUITE>>,
+}
+
+impl<SUITE: Suite + core::fmt::Debug> core::fmt::Display for Verifier<SUITE> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write! {f, "Verifier( suite: {:?}, longterm: {}, pubb: {}, dealer: {}, index: {}, verifiers: {:?}, hkdf_context: {:?}, aggregator: {:?} )",
+            self.suite,
+            self.longterm,
+            self.pubb,
+            self.dealer,
+            self.index,
+            self.verifiers.iter().map(|v| v.to_string()).collect::<Vec<_>>(),
+            self.hkdf_context,
+            self.aggregator
+        }
+    }
 }
 
 /// [`new_verifier()`] returns a [`Verifier`] out of:
@@ -611,7 +690,7 @@ where
 
 /// [`Aggregator`] is used to collect all [`deals`](Deal), and [`responses`](Response) for one protocol run.
 /// It brings common functionalities for both [`Dealer`] and [`Verifier`] structs.
-#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize, Eq)]
 pub struct Aggregator<SUITE: Suite> {
     suite: SUITE,
     pub dealer: SUITE::POINT,
@@ -623,6 +702,23 @@ pub struct Aggregator<SUITE: Suite> {
     pub(crate) deal: Option<Deal<SUITE>>,
     pub(crate) t: usize,
     pub(crate) bad_dealer: bool,
+}
+
+impl<SUITE: Suite + core::fmt::Debug> core::fmt::Display for Aggregator<SUITE> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write! {f, "Aggregator ( suite: {:?},  dealer: {}, verifiers: {:?},
+            commits: {:?}, responses: {:?}, session_id: {:?}, deal: {:?}, threshold: {}, bad_dealer: {} )",
+            self.suite,
+            self.dealer,
+            self.verifiers.iter().map(|v| v.to_string()).collect::<Vec<_>>(),
+            self.commits.iter().map(|c| c.to_string()).collect::<Vec<_>>(),
+            self.responses,
+            self.sid,
+            self.deal,
+            self.t,
+            self.bad_dealer
+        }
+    }
 }
 
 fn new_aggregator<SUITE: Suite>(

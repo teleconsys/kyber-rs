@@ -1,5 +1,6 @@
 /// module key creates asymmetric key pairs.
 use crate::{group::edwards25519::CurveError, Group, Point, Random, Scalar};
+use serde::Serialize;
 use thiserror::Error;
 
 /// [`Generator`] is a type that needs to implement a special case in order
@@ -16,10 +17,16 @@ pub trait Suite: Group + Random {}
 
 /// [`Pair`] represents a public/private keypair together with the
 /// [`ciphersuite`](Suite) the key was generated from.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct Pair<POINT: Point> {
     pub public: POINT,          // Public key
     pub private: POINT::SCALAR, // Private key
+}
+
+impl<POINT: Point> core::fmt::Display for Pair<POINT> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write! {f, "Keypair( public_key: {}, private_key: {} )", self.public, self.private}
+    }
 }
 
 /// [`new_key_pair()`] directly creates a secret/public key pair

@@ -35,7 +35,7 @@ impl Point {
 impl BinaryMarshaler for Point {
     fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
         let mut b = [0_u8; 32];
-        self.ge.get_bytes(&mut b);
+        self.ge.write_bytes(&mut b);
         Ok(b.to_vec())
     }
 }
@@ -168,7 +168,7 @@ impl group::Point for Point {
 
     fn data(&self) -> Result<Vec<u8>, PointError> {
         let mut b = [0u8; 32];
-        self.ge.get_bytes(&mut b);
+        self.ge.write_bytes(&mut b);
         let dl = b[0] as usize; // extract length byte
         if dl > self.embed_len() {
             return Err(PointError::EmbedDataLength);
@@ -180,7 +180,7 @@ impl group::Point for Point {
         let mut t2 = CachedGroupElement::default();
         let mut r = CompletedGroupElement::default();
 
-        p2.ge.get_cached(&mut t2);
+        p2.ge.write_cached(&mut t2);
         r.add(&p1.ge, &t2);
         r.to_extended(&mut self.ge);
 
@@ -191,7 +191,7 @@ impl group::Point for Point {
         let mut t2 = CachedGroupElement::default();
         let mut r = CompletedGroupElement::default();
 
-        p2.ge.get_cached(&mut t2);
+        p2.ge.write_cached(&mut t2);
         r.sub(&p1.ge, &t2);
         r.to_extended(&mut self.ge);
 
@@ -229,8 +229,8 @@ impl PartialEq for Point {
     fn eq(&self, p2: &Self) -> bool {
         let mut b1 = [0_u8; 32];
         let mut b2 = [0_u8; 32];
-        self.ge.get_bytes(&mut b1);
-        p2.ge.get_bytes(&mut b2);
+        self.ge.write_bytes(&mut b1);
+        p2.ge.write_bytes(&mut b2);
         for i in 0..b1.len() {
             if b1[i] != b2[i] {
                 return false;
@@ -250,7 +250,7 @@ impl LowerHex for Point {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let prefix = if f.alternate() { "0x" } else { "" };
         let mut b = [0u8; 32];
-        self.ge.get_bytes(&mut b);
+        self.ge.write_bytes(&mut b);
         let encoded = hex::encode(b);
         write!(f, "{prefix}{encoded}")
     }
@@ -260,7 +260,7 @@ impl UpperHex for Point {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let prefix = if f.alternate() { "0X" } else { "" };
         let mut b = [0u8; 32];
-        self.ge.get_bytes(&mut b);
+        self.ge.write_bytes(&mut b);
         let encoded = hex::encode_upper(b);
         write!(f, "{prefix}{encoded}")
     }
