@@ -24,6 +24,10 @@ pub struct Scalar {
 }
 
 impl Scalar {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     fn as_int(&self) -> Int {
         Int::new_int_bytes(&self.v, &PRIME_ORDER, LittleEndian)
     }

@@ -34,6 +34,12 @@ pub struct SimpleCTScalar {
     s: Scalar,
 }
 
+impl SimpleCTScalar {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 impl Display for SimpleCTScalar {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "SimpleCTScalar({})", self.s)
@@ -183,6 +189,12 @@ impl ScalarTrait for SimpleCTScalar {
 #[derive(Copy, Clone, Eq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct FactoredScalar {
     s: Scalar,
+}
+
+impl FactoredScalar {
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 impl Display for FactoredScalar {

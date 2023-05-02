@@ -37,7 +37,7 @@ impl Group for Curve {
     /// compatible with other Ed25519 implementations, and with the standard implementation
     /// of the EdDSA signature.
     fn scalar(&self) -> Scalar {
-        Scalar::default()
+        Scalar::new()
     }
 
     /// [`scalar_len()`] returns 32, the size in bytes of an encoded [`Scalar`]
@@ -47,7 +47,7 @@ impl Group for Curve {
     }
 
     fn point(&self) -> Point {
-        Point::default()
+        Point::new()
     }
 
     /// [`point_len()`] returns 32, the size in bytes of an encoded [`Point`] on the Ed25519 curve.

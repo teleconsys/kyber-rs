@@ -26,6 +26,12 @@ pub struct Point {
     var_time: bool,
 }
 
+impl Point {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 impl BinaryMarshaler for Point {
     fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
         let mut b = [0_u8; 32];
