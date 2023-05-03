@@ -33,7 +33,10 @@
 ///    must be broadcasted to all the QUAL participant.
 ///   7. At this point, every QUAL participant can issue the distributed key by
 ///    calling [`dist_key_share()`].
-use std::{collections::HashMap, fmt::Display};
+
+extern crate alloc;
+use core::fmt::{Debug, Display, Formatter};
+use std::collections::HashMap;
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use digest::Digest;
@@ -55,7 +58,7 @@ use crate::{
 };
 
 /// [`DistKeyShare`] holds the share of a distributed key for a participant.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct DistKeyShare<SUITE: Suite> {
     /// `Coefficients` of the public polynomial holding the public key
     pub commits: Vec<SUITE::POINT>,
@@ -63,13 +66,17 @@ pub struct DistKeyShare<SUITE: Suite> {
     pub share: PriShare<<SUITE::POINT as Point>::SCALAR>,
 }
 
-impl<T: Suite> Display for DistKeyShare<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "DistKeyShare(commits: {:?}, share: {})",
-            self.commits, self.share
-        )
+impl<SUITE: Suite> Debug for DistKeyShare<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("DistKeyShare")
+            .field("commits", &self.commits)
+            .finish()
+    }
+}
+
+impl<SUITE: Suite> Display for DistKeyShare<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "DistKeyShare( commits: {:?} )", self.commits)
     }
 }
 
@@ -98,7 +105,7 @@ impl<SUITE: Suite> dss::DistKeyShare<SUITE> for DistKeyShare<SUITE> {
 /// Dealer.
 ///  NOTE: Doing that in vss module would be possible but then the Dealer is always
 ///  assumed to be a member of the participants. It's only the case here.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct Deal<POINT: Point> {
     /// `Index` of the Dealer in the list of participants
     pub index: u32,
@@ -107,9 +114,15 @@ pub struct Deal<POINT: Point> {
     pub deal: EncryptedDeal<POINT>,
 }
 
+impl<POINT: Point> Display for Deal<POINT> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Deal( index: {}, deal: {} )", self.index, self.deal)
+    }
+}
+
 /// [`Response`] holds the Response from another participant as well as the index of
 /// the target Dealer.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
 pub struct Response {
     /// `Index` of the Dealer for which this response is for
     pub index: u32,
@@ -117,9 +130,19 @@ pub struct Response {
     pub response: vss::Response,
 }
 
+impl Display for Response {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "Response( index: {}, response: {} )",
+            self.index, self.response
+        )
+    }
+}
+
 /// [`Justification`] holds the Justification from a Dealer as well as the index of
 /// the Dealer in question.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
 pub struct Justification<SUITE: Suite> {
     /// Index of the Dealer who answered with this Justification
     pub index: u32,
@@ -127,9 +150,19 @@ pub struct Justification<SUITE: Suite> {
     pub justification: vss::Justification<SUITE>,
 }
 
+impl<SUITE: Suite> Display for Justification<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "Justification( index: {}, justification: {} )",
+            self.index, self.justification
+        )
+    }
+}
+
 /// [`SecretCommits`] is sent during the distributed public key reconstruction phase,
 /// basically a Feldman VSS scheme.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct SecretCommits<SUITE: Suite> {
     /// Index of the Dealer in the list of participants
     pub index: u32,
@@ -139,6 +172,22 @@ pub struct SecretCommits<SUITE: Suite> {
     pub session_id: Vec<u8>,
     /// Signature from the Dealer
     pub signature: Vec<u8>,
+}
+
+impl<SUITE: Suite> Display for SecretCommits<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "SecretCommits( index: {}, commitments: {:?}, session_id: {:?}, signature: {:?} )",
+            self.index,
+            self.commitments
+                .iter()
+                .map(|c| c.to_string())
+                .collect::<Vec<_>>(),
+            self.session_id,
+            self.signature
+        )
+    }
 }
 
 impl<SUITE: Suite> SecretCommits<SUITE> {
@@ -156,7 +205,7 @@ impl<SUITE: Suite> SecretCommits<SUITE> {
 
 /// [`ComplaintCommits`] is sent if the secret commitments revealed by a peer are not
 /// valid.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
 pub struct ComplaintCommits<SUITE: Suite> {
     /// `index` of the Verifier issuing the Complaint Commit
     pub index: u32,
@@ -167,6 +216,16 @@ pub struct ComplaintCommits<SUITE: Suite> {
     pub deal: vss::Deal<SUITE>,
     /// `signature` made by the verifier
     pub signature: Vec<u8>,
+}
+
+impl<SUITE: Suite> Display for ComplaintCommits<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "ComplaintCommits( index: {}, commitments: {}, session_id: {}, signature: {:?} )",
+            self.index, self.dealer_index, self.deal, self.signature
+        )
+    }
 }
 
 impl<SUITE: Suite> ComplaintCommits<SUITE> {
@@ -184,7 +243,7 @@ impl<SUITE: Suite> ComplaintCommits<SUITE> {
 
 /// [`ReconstructCommits`] holds the information given by a participant who reveals
 /// the deal received from a peer that has received a Complaint Commits.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct ReconstructCommits<SUITE: Suite> {
     /// `id` of the session
     pub session_id: Vec<u8>,
@@ -196,6 +255,27 @@ pub struct ReconstructCommits<SUITE: Suite> {
     pub share: PriShare<<SUITE::POINT as Point>::SCALAR>,
     /// `signature` over all over fields generated by the issuing verifier
     pub signature: Vec<u8>,
+}
+
+impl<SUITE: Suite> Debug for ReconstructCommits<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ReconstructCommits")
+            .field("session_id", &self.session_id)
+            .field("index", &self.index)
+            .field("dealer_index", &self.dealer_index)
+            .field("signature", &self.signature)
+            .finish()
+    }
+}
+
+impl<SUITE: Suite> Display for ReconstructCommits<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "ReconstructCommits( session_id: {:?}, index: {}, dealer_index: {}, signature: {:?} )",
+            self.session_id, self.index, self.dealer_index, self.signature
+        )
+    }
 }
 
 impl<SUITE: Suite> ReconstructCommits<SUITE> {
@@ -212,12 +292,12 @@ impl<SUITE: Suite> ReconstructCommits<SUITE> {
 }
 
 /// [`DistKeyGenerator`] is the struct that runs the DKG protocol.
-#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct DistKeyGenerator<SUITE: Suite> {
     pub suite: SUITE,
 
     pub index: u32,
-    pub long: <SUITE::POINT as Point>::SCALAR,
+    pub(crate) long: <SUITE::POINT as Point>::SCALAR,
     pub pubb: SUITE::POINT,
 
     pub participants: Vec<SUITE::POINT>,
@@ -238,14 +318,43 @@ pub struct DistKeyGenerator<SUITE: Suite> {
     pub reconstructed: HashMap<u32, bool>,
 }
 
+impl<SUITE: Suite> Debug for DistKeyGenerator<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("DistKeyGenerator")
+            .field("suite", &self.suite)
+            .field("index", &self.index)
+            .field("pubb", &self.pubb)
+            .field("participants", &self.participants)
+            .field("t", &self.t)
+            .field("dealer", &self.dealer)
+            .field("verifiers", &self.verifiers)
+            .field("commitments", &self.commitments)
+            .field("pending_reconstruct", &self.pending_reconstruct)
+            .field("reconstructed", &self.reconstructed)
+            .finish()
+    }
+}
+
 impl<T: Suite> Display for DistKeyGenerator<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
-            "DistKeyGenerator( index: {}, threshold: {}, participants: {} )",
+            "DistKeyGenerator( suite: {}, public: {}, index: {}, threshold: {}, dealer: {}, 
+                verifiers: {:?}, commitments: {:?}, pending_reconstruct: {:?}, 
+                reconstructed: {:?}, participants: {:?} )",
+            self.suite,
+            self.pubb,
             self.index,
             self.t,
-            self.participants.len(),
+            self.dealer,
+            self.verifiers,
+            self.commitments,
+            self.pending_reconstruct,
+            self.reconstructed,
+            self.participants
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>(),
         )
     }
 }
@@ -630,7 +739,7 @@ where
 
         self.pending_reconstruct
             .entry(cc.dealer_index)
-            .or_insert_with(std::vec::Vec::new);
+            .or_insert_with(alloc::vec::Vec::new);
         self.pending_reconstruct
             .get_mut(&cc.dealer_index)
             .unwrap()
@@ -664,7 +773,7 @@ where
 
         self.pending_reconstruct
             .entry(rc.dealer_index)
-            .or_insert_with(std::vec::Vec::new);
+            .or_insert_with(alloc::vec::Vec::new);
         let arr = self.pending_reconstruct.get_mut(&rc.dealer_index).unwrap();
         // check if packet is already received or not
         // or if the session ID does not match the others

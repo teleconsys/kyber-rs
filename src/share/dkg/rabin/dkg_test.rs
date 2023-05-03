@@ -503,8 +503,8 @@ fn test_dkg_reconstruct_commits() {
     let com = dkgs[2].commitments.get(&0);
     assert!(com.is_some());
     assert_eq!(
-        dkgs[0].dealer.secret_commit().unwrap().to_string(),
-        com.unwrap().commit().to_string()
+        dkgs[0].dealer.secret_commit().unwrap(),
+        com.unwrap().commit()
     );
 
     assert!(dkgs[2].finished());
@@ -653,7 +653,7 @@ fn test_dist_key_share() {
     let secret = recover_secret(t.suite, &shares, NB_PARTICIPANTS, NB_PARTICIPANTS).unwrap();
 
     let commit_secret = t.suite.point().mul(&secret, None);
-    assert_eq!(dkss[0].public().to_string(), commit_secret.to_string())
+    assert_eq!(dkss[0].public(), commit_secret)
 }
 
 fn gen_pair() -> (EdScalar, EdPoint) {

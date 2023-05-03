@@ -1,7 +1,6 @@
-use std::{
-    cmp::Ordering,
-    io::{Read, Write},
-};
+use std::io::{Read, Write};
+
+use core::cmp::Ordering;
 
 use num_bigint::BigInt;
 use num_bigint_dig as num_bigint;

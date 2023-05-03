@@ -106,11 +106,11 @@ fn test_vss_whole() {
         minimum_t(test_data.nb_verifiers),
     )
     .unwrap();
-    assert_eq!(dealer.secret.to_string(), sec.to_string());
+    assert_eq!(dealer.secret, sec);
 
     let pri_poly = dealer.private_poly();
     let pri_coeffs = pri_poly.coefficients();
-    assert_eq!(test_data.secret.to_string(), pri_coeffs[0].to_string())
+    assert_eq!(test_data.secret, pri_coeffs[0])
 }
 
 #[test]
@@ -145,7 +145,7 @@ fn test_vss_verifier_new() {
     let test_data = new_test_data();
     let rand_idx = rand::thread_rng().gen::<usize>() % test_data.verifiers_pub.len();
     let v = new_verifier(
-        &test_data.suite,
+        test_data.suite,
         &test_data.verifiers_sec[rand_idx],
         &test_data.dealer_pub,
         &test_data.verifiers_pub,
@@ -158,7 +158,7 @@ fn test_vss_verifier_new() {
         .scalar()
         .pick(&mut test_data.suite.random_stream());
     if let Err(VSSError::PublicKeyNotFound) = new_verifier(
-        &test_data.suite,
+        test_data.suite,
         &wrong_key,
         &test_data.dealer_pub,
         &test_data.verifiers_pub,
@@ -831,14 +831,14 @@ fn test_vss_dhexchange() {
         .scalar()
         .pick(&mut test_data.suite.random_stream());
     let point = SuiteEd25519::dh_exchange(test_data.suite, privv, pubb);
-    assert_eq!(pubb.mul(&privv, None).to_string(), point.to_string());
+    assert_eq!(pubb.mul(&privv, None), point);
 }
 
 #[test]
 fn test_vss_context() {
     let test_data = new_test_data();
     let c = vss::context(
-        &test_data.suite,
+        test_data.suite,
         &test_data.dealer_pub,
         &test_data.verifiers_pub,
     );
@@ -880,7 +880,7 @@ fn gen_all<SUITE: Suite>(test_data: &TestData<SUITE>) -> (Dealer<SUITE>, Vec<Ver
     let mut verifiers = vec![];
     for i in 0..NB_VERIFIERS {
         let v = new_verifier(
-            &test_data.suite,
+            test_data.suite,
             &test_data.verifiers_sec[i],
             &test_data.dealer_pub,
             &test_data.verifiers_pub,

@@ -1,3 +1,4 @@
+use core::fmt::{Display, Formatter};
 use sha2::Sha256;
 
 use crate::{
@@ -30,10 +31,6 @@ struct FixedPrivSuiteEd25519 {
 
 impl Group for FixedPrivSuiteEd25519 {
     type POINT = EdPoint;
-
-    fn string(&self) -> String {
-        self.curve.string()
-    }
 
     fn scalar(&self) -> EdScalar {
         self.curve.scalar()
@@ -70,6 +67,12 @@ impl XOFFactory for FixedPrivSuiteEd25519 {
 
 impl HashFactory for FixedPrivSuiteEd25519 {
     type T = Sha256;
+}
+
+impl Display for FixedPrivSuiteEd25519 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.curve)
+    }
 }
 
 impl Suite for FixedPrivSuiteEd25519 {}

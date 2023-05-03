@@ -2,8 +2,10 @@
 /// "Non-Interactive and Information-Theoretic Secure Verifiable Secret Sharing"
 /// by Torben Pryds Pedersen.
 /// https://link.springer.com/content/pdf/10.1007/3-540-46766-1_9.pdf
-use core::ops::Deref;
-use std::{collections::HashMap, io::Write, ops::DerefMut};
+use core::fmt::{Debug, Display, Formatter};
+use core::ops::{Deref, DerefMut};
+use std::collections::HashMap;
+use std::io::Write;
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use digest::Digest;
@@ -24,7 +26,7 @@ use crate::{
 
 /// [`Dealer`] encapsulates for creating and distributing the shares and for
 /// replying to any Responses.
-#[derive(Clone)]
+#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Dealer<SUITE: Suite> {
     suite: SUITE,
     // reader: STREAM,
@@ -37,12 +39,43 @@ pub struct Dealer<SUITE: Suite> {
     pub(crate) verifiers: Vec<SUITE::POINT>,
     hkdf_context: Vec<u8>,
     /// `threshold` of shares that is needed to reconstruct the secret
-    t: usize,
+    pub t: usize,
     /// `session_id` is a unique identifier for the whole session of the scheme
     session_id: Vec<u8>,
     /// list of `deals` this Dealer has generated
     pub(crate) deals: Vec<Deal<SUITE>>,
     pub(crate) aggregator: Aggregator<SUITE>,
+}
+
+impl<SUITE: Suite> Debug for Dealer<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Dealer")
+            .field("suite", &self.suite)
+            .field("pubb", &self.pubb)
+            .field("verifiers", &self.verifiers)
+            .field("hkdf_context", &self.hkdf_context)
+            .field("t", &self.t)
+            .field("session_id", &self.session_id)
+            .field("deals", &self.deals)
+            .field("aggregator", &self.aggregator)
+            .finish()
+    }
+}
+
+impl<SUITE: Suite> Display for Dealer<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write! {f, "Dealer( public_key: {},
+            verifiers: {:?}, hkdf_context: {:?}, 
+            threshold: {}, session_id: {:?}, deals: {:?}, aggregator: {} )",
+            self.pubb,
+            self.verifiers.iter().map(|v| v.to_string()).collect::<Vec<_>>(),
+            self.hkdf_context,
+            self.t,
+            self.session_id,
+            self.deals,
+            self.aggregator
+        }
+    }
 }
 
 impl<SUITE: Suite> Deref for Dealer<SUITE> {
@@ -59,27 +92,8 @@ impl<SUITE: Suite> DerefMut for Dealer<SUITE> {
     }
 }
 
-impl<SUITE: Suite> Default for Dealer<SUITE> {
-    fn default() -> Self {
-        Self {
-            suite: Default::default(),
-            long: Default::default(),
-            pubb: Default::default(),
-            secret: Default::default(),
-            secret_commits: Default::default(),
-            secret_poly: Default::default(),
-            verifiers: Default::default(),
-            hkdf_context: Default::default(),
-            t: Default::default(),
-            session_id: Default::default(),
-            deals: Default::default(),
-            aggregator: Default::default(),
-        }
-    }
-}
-
 /// [`Deal`] encapsulates the verifiable secret share and is sent by the dealer to a verifier.
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 pub struct Deal<SUITE: Suite> {
     /// Unique session identifier for this protocol run
     pub(crate) session_id: Vec<u8>,
@@ -91,13 +105,22 @@ pub struct Deal<SUITE: Suite> {
     pub(crate) commitments: Vec<SUITE::POINT>,
 }
 
-impl<SUITE: Suite> Default for Deal<SUITE> {
-    fn default() -> Self {
-        Self {
-            session_id: Default::default(),
-            sec_share: Default::default(),
-            t: Default::default(),
-            commitments: Default::default(),
+impl<SUITE: Suite> Debug for Deal<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Deal")
+            .field("session_id", &self.session_id)
+            .field("t", &self.t)
+            .field("commitments", &self.commitments)
+            .finish()
+    }
+}
+
+impl<SUITE: Suite> Display for Deal<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write! {f, "Deal( session_id: {:?}, threshold: {}, commitments: {:?} )",
+            self.session_id,
+            self.t,
+            self.commitments.iter().map(|c| c.to_string()).collect::<Vec<_>>()
         }
     }
 }
@@ -120,21 +143,33 @@ impl<SUITE: Suite> BinaryMarshaler for Deal<SUITE> {
 /// correct recipient. The encryption is performed in a similar manner as what is
 /// done in TLS. The dealer generates a temporary key pair, signs it with its
 /// longterm secret key.
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
 pub struct EncryptedDeal<POINT: Point> {
     /// Ephemeral Diffie Hellman key
+    #[serde(deserialize_with = "POINT::deserialize")]
     pub(crate) dhkey: POINT,
     /// Signature of the DH key by the longterm key of the dealer
     pub(crate) signature: Vec<u8>,
     /// Nonce used for the encryption
     nonce: Vec<u8>,
-    /// AEAD encryption of the deal marshalled by protobuf
+    /// AEAD encryption of the deal
     pub(crate) cipher: Vec<u8>,
+}
+
+impl<POINT: Point> Display for EncryptedDeal<POINT> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write! {f, "EncyptedDeal( dh_key: {}, signature: {:?}, nonce: {:?}, cipher: {:?} )",
+            self.dhkey,
+            self.signature,
+            self.nonce,
+            self.cipher,
+        }
+    }
 }
 
 /// [`Response`] is sent by the verifiers to all participants and holds each
 /// individual validation or refusal of a [`Deal`].
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Response {
     /// SessionID related to this run of the protocol
     pub session_id: Vec<u8>,
@@ -144,6 +179,17 @@ pub struct Response {
     pub status: bool,
     /// Signature over the whole packet
     pub signature: Vec<u8>,
+}
+
+impl Display for Response {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write! {f, "Response( session_id: {:?}, index: {}, status: {}, signature: {:?} )",
+        self.session_id,
+        self.index,
+        self.status,
+        self.signature
+        }
+    }
 }
 
 impl Response {
@@ -168,7 +214,7 @@ pub const STATUS_APPROVAL: bool = true;
 /// [`Justification`] is a message that is broadcasted by the Dealer in response to
 /// a Complaint. It contains the original Complaint as well as the shares
 /// distributed to the complainer.
-#[derive(Clone)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Justification<SUITE: Suite> {
     /// SessionID related to the current run of the protocol
     pub(crate) session_id: Vec<u8>,
@@ -178,6 +224,17 @@ pub struct Justification<SUITE: Suite> {
     pub(crate) deal: Deal<SUITE>,
     /// Signature over the whole packet
     pub(crate) signature: Vec<u8>,
+}
+
+impl<SUITE: Suite> Display for Justification<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write! {f, "Justification( session_id: {:?}, index: {}, deal: {}, signature: {:?} )",
+        self.session_id,
+        self.index,
+        self.deal,
+        self.signature
+        }
+    }
 }
 
 impl<SUITE: Suite> Justification<SUITE> {
@@ -236,7 +293,7 @@ pub fn new_dealer<SUITE: Suite>(
         });
     }
 
-    let hkdf_context = context(&suite, &d_pubb, verifiers).to_vec();
+    let hkdf_context = context(suite, &d_pubb, verifiers).to_vec();
     Ok(Dealer {
         suite,
         long: longterm,
@@ -387,7 +444,7 @@ where
 
 /// [`Verifier`] receives a [`Deal`] from a [`Dealer`], can reply with a Complaint, and can
 /// collaborate with other Verifiers to reconstruct a secret.
-#[derive(Clone)]
+#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Verifier<SUITE: Suite> {
     suite: SUITE,
     pub(crate) longterm: <SUITE::POINT as Point>::SCALAR,
@@ -399,6 +456,34 @@ pub struct Verifier<SUITE: Suite> {
     pub(crate) aggregator: Option<Aggregator<SUITE>>,
 }
 
+impl<SUITE: Suite> Debug for Verifier<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Verifier")
+            .field("suite", &self.suite)
+            .field("pubb", &self.pubb)
+            .field("dealer", &self.dealer)
+            .field("index", &self.index)
+            .field("verifiers", &self.verifiers)
+            .field("hkdf_context", &self.hkdf_context)
+            .field("aggregator", &self.aggregator)
+            .finish()
+    }
+}
+
+impl<SUITE: Suite> Display for Verifier<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write! {f, "Verifier( suite: {:?}, pubb: {}, dealer: {}, index: {}, verifiers: {:?}, hkdf_context: {:?}, aggregator: {:?} )",
+            self.suite,
+            self.pubb,
+            self.dealer,
+            self.index,
+            self.verifiers.iter().map(|v| v.to_string()).collect::<Vec<_>>(),
+            self.hkdf_context,
+            self.aggregator.as_ref().map(|a| a.to_string())
+        }
+    }
+}
+
 /// [`new_verifier()`] returns a [`Verifier`] out of:
 ///   - its `longterm secret key`
 ///   - the `longterm dealer public key`
@@ -408,7 +493,7 @@ pub struct Verifier<SUITE: Suite> {
 /// a default safe value. If a different t value is required, it is possible to set
 /// it with [`verifier.set_t()`].
 pub fn new_verifier<SUITE: Suite>(
-    suite: &SUITE,
+    suite: SUITE,
     longterm: &<SUITE::POINT as Point>::SCALAR,
     dealer_key: &SUITE::POINT,
     verifiers: &[SUITE::POINT],
@@ -428,14 +513,14 @@ pub fn new_verifier<SUITE: Suite>(
     }
     let c = context(suite, dealer_key, verifiers);
     Ok(Verifier {
-        suite: *suite,
+        suite,
         longterm: longterm.clone(),
         dealer: dealer_key.clone(),
         verifiers: verifiers.to_vec(),
         pubb,
         index,
         hkdf_context: c,
-        aggregator: Some(new_empty_aggregator(*suite, verifiers)),
+        aggregator: Some(new_empty_aggregator(suite, verifiers)),
     })
 }
 
@@ -638,10 +723,10 @@ pub fn recover_secret<SUITE: Suite>(
 
 /// [`Aggregator`] is used to collect all [`deals`](Deal), and responses for one protocol run.
 /// It brings common functionalities for both [`Dealer`] and [`Verifier`] structs.
-#[derive(Clone)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Aggregator<SUITE: Suite> {
     pub suite: SUITE,
-    dealer: SUITE::POINT,
+    pub dealer: SUITE::POINT,
     pub verifiers: Vec<SUITE::POINT>,
     commits: Vec<SUITE::POINT>,
 
@@ -651,6 +736,24 @@ pub struct Aggregator<SUITE: Suite> {
     pub(crate) t: usize,
     pub(crate) bad_dealer: bool,
     pub(crate) timeout: bool,
+}
+
+impl<SUITE: Suite> Display for Aggregator<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write! {f, "Aggregator ( suite: {:?},  dealer: {}, verifiers: {:?}, commits: {:?},
+            responses: {:?}, session_id: {:?}, deal: {:?}, threshold: {}, bad_dealer: {}, timeout: {} )",
+            self.suite,
+            self.dealer,
+            self.verifiers.iter().map(|v| v.to_string()).collect::<Vec<_>>(),
+            self.commits.iter().map(|c| c.to_string()).collect::<Vec<_>>(),
+            self.responses,
+            self.sid,
+            self.deal.as_ref().map(|d| d.to_string()),
+            self.t,
+            self.bad_dealer,
+            self.timeout
+        }
+    }
 }
 
 fn new_aggregator<SUITE: Suite>(
@@ -672,23 +775,6 @@ fn new_aggregator<SUITE: Suite>(
         deal: None,
         bad_dealer: false,
         timeout: false,
-    }
-}
-
-impl<SUITE: Suite> Default for Aggregator<SUITE> {
-    fn default() -> Self {
-        Self {
-            suite: Default::default(),
-            dealer: Default::default(),
-            verifiers: Default::default(),
-            commits: Default::default(),
-            responses: Default::default(),
-            sid: Default::default(),
-            deal: Default::default(),
-            t: Default::default(),
-            bad_dealer: Default::default(),
-            timeout: Default::default(),
-        }
     }
 }
 
@@ -932,7 +1018,7 @@ pub(crate) fn session_id<SUITE: Suite>(
 
 /// [`context()`] returns the context slice to be used when encrypting a share
 pub fn context<SUITE: Suite>(
-    suite: &SUITE,
+    suite: SUITE,
     dealer: &SUITE::POINT,
     verifiers: &[SUITE::POINT],
 ) -> Vec<u8> {

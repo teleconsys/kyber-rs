@@ -1,4 +1,4 @@
-use std::ops::Add;
+use core::ops::Add;
 
 use num_bigint_dig::BigInt;
 
@@ -15,79 +15,68 @@ use crate::{
 
 #[test]
 fn test_factored_scalar() {
-    test_simple(FactoredScalar::default)
+    test_simple(FactoredScalar::new)
 }
 
 #[test]
 fn test_simple_ct_scalar() {
-    test_simple(SimpleCTScalar::default)
+    test_simple(SimpleCTScalar::new)
 }
 
 #[test]
 fn test_string() {
     // Create a scalar that would trigger #262.
-    let mut s = Scalar::default();
-    s = s.set_int64(0x100);
-    s = s + *ONE;
-    let _z = s.to_string();
+    let s = Scalar::new().set_int64(0x100) + *ONE;
     assert_eq!(
-        s.to_string(),
+        format!("{s:x}"),
         "0101000000000000000000000000000000000000000000000000000000000000",
-        "unexpected result from string(): {}",
-        s
+        "unexpected result from string(): {s:x}"
     );
 }
 
 #[test]
 fn test_negative_big_int() {
     // Create a scalar that would trigger #262.
-    let mut s = Scalar::default();
-    s = s.set_int64(-1);
+    let s = Scalar::new().set_int64(-1);
     assert_eq!(
-        s.to_string(),
+        format!("{s:x}"),
         "ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000010",
-        "unexpected result: {}",
-        s
+        "unexpected result: {s:x}"
     );
 }
 
 #[test]
 fn test_positive_big_int() {
     // Create a scalar that would trigger #262.
-    let mut s = Scalar::default();
-    s = s.set_int64(1);
+    let s = Scalar::new().set_int64(1);
     assert_eq!(
-        s.to_string(),
+        format!("{s:x}"),
         "0100000000000000000000000000000000000000000000000000000000000000",
-        "unexpected result: {}",
-        s
+        "unexpected result: {s:x}"
     );
 }
 
 #[test]
 fn test_scalar_marshal() {
-    let s = Scalar::default();
-
-    assert_eq!("ed.scala", std::str::from_utf8(&s.marshal_id()).unwrap());
+    assert_eq!(
+        "ed.scala",
+        core::str::from_utf8(&Scalar::new().marshal_id()).unwrap()
+    );
 }
 
 #[test]
 fn test_set_bytes_le() {
-    let mut s = Scalar::default();
-    s = s.set_bytes(&[0, 1, 2, 3]);
+    let s = Scalar::new().set_bytes(&[0, 1, 2, 3]);
     assert_eq!(
-        s.to_string(),
+        format!("{s:x}"),
         "0001020300000000000000000000000000000000000000000000000000000000",
-        "unexpected result from string(): {}",
-        s
+        "unexpected result from string(): {s:x}"
     );
 }
 
 fn test_simple<T: ScalarTrait>(new: fn() -> T) {
-    let mut s1 = new();
-    let mut s2 = new();
-    s1 = s1.set_int64(2);
-    s2 = s2.pick(&mut random_stream::RandStream::default());
+    let s1 = new().set_int64(2);
+    let s2 = new().pick(&mut random_stream::RandStream::default());
 
     let s22 = s2.clone() + s2.clone();
 

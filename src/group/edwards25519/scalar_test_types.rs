@@ -1,11 +1,11 @@
 use super::{Scalar, SuiteEd25519};
 use crate::{encoding::MarshallingError, Group, Scalar as ScalarTrait, XOFFactory};
+use core::{
+    fmt::{Debug, Display, Formatter, LowerHex, UpperHex},
+    ops::{self, Deref, DerefMut},
+};
 use criterion::{measurement::WallTime, BenchmarkGroup, Criterion};
 use lazy_static::lazy_static;
-use std::{
-    fmt::{Display, Formatter},
-    ops::Deref,
-};
 
 use serde::{Deserialize, Serialize};
 
@@ -34,8 +34,14 @@ pub struct SimpleCTScalar {
     s: Scalar,
 }
 
+impl SimpleCTScalar {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 impl Display for SimpleCTScalar {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "SimpleCTScalar({})", self.s)
     }
 }
@@ -80,7 +86,22 @@ impl BinaryUnmarshaler for SimpleCTScalar {
     }
 }
 
-use std::ops::{self, DerefMut};
+impl LowerHex for SimpleCTScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let prefix = if f.alternate() { "0x" } else { "" };
+        let scalar_hex = format! {"{:x}", self.s};
+        write!(f, "{prefix}{scalar_hex}")
+    }
+}
+
+impl UpperHex for SimpleCTScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let prefix = if f.alternate() { "0X" } else { "" };
+        let scalar_hex = format! {"{:X}", self.s};
+        write!(f, "{prefix}{scalar_hex}")
+    }
+}
+
 impl_op_ex!(
     *|a: &SimpleCTScalar, b: &SimpleCTScalar| -> SimpleCTScalar {
         // // a * b + c = a * b + 0
@@ -169,8 +190,14 @@ pub struct FactoredScalar {
     s: Scalar,
 }
 
+impl FactoredScalar {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 impl Display for FactoredScalar {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "FactoredScalar({})", self.s)
     }
 }
@@ -212,6 +239,22 @@ impl BinaryMarshaler for FactoredScalar {
 impl BinaryUnmarshaler for FactoredScalar {
     fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError> {
         encoding::unmarshal_binary(self, data)
+    }
+}
+
+impl LowerHex for FactoredScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let prefix = if f.alternate() { "0x" } else { "" };
+        let scalar_hex = format! {"{:x}", self.s};
+        write!(f, "{prefix}{scalar_hex}")
+    }
+}
+
+impl UpperHex for FactoredScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let prefix = if f.alternate() { "0X" } else { "" };
+        let scalar_hex = format! {"{:X}", self.s};
+        write!(f, "{prefix}{scalar_hex}")
     }
 }
 

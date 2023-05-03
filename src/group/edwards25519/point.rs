@@ -1,3 +1,5 @@
+use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -24,16 +26,22 @@ pub struct Point {
     var_time: bool,
 }
 
+impl Point {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 impl BinaryMarshaler for Point {
     fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
         let mut b = [0_u8; 32];
-        self.ge.to_bytes(&mut b);
+        self.ge.write_bytes(&mut b);
         Ok(b.to_vec())
     }
 }
 impl BinaryUnmarshaler for Point {
     fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError> {
-        if !self.ge.from_bytes(data) {
+        if !self.ge.set_bytes(data) {
             return Err(MarshallingError::InvalidInput(
                 "invalid Ed25519 curve point".to_owned(),
             ));
@@ -117,7 +125,7 @@ impl group::Point for Point {
                 b[1..1 + dl].copy_from_slice(&d[0..dl]);
             }
             // Try to decode
-            if !self.ge.from_bytes(&b) {
+            if !self.ge.set_bytes(&b) {
                 // invalid point, retry
                 continue;
             }
@@ -160,7 +168,7 @@ impl group::Point for Point {
 
     fn data(&self) -> Result<Vec<u8>, PointError> {
         let mut b = [0u8; 32];
-        self.ge.to_bytes(&mut b);
+        self.ge.write_bytes(&mut b);
         let dl = b[0] as usize; // extract length byte
         if dl > self.embed_len() {
             return Err(PointError::EmbedDataLength);
@@ -172,7 +180,7 @@ impl group::Point for Point {
         let mut t2 = CachedGroupElement::default();
         let mut r = CompletedGroupElement::default();
 
-        p2.ge.to_cached(&mut t2);
+        p2.ge.write_cached(&mut t2);
         r.add(&p1.ge, &t2);
         r.to_extended(&mut self.ge);
 
@@ -183,7 +191,7 @@ impl group::Point for Point {
         let mut t2 = CachedGroupElement::default();
         let mut r = CompletedGroupElement::default();
 
-        p2.ge.to_cached(&mut t2);
+        p2.ge.write_cached(&mut t2);
         r.sub(&p1.ge, &t2);
         r.to_extended(&mut self.ge);
 
@@ -221,8 +229,8 @@ impl PartialEq for Point {
     fn eq(&self, p2: &Self) -> bool {
         let mut b1 = [0_u8; 32];
         let mut b2 = [0_u8; 32];
-        self.ge.to_bytes(&mut b1);
-        p2.ge.to_bytes(&mut b2);
+        self.ge.write_bytes(&mut b1);
+        p2.ge.write_bytes(&mut b2);
         for i in 0..b1.len() {
             if b1[i] != b2[i] {
                 return false;
@@ -232,11 +240,29 @@ impl PartialEq for Point {
     }
 }
 
-impl ToString for Point {
-    fn to_string(&self) -> String {
+impl Display for Point {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Ed25519Point( {self:#x} )")
+    }
+}
+
+impl LowerHex for Point {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let prefix = if f.alternate() { "0x" } else { "" };
         let mut b = [0u8; 32];
-        self.ge.to_bytes(&mut b);
-        hex::encode(b)
+        self.ge.write_bytes(&mut b);
+        let encoded = hex::encode(b);
+        write!(f, "{prefix}{encoded}")
+    }
+}
+
+impl UpperHex for Point {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let prefix = if f.alternate() { "0X" } else { "" };
+        let mut b = [0u8; 32];
+        self.ge.write_bytes(&mut b);
+        let encoded = hex::encode_upper(b);
+        write!(f, "{prefix}{encoded}")
     }
 }
 
