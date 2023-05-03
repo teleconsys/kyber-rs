@@ -8,6 +8,8 @@
 /// Schemes", by T. Wong et
 /// al.(https://www.cs.cmu.edu/~wing/publications/Wong-Wing02b.pdf)
 /// For an example how to use it please have a look at examples/dkg_test.rs
+use core::fmt::{Debug, Display, Formatter};
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, io::Read};
 
 use rand::{rngs::StdRng, RngCore, SeedableRng};
@@ -36,7 +38,7 @@ use super::structs::{Deal, DistKeyShare, Justification, Response};
 /// with the current share of the node. If the node using this config is a new
 /// addition and thus has no current share, the `public_coeffs` field be must be
 /// filled in.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Config<SUITE: Suite, READ: Read + Clone> {
     pub suite: SUITE,
 
@@ -95,8 +97,41 @@ pub struct Config<SUITE: Suite, READ: Read + Clone> {
     pub user_reader_only: bool,
 }
 
+impl<SUITE: Suite, READ: Read + Clone> Debug for Config<SUITE, READ> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Config")
+            .field("suite", &self.suite)
+            .field("old_nodes", &self.old_nodes)
+            .field("public_coeffs", &self.public_coeffs)
+            .field("new_nodes", &self.new_nodes)
+            .field("share", &self.share)
+            .field("threshold", &self.threshold)
+            .field("old_threshold", &self.old_threshold)
+            .field("reader", &self.reader.is_some())
+            .field("user_reader_only", &self.user_reader_only)
+            .finish()
+    }
+}
+
+impl<SUITE: Suite, READ: Read + Clone> Display for Config<SUITE, READ> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write! {f, "Config( suite: {}, old_nodes: {:?}, public_coefficients: {:?}, new_nodes: {:?},
+            share: {:?}, threshold: {}, old_threshold: {}, reader: {}, user_reader_only: {} )",
+            self.suite,
+            self.old_nodes.iter().map(|n| n.to_string()).collect::<Vec<_>>(),
+            self.public_coeffs.as_ref().map(|f| f.iter().map(|p| p.to_string()).collect::<Vec<_>>()),
+            self.new_nodes.iter().map(|n| n.to_string()).collect::<Vec<_>>(),
+            self.share.as_ref().map(|s| s.to_string()),
+            self.threshold,
+            self.old_threshold,
+            self.reader.is_some(),
+            self.user_reader_only
+        }
+    }
+}
+
 /// [`DistKeyGenerator`] is the struct that runs the DKG protocol.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DistKeyGenerator<SUITE: Suite, READ: Read + Clone> {
     /// `config` driving the behavior of DistKeyGenerator
     pub c: Config<SUITE, READ>,
@@ -132,6 +167,59 @@ pub struct DistKeyGenerator<SUITE: Suite, READ: Read + Clone> {
     pub processed: bool,
     /// did the timeout / period / already occured or not
     pub timeout: bool,
+}
+
+impl<SUITE: Suite, READ: Read + Clone> Debug for DistKeyGenerator<SUITE, READ> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("DistKeyGenerator")
+            .field("c", &self.c)
+            .field("suite", &self.suite)
+            .field("pubb", &self.pubb)
+            .field("dpub", &self.dpub)
+            .field("dealer", &self.dealer)
+            .field("verifiers", &self.verifiers)
+            .field("old_aggregators", &self.old_aggregators)
+            .field("oidx", &self.oidx)
+            .field("nidx", &self.nidx)
+            .field("old_t", &self.old_t)
+            .field("new_t", &self.new_t)
+            .field("is_resharing", &self.is_resharing)
+            .field("can_issue", &self.can_issue)
+            .field("can_receive", &self.can_receive)
+            .field("new_present", &self.new_present)
+            .field("old_present", &self.old_present)
+            .field("processed", &self.processed)
+            .field("timeout", &self.timeout)
+            .finish()
+    }
+}
+
+impl<SUITE: Suite, READ: Read + Clone> Display for DistKeyGenerator<SUITE, READ> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write! {f, "DistKeyGenerator( config: {}, suite: {:?}, public_key: {:?}, distributed_public_key: {:?},
+            dealer: {:?}, verifiers: {:?}, old_aggregators: {:?}, old_index: {}, new_index: {}, old_threshold: {}, 
+            new_threshold: {}, is_resharing: {}, can_issue: {}, can_receive: {}, new_present: {}, old_present: {}, 
+            processed: {}, timeout: {} )",
+            self.c,
+            self.suite,
+            self.pubb,
+            self.dpub,
+            self.dealer,
+            self.verifiers,
+            self.old_aggregators,
+            self.oidx,
+            self.nidx,
+            self.old_t,
+            self.new_t,
+            self.is_resharing,
+            self.can_issue,
+            self.can_receive,
+            self.new_present,
+            self.old_present,
+            self.processed,
+            self.timeout
+        }
+    }
 }
 
 /// [`new_dist_key_handler()`] takes a [`Config`] and returns a [`DistKeyGenerator`] that is able

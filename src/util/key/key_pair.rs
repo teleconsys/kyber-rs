@@ -1,6 +1,7 @@
 /// module key creates asymmetric key pairs.
+use core::fmt::{Debug, Display, Formatter};
 use crate::{group::edwards25519::CurveError, Group, Point, Random, Scalar};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// [`Generator`] is a type that needs to implement a special case in order
@@ -17,15 +18,24 @@ pub trait Suite: Group + Random {}
 
 /// [`Pair`] represents a public/private keypair together with the
 /// [`ciphersuite`](Suite) the key was generated from.
-#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Pair<POINT: Point> {
-    pub public: POINT,          // Public key
+    #[serde(deserialize_with = "POINT::deserialize")]
+    pub public: POINT, // Public key
     pub private: POINT::SCALAR, // Private key
 }
 
-impl<POINT: Point> core::fmt::Display for Pair<POINT> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write! {f, "Keypair( public_key: {}, private_key: {} )", self.public, self.private}
+impl<POINT: Point> Debug for Pair<POINT> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Pair")
+            .field("public", &self.public)
+            .finish()
+    }
+}
+
+impl<POINT: Point> Display for Pair<POINT> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write! {f, "Pair( public_key: {} )", self.public}
     }
 }
 

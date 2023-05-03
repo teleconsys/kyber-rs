@@ -1,11 +1,11 @@
 use super::{Scalar, SuiteEd25519};
 use crate::{encoding::MarshallingError, Group, Scalar as ScalarTrait, XOFFactory};
+use core::{
+    fmt::{Debug, Display, Formatter, LowerHex, UpperHex},
+    ops::{self, Deref, DerefMut},
+};
 use criterion::{measurement::WallTime, BenchmarkGroup, Criterion};
 use lazy_static::lazy_static;
-use std::{
-    fmt::{Display, Formatter, LowerHex, UpperHex},
-    ops::Deref,
-};
 
 use serde::{Deserialize, Serialize};
 
@@ -41,7 +41,7 @@ impl SimpleCTScalar {
 }
 
 impl Display for SimpleCTScalar {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "SimpleCTScalar({})", self.s)
     }
 }
@@ -87,7 +87,7 @@ impl BinaryUnmarshaler for SimpleCTScalar {
 }
 
 impl LowerHex for SimpleCTScalar {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let prefix = if f.alternate() { "0x" } else { "" };
         let scalar_hex = format! {"{:x}", self.s};
         write!(f, "{prefix}{scalar_hex}")
@@ -95,14 +95,13 @@ impl LowerHex for SimpleCTScalar {
 }
 
 impl UpperHex for SimpleCTScalar {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let prefix = if f.alternate() { "0X" } else { "" };
         let scalar_hex = format! {"{:X}", self.s};
         write!(f, "{prefix}{scalar_hex}")
     }
 }
 
-use std::ops::{self, DerefMut};
 impl_op_ex!(
     *|a: &SimpleCTScalar, b: &SimpleCTScalar| -> SimpleCTScalar {
         // // a * b + c = a * b + 0
@@ -198,7 +197,7 @@ impl FactoredScalar {
 }
 
 impl Display for FactoredScalar {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "FactoredScalar({})", self.s)
     }
 }
@@ -244,7 +243,7 @@ impl BinaryUnmarshaler for FactoredScalar {
 }
 
 impl LowerHex for FactoredScalar {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let prefix = if f.alternate() { "0x" } else { "" };
         let scalar_hex = format! {"{:x}", self.s};
         write!(f, "{prefix}{scalar_hex}")
@@ -252,7 +251,7 @@ impl LowerHex for FactoredScalar {
 }
 
 impl UpperHex for FactoredScalar {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let prefix = if f.alternate() { "0X" } else { "" };
         let scalar_hex = format! {"{:X}", self.s};
         write!(f, "{prefix}{scalar_hex}")

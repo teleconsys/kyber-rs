@@ -1,4 +1,4 @@
-use std::ops::Add;
+use core::ops::Add;
 
 use num_bigint_dig::BigInt;
 
@@ -60,7 +60,7 @@ fn test_positive_big_int() {
 fn test_scalar_marshal() {
     assert_eq!(
         "ed.scala",
-        std::str::from_utf8(&Scalar::new().marshal_id()).unwrap()
+        core::str::from_utf8(&Scalar::new().marshal_id()).unwrap()
     );
 }
 

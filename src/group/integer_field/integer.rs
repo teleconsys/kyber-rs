@@ -1,8 +1,7 @@
-use core::fmt;
+use core::cmp::Ordering::{self, Equal, Greater};
+use core::fmt::{Display, Formatter, LowerHex, UpperHex};
 use lazy_static::lazy_static;
 use num_bigint_dig as num_bigint;
-use std::cmp::Ordering::{self, Equal, Greater};
-use std::fmt::{Display, Formatter, LowerHex, UpperHex};
 use thiserror::Error;
 
 use num_bigint::algorithms::jacobi;
@@ -204,7 +203,7 @@ impl Int {
 }
 
 impl Display for Int {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "{self:#x}")
     }
 }
@@ -303,7 +302,7 @@ impl Marshaling for Int {
 }
 
 impl LowerHex for Int {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let prefix = if f.alternate() { "0x" } else { "" };
         let encoded = hex::encode(self.v.to_bytes_be().1);
         write!(f, "{prefix}{encoded}")
@@ -311,14 +310,14 @@ impl LowerHex for Int {
 }
 
 impl UpperHex for Int {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let prefix = if f.alternate() { "0X" } else { "" };
         let encoded = hex::encode_upper(self.v.to_bytes_be().1);
         write!(f, "{prefix}{encoded}")
     }
 }
 
-use std::ops::{self, Sub};
+use core::ops::{self, Sub};
 impl_op_ex!(*|a: &Int, b: &Int| -> Int {
     let m = a.m.clone();
     let v = (a.v.clone() * b.v.clone()) % m.clone();

@@ -1,3 +1,4 @@
+use core::fmt::{Debug, Display, Formatter};
 /// module dss implements the Distributed Schnorr Signature protocol from the
 /// paper "Provably Secure Distributed Schnorr Signatures and a (t, n)
 /// Threshold Scheme for Implicit Certificates".
@@ -40,14 +41,14 @@ pub trait DistKeyShare<GROUP: Group>: Clone {
 
 /// [`DSS`] holds the information used to issue partial signatures as well as to
 /// compute the distributed schnorr signature.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DSS<SUITE: Suite, DKS: DistKeyShare<SUITE>> {
     suite: SUITE,
     pub(crate) secret: <SUITE::POINT as Point>::SCALAR,
     pub public: SUITE::POINT,
     pub index: usize,
     pub participants: Vec<SUITE::POINT>,
-    t: usize,
+    pub t: usize,
     long: DKS,
     random: DKS,
     long_poly: PubPoly<SUITE>,
@@ -56,7 +57,46 @@ pub struct DSS<SUITE: Suite, DKS: DistKeyShare<SUITE>> {
     pub partials: Vec<Option<PriShare<<SUITE::POINT as Point>::SCALAR>>>,
     partials_idx: HashMap<usize, bool>,
     signed: bool,
-    session_id: Vec<u8>,
+    pub session_id: Vec<u8>,
+}
+
+impl<SUITE: Suite, DKS: DistKeyShare<SUITE> + Debug> Debug for DSS<SUITE, DKS> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("DSS")
+            .field("suite", &self.suite)
+            .field("public", &self.public)
+            .field("index", &self.index)
+            .field("participants", &self.participants)
+            .field("t", &self.t)
+            .field("long_poly", &self.long_poly)
+            .field("random_poly", &self.random_poly)
+            .field("msg", &self.msg)
+            .field("partials", &self.partials)
+            .field("partials_idx", &self.partials_idx)
+            .field("signed", &self.signed)
+            .field("session_id", &self.session_id)
+            .finish()
+    }
+}
+
+impl<SUITE: Suite, DKS: DistKeyShare<SUITE> + Display> Display for DSS<SUITE, DKS> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write! (f, "DSS( suite: {}, public_key: {}, index: {}, participants: {:?}, threshold: {}, 
+            long_polynomial: {}, random_polynomial: {}, message: {:?}, partials: {:?}, partials_indexes: {:?}, 
+            signed: {}, session_id: {:?} )",
+            self.suite,
+            self.public,
+            self.index,
+            self.participants.iter().map(|p| p.to_string()).collect::<Vec<_>>(),
+            self.t,
+            self.long_poly,
+            self.random_poly,
+            self.msg,
+            self.partials.iter().map(|p| p.as_ref().map(|s| s.to_string())).collect::<Vec<_>>(),
+            self.partials_idx,
+            self.signed,
+            self.session_id)
+    }
 }
 
 /// [`PartialSig`] is partial representation of the final distributed signature. It

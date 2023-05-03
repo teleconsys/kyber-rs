@@ -2,6 +2,7 @@ use crate::{
     group::edwards25519::SuiteEd25519, util::random::RandStream, Group, Point, Random, Scalar,
 };
 use anyhow::Result;
+use core::str::from_utf8;
 
 pub fn el_gamal_encrypt<GROUP: Group>(
     group: GROUP,
@@ -81,16 +82,13 @@ fn example_el_gamal_encryption() {
         panic!("decryption failed: {}", dec_res.err().unwrap())
     }
     let mm = dec_res.unwrap();
-    if std::str::from_utf8(&mm).unwrap() != std::str::from_utf8(m).unwrap() {
+    if from_utf8(&mm).unwrap() != from_utf8(m).unwrap() {
         panic!(
             "decryption produced wrong output: {}",
-            std::str::from_utf8(&mm).unwrap()
+            from_utf8(&mm).unwrap()
         );
     }
-    println!(
-        "Decryption succeeded: {}",
-        std::str::from_utf8(&mm).unwrap()
-    )
+    println!("Decryption succeeded: {}", from_utf8(&mm).unwrap())
 
     // Output:
     // Decryption succeeded: The quick brown fox

@@ -14,6 +14,8 @@ use crate::group::integer_field::integer::ByteOrder::LittleEndian;
 use crate::group::integer_field::integer::Int;
 use subtle::ConstantTimeEq;
 
+use core::fmt::{Debug, Display, Formatter};
+
 use super::constants::{FULL_ORDER, L_MINUS2};
 
 const MARSHAL_SCALAR_ID: [u8; 8] = [b'e', b'd', b'.', b's', b'c', b'a', b'l', b'a'];
@@ -81,8 +83,8 @@ impl PartialEq for Scalar {
 }
 
 impl Display for Scalar {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Ed25519Scalar({self:#x})")
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Ed25519Scalar( {self:#x} )")
     }
 }
 
@@ -110,7 +112,7 @@ impl BinaryUnmarshaler for Scalar {
 }
 
 impl LowerHex for Scalar {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let prefix = if f.alternate() { "0x" } else { "" };
         let encoded = hex::encode(self.v);
         write!(f, "{prefix}{encoded}")
@@ -118,15 +120,15 @@ impl LowerHex for Scalar {
 }
 
 impl UpperHex for Scalar {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let prefix = if f.alternate() { "0X" } else { "" };
         let encoded = hex::encode_upper(self.v);
         write!(f, "{prefix}{encoded}")
     }
 }
 
-use std::fmt::{Display, LowerHex, UpperHex};
-use std::ops;
+use core::fmt::{LowerHex, UpperHex};
+use core::ops;
 impl_op_ex!(*|a: &Scalar, b: &Scalar| -> Scalar {
     let mut v = [0_u8; 32];
     sc_mul(&mut v, &a.v, &b.v);

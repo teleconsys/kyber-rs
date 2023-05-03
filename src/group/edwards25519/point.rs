@@ -1,4 +1,4 @@
-use std::fmt::{Display, LowerHex, UpperHex};
+use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 
 use serde::{Deserialize, Serialize};
 
@@ -241,13 +241,13 @@ impl PartialEq for Point {
 }
 
 impl Display for Point {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Ed25519Point({self:#x})")
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Ed25519Point( {self:#x} )")
     }
 }
 
 impl LowerHex for Point {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let prefix = if f.alternate() { "0x" } else { "" };
         let mut b = [0u8; 32];
         self.ge.write_bytes(&mut b);
@@ -257,7 +257,7 @@ impl LowerHex for Point {
 }
 
 impl UpperHex for Point {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let prefix = if f.alternate() { "0X" } else { "" };
         let mut b = [0u8; 32];
         self.ge.write_bytes(&mut b);

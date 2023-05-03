@@ -1,5 +1,6 @@
 use crate::util::key::{self, KeyError};
 use anyhow::{bail, Result};
+use core::fmt::{Debug, Display, Formatter};
 use digest::{Digest, DynDigest};
 
 use crate::{
@@ -16,7 +17,7 @@ use crate::{
 /// Suite represents the functionalities that this package can test
 pub trait Suite: Group + Random + HashFactory + XOFFactory + Clone + KeySuite {}
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 struct SuiteStable<SUITE: Suite> {
     suite: SUITE,
 }
@@ -54,12 +55,14 @@ impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>>
     }
 }
 
+impl<SUITE: Suite> Display for SuiteStable<SUITE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.suite)
+    }
+}
+
 impl<SUITE: Suite + Generator<<SUITE::POINT as Point>::SCALAR>> Group for SuiteStable<SUITE> {
     type POINT = SUITE::POINT;
-
-    fn string(&self) -> String {
-        self.suite.string()
-    }
 
     fn scalar_len(&self) -> usize {
         self.suite.scalar_len()
@@ -207,7 +210,7 @@ fn test_scalar_clone<GROUP: Group, S: Stream>(g: &GROUP, rand: &mut S) -> Result
 fn test_group<GROUP: Group, S: Stream>(g: GROUP, rand: &mut S) -> Result<Vec<GROUP::POINT>> {
     print!(
         "\nTesting group '{}': {}-byte Point, {}-byte Scalar\n",
-        g.string(),
+        g,
         g.point_len(),
         g.scalar_len()
     );

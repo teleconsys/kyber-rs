@@ -1,9 +1,9 @@
-use std::ops::DerefMut;
+use core::fmt::{Display, Formatter};
+use core::ops::{Deref, DerefMut};
 
 use serde::Deserialize;
 use serde::Serialize;
 use sha2::Sha256;
-use std::ops::Deref;
 
 use crate::cipher::Stream;
 use crate::group::edwards25519::curve::Curve;
@@ -84,12 +84,14 @@ impl Generator<Scalar> for SuiteEd25519 {
     }
 }
 
+impl Display for SuiteEd25519 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.curve)
+    }
+}
+
 impl Group for SuiteEd25519 {
     type POINT = Point;
-
-    fn string(&self) -> String {
-        self.curve.string()
-    }
 
     fn scalar(&self) -> Scalar {
         self.curve.scalar()

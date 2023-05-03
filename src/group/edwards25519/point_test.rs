@@ -10,7 +10,7 @@ use crate::{
 fn test_point_marshal() {
     let p = Point::new();
 
-    assert_eq!("ed.point", std::str::from_utf8(&p.marshal_id()).unwrap());
+    assert_eq!("ed.point", core::str::from_utf8(&p.marshal_id()).unwrap());
 }
 
 /// [`test_point_has_small_order()`] ensures [`WEAK_KEYS`] are considered to have

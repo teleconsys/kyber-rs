@@ -10,9 +10,9 @@ use thiserror::Error;
 use crate::cipher::stream::Stream;
 use crate::dh::{Dh, HmacCompatible};
 use crate::encoding::Marshaling;
-use std::fmt::{Debug, Display};
+use core::fmt::{Debug, Display};
+use core::ops::{Add, Mul};
 use std::io::Write;
-use std::ops::{Add, Mul};
 
 /// [`Scalar`] represents a scalar value by which
 /// a [`Point`] ([`Group`] element) may be encrypted to produce another [`Point`].
@@ -182,10 +182,8 @@ pub trait AllowsVarTime {
 /// Any implementation is also expected to satisfy
 /// the standard homomorphism properties that Diffie-Hellman
 /// and the associated body of public-key cryptography are based on.
-pub trait Group: Dh + Clone + Default {
+pub trait Group: Dh + Clone + Default + Debug + Display {
     type POINT: Point;
-
-    fn string(&self) -> String;
 
     /// [`scalar_len()`] returns the max length of scalars in bytes
     fn scalar_len(&self) -> usize;

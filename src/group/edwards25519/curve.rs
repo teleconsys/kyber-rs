@@ -1,3 +1,5 @@
+use core::fmt::{Debug, Display, Formatter};
+
 use crate::cipher::StreamError;
 use crate::dh::Dh;
 use crate::group::edwards25519::Point;
@@ -23,13 +25,14 @@ impl Dh for Curve {
     type H = Sha256;
 }
 
+impl Display for Curve {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Ed25519")
+    }
+}
+
 impl Group for Curve {
     type POINT = Point;
-
-    /// [`string()`] return the name of the curve, `Ed25519`.
-    fn string(&self) -> String {
-        "Ed25519".to_string()
-    }
 
     /// [`scalar()`] creates a new scalar for the prime-order subgroup of the Ed25519 curve.
     /// The scalars in this package implement scalar's [`set_bytes()`]
