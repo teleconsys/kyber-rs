@@ -106,11 +106,11 @@ fn test_vss_whole() {
         minimum_t(test_data.nb_verifiers),
     )
     .unwrap();
-    assert_eq!(dealer.secret.to_string(), sec.to_string());
+    assert_eq!(dealer.secret, sec);
 
     let pri_poly = dealer.private_poly();
     let pri_coeffs = pri_poly.coefficients();
-    assert_eq!(test_data.secret.to_string(), pri_coeffs[0].to_string())
+    assert_eq!(test_data.secret, pri_coeffs[0])
 }
 
 #[test]
@@ -119,8 +119,8 @@ fn test_vss_dealer_new() {
     let good_t = minimum_t(test_data.nb_verifiers);
     new_dealer(
         test_data.suite,
-        test_data.dealer_sec.clone(),
-        test_data.secret.clone(),
+        test_data.dealer_sec,
+        test_data.secret,
         &test_data.verifiers_pub,
         good_t,
     )
@@ -129,8 +129,8 @@ fn test_vss_dealer_new() {
     for bad_t in [0i32, 1, -4] {
         if let Err(VSSError::InvalidThreshold(_)) = new_dealer(
             test_data.suite,
-            test_data.dealer_sec.clone(),
-            test_data.secret.clone(),
+            test_data.dealer_sec,
+            test_data.secret,
             &test_data.verifiers_pub,
             bad_t as usize,
         ) {
@@ -145,7 +145,7 @@ fn test_vss_verifier_new() {
     let test_data = new_test_data();
     let rand_idx = rand::thread_rng().gen::<usize>() % test_data.verifiers_pub.len();
     let v = new_verifier(
-        &test_data.suite,
+        test_data.suite,
         &test_data.verifiers_sec[rand_idx],
         &test_data.dealer_pub,
         &test_data.verifiers_pub,
@@ -158,7 +158,7 @@ fn test_vss_verifier_new() {
         .scalar()
         .pick(&mut test_data.suite.random_stream());
     if let Err(VSSError::PublicKeyNotFound) = new_verifier(
-        &test_data.suite,
+        test_data.suite,
         &wrong_key,
         &test_data.dealer_pub,
         &test_data.verifiers_pub,
@@ -357,7 +357,7 @@ fn test_vss_verifier_receive_deal() {
 
     // wrong commitments
     // TODO: fix this check
-    let good_commit = d.commitments[0].clone();
+    let good_commit = d.commitments[0];
     d.commitments[0] = test_data
         .suite
         .point()
@@ -369,7 +369,7 @@ fn test_vss_verifier_receive_deal() {
     };
 
     let d = &mut dealer.deals[0];
-    d.commitments[0] = good_commit.clone();
+    d.commitments[0] = good_commit;
 
     // already seen twice
     if let Err(VSSError::DealAlreadyProcessed) = v.process_encrypted_deal(&enc_d) {
@@ -417,8 +417,8 @@ fn test_vss_aggregator_verify_justification() {
         .suite
         .scalar()
         .pick(&mut test_data.suite.random_stream());
-    let good_v = d.sec_share.v.clone();
-    d.sec_share.v = wrong_v.clone();
+    let good_v = d.sec_share.v;
+    d.sec_share.v = wrong_v;
     let enc_d = dealer.encrypted_deal(0).unwrap();
     let mut resp = v.process_encrypted_deal(&enc_d).unwrap();
     assert_eq!(resp.status, STATUS_COMPLAINT);
@@ -770,8 +770,8 @@ fn test_vss_session_id() {
     let test_data = new_test_data();
     let dealer = new_dealer(
         test_data.suite,
-        test_data.dealer_sec.clone(),
-        test_data.secret.clone(),
+        test_data.dealer_sec,
+        test_data.secret,
         &test_data.verifiers_pub,
         test_data.vss_threshold,
     )
@@ -830,15 +830,15 @@ fn test_vss_dhexchange() {
         .suite
         .scalar()
         .pick(&mut test_data.suite.random_stream());
-    let point = SuiteEd25519::dh_exchange(test_data.suite, privv.clone(), pubb.clone());
-    assert_eq!(pubb.mul(&privv, None).to_string(), point.to_string());
+    let point = SuiteEd25519::dh_exchange(test_data.suite, privv, pubb);
+    assert_eq!(pubb.mul(&privv, None), point);
 }
 
 #[test]
 fn test_vss_context() {
     let test_data = new_test_data();
     let c = vss::context(
-        &test_data.suite,
+        test_data.suite,
         &test_data.dealer_pub,
         &test_data.verifiers_pub,
     );
@@ -880,7 +880,7 @@ fn gen_all<SUITE: Suite>(test_data: &TestData<SUITE>) -> (Dealer<SUITE>, Vec<Ver
     let mut verifiers = vec![];
     for i in 0..NB_VERIFIERS {
         let v = new_verifier(
-            &test_data.suite,
+            test_data.suite,
             &test_data.verifiers_sec[i],
             &test_data.dealer_pub,
             &test_data.verifiers_pub,

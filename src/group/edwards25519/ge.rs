@@ -25,6 +25,7 @@ pub struct ProjectiveGroupElement {
 }
 
 impl ProjectiveGroupElement {
+    #[allow(dead_code)]
     fn zero(&mut self) {
         fe_zero(&mut self.x);
         fe_one(&mut self.y);
@@ -47,6 +48,7 @@ impl ProjectiveGroupElement {
         fe_sub(&mut r.t, &r_t, &r.z);
     }
 
+    #[allow(dead_code)]
     pub fn to_bytes(&self, s: &mut [u8; 32]) {
         let mut recip = FieldElement::default();
         let mut x = FieldElement::default();
@@ -67,10 +69,12 @@ fn test_from_bytes() {
         19, 80, 57, 234, 7, 56, 227, 90, 220, 227, 87, 78, 223,
     ];
     let mut el = ExtendedGroupElement::default();
-    assert!(el.from_bytes(&arr));
+    assert!(el.set_bytes(&arr));
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, Default)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default, Serialize, Deserialize,
+)]
 pub struct ExtendedGroupElement {
     pub x: FieldElement,
     pub y: FieldElement,
@@ -88,24 +92,24 @@ impl ExtendedGroupElement {
 
     pub fn double(&mut self, r: &mut CompletedGroupElement) {
         let mut q = ProjectiveGroupElement::default();
-        self.to_projective(&mut q);
+        self.write_projective(&mut q);
         q.double(r);
     }
 
-    pub fn to_cached(&self, r: &mut CachedGroupElement) {
+    pub fn write_cached(&self, r: &mut CachedGroupElement) {
         fe_add(&mut r.y_plus_x, &self.y, &self.x);
         fe_sub(&mut r.y_minus_x, &self.y, &self.x);
         fe_copy(&mut r.z, &self.z);
         fe_mul(&mut r.t2d, &self.t, &D2);
     }
 
-    fn to_projective(&self, r: &mut ProjectiveGroupElement) {
+    fn write_projective(&self, r: &mut ProjectiveGroupElement) {
         fe_copy(&mut r.x, &self.x);
         fe_copy(&mut r.y, &self.y);
         fe_copy(&mut r.z, &self.z);
     }
 
-    pub fn to_bytes(&self, s: &mut [u8; 32]) {
+    pub fn write_bytes(&self, s: &mut [u8; 32]) {
         let mut recip = FieldElement::default();
         let mut x = FieldElement::default();
         let mut y = FieldElement::default();
@@ -117,8 +121,7 @@ impl ExtendedGroupElement {
         s[31] ^= fe_is_negative(&x) << 7;
     }
 
-    pub fn from_bytes(&mut self, s: &[u8]) -> bool {
-        // println!("{:#?}", s);
+    pub fn set_bytes(&mut self, s: &[u8]) -> bool {
         let mut u = FieldElement::default();
         let mut v = FieldElement::default();
         let mut v3 = FieldElement::default();
@@ -175,6 +178,7 @@ impl ExtendedGroupElement {
         true
     }
 
+    #[allow(dead_code)]
     pub fn string(&self) -> String {
         "extendedGroupElement{\n\t".to_owned()
             + &format!("{:?}", self.x)
@@ -248,6 +252,7 @@ impl CompletedGroupElement {
         fe_add(&mut self.t, &t0, &self_t);
     }
 
+    #[allow(dead_code)]
     pub fn mixed_sub(&mut self, p: ExtendedGroupElement, q: PreComputedGroupElement) {
         let mut t0 = FieldElement::default();
 
@@ -530,11 +535,11 @@ pub fn ge_scalar_mult(
 
     // compute cached array of multiples of A from 1A through 8A
     let mut ai = [CachedGroupElement::default(); 8]; // A,1A,2A,3A,4A,5A,6A,7A
-    a_p.to_cached(&mut ai[0]);
+    a_p.write_cached(&mut ai[0]);
     for i in 0..7 {
         t.add(a_p, &ai[i]);
         t.to_extended(&mut u);
-        u.to_cached(&mut ai[i + 1]);
+        u.write_cached(&mut ai[i + 1]);
     }
 
     // special case for exponent nybble i == 63

@@ -1,8 +1,11 @@
 use super::{Scalar, SuiteEd25519};
 use crate::{encoding::MarshallingError, Group, Scalar as ScalarTrait, XOFFactory};
+use core::{
+    fmt::{Debug, Display, Formatter, LowerHex, UpperHex},
+    ops::{self, Deref, DerefMut},
+};
 use criterion::{measurement::WallTime, BenchmarkGroup, Criterion};
 use lazy_static::lazy_static;
-use std::ops::Deref;
 
 use serde::{Deserialize, Serialize};
 
@@ -26,9 +29,21 @@ lazy_static! {
 
 /// [`SimpleCTScalar`] implements the scalar operations only using [`sc_mul_add()`] by
 /// playing with the parameters.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Copy, Clone, Eq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct SimpleCTScalar {
     s: Scalar,
+}
+
+impl SimpleCTScalar {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Display for SimpleCTScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "SimpleCTScalar({})", self.s)
+    }
 }
 
 impl PartialEq for SimpleCTScalar {
@@ -71,13 +86,22 @@ impl BinaryUnmarshaler for SimpleCTScalar {
     }
 }
 
-impl ToString for SimpleCTScalar {
-    fn to_string(&self) -> String {
-        self.s.to_string()
+impl LowerHex for SimpleCTScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let prefix = if f.alternate() { "0x" } else { "" };
+        let scalar_hex = format! {"{:x}", self.s};
+        write!(f, "{prefix}{scalar_hex}")
     }
 }
 
-use std::ops::{self, DerefMut};
+impl UpperHex for SimpleCTScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let prefix = if f.alternate() { "0X" } else { "" };
+        let scalar_hex = format! {"{:X}", self.s};
+        write!(f, "{prefix}{scalar_hex}")
+    }
+}
+
 impl_op_ex!(
     *|a: &SimpleCTScalar, b: &SimpleCTScalar| -> SimpleCTScalar {
         // // a * b + c = a * b + 0
@@ -161,9 +185,21 @@ impl ScalarTrait for SimpleCTScalar {
 
 /// [`FactoredScalar`] implements the scalar operations using a factored version or
 /// [`sc_reduce_limbs()`] at the end of each operations.
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Copy, Clone, Eq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct FactoredScalar {
     s: Scalar,
+}
+
+impl FactoredScalar {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Display for FactoredScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "FactoredScalar({})", self.s)
+    }
 }
 
 impl PartialEq for FactoredScalar {
@@ -206,9 +242,19 @@ impl BinaryUnmarshaler for FactoredScalar {
     }
 }
 
-impl ToString for FactoredScalar {
-    fn to_string(&self) -> String {
-        self.s.to_string()
+impl LowerHex for FactoredScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let prefix = if f.alternate() { "0x" } else { "" };
+        let scalar_hex = format! {"{:x}", self.s};
+        write!(f, "{prefix}{scalar_hex}")
+    }
+}
+
+impl UpperHex for FactoredScalar {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let prefix = if f.alternate() { "0X" } else { "" };
+        let scalar_hex = format! {"{:X}", self.s};
+        write!(f, "{prefix}{scalar_hex}")
     }
 }
 

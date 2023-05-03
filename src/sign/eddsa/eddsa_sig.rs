@@ -139,7 +139,7 @@ impl EdDSA<Curve> {
 
         // response
         // s = r + h * s
-        let s = r + self.secret.clone() * h;
+        let s = r + self.secret * h;
 
         let s_buff = s.marshal_binary()?;
 

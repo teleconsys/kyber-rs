@@ -14,8 +14,10 @@ use serde::Deserialize;
 use serde::Serialize;
 use thiserror::Error;
 
+extern crate alloc;
+use alloc::vec;
+use core::fmt::{Debug, Display, Formatter};
 use std::collections::HashMap;
-use std::vec;
 
 use crate::encoding::BinaryMarshaler;
 
@@ -30,20 +32,23 @@ type ScalarMap<GROUP> = HashMap<usize, <<GROUP as Group>::POINT as Point>::SCALA
 type PointMap<GROUP> = HashMap<usize, <GROUP as Group>::POINT>;
 
 /// [`PriShare`] represents a private share.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct PriShare<SCALAR> {
     /// Index of the private share
     pub i: usize,
     /// Value of the private share
-    pub v: SCALAR,
+    pub(crate) v: SCALAR,
 }
 
-impl<SCALAR: Scalar> Default for PriShare<SCALAR> {
-    fn default() -> Self {
-        Self {
-            i: Default::default(),
-            v: Default::default(),
-        }
+impl<SCALAR: Scalar> Debug for PriShare<SCALAR> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("PriShare").field("i", &self.i).finish()
+    }
+}
+
+impl<SCALAR: Scalar> Display for PriShare<SCALAR> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "PriShare( index: {} )", self.i)
     }
 }
 
@@ -55,27 +60,26 @@ impl<SCALAR: Scalar> PriShare<SCALAR> {
         h.write_u32::<LittleEndian>(self.i as u32)?;
         Ok(h.finalize().to_vec())
     }
-
-    pub fn string(&self) -> String {
-        format!("{{{}:{}}}", self.i, self.v.to_string())
-    }
 }
 
 /// [`PriPoly`] represents a secret sharing polynomial.
-#[derive(Clone)]
+#[derive(Clone, Default, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PriPoly<GROUP: Group> {
     /// Cryptographic [`Group`]
-    g: GROUP,
+    pub g: GROUP,
     /// Coefficients of the polynomial
-    pub coeffs: Vec<<GROUP::POINT as Point>::SCALAR>,
+    pub(crate) coeffs: Vec<<GROUP::POINT as Point>::SCALAR>,
 }
 
-impl<GROUP: Group> Default for PriPoly<GROUP> {
-    fn default() -> Self {
-        Self {
-            g: Default::default(),
-            coeffs: Default::default(),
-        }
+impl<GROUP: Group> Debug for PriPoly<GROUP> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("PriPoly").field("g", &self.g).finish()
+    }
+}
+
+impl<GROUP: Group> Display for PriPoly<GROUP> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "PriPoly( group: {} )", self.g)
     }
 }
 
@@ -148,7 +152,7 @@ impl<GROUP: Group> PriPoly<GROUP> {
     /// [`add()`] computes the component-wise sum of the polynomials `p` and `q` and returns it
     /// as a new polynomial.
     pub fn add(&self, q: &PriPoly<GROUP>) -> Result<PriPoly<GROUP>, PolyError> {
-        if self.g.string() != q.g.string() {
+        if self.g.to_string() != q.g.to_string() {
             return Err(PolyError::NoGroupsMatch);
         }
         if self.threshold() != q.threshold() {
@@ -170,7 +174,7 @@ impl<GROUP: Group> PriPoly<GROUP> {
     /// returns in variable time. Otherwise it runs in constant time regardless of whether it
     /// eventually returns `true` or `false`.
     pub fn equal(&self, q: &PriPoly<GROUP>) -> Result<bool, PolyError> {
-        if self.g.string() != q.g.string() {
+        if self.g.to_string() != q.g.to_string() {
             return Ok(false);
         }
         if self.coeffs.len() != q.coeffs.len() {
@@ -358,18 +362,26 @@ impl<GROUP: Group> PriPoly<GROUP> {
     pub fn string(&self) -> String {
         let mut strs = Vec::with_capacity(self.coeffs.len());
         for c in self.coeffs.clone() {
-            strs.push(c.to_string());
+            strs.push(format!("{c}"));
         }
         "[ ".to_string() + &strs.join(", ") + " ]"
     }
 }
 
 /// [`PubShare`] represents a public share.
+#[derive(Clone, Copy, Default, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PubShare<POINT: Point> {
     /// Index of the public share
     pub i: usize,
     /// Value of the public share
+    #[serde(deserialize_with = "POINT::deserialize")]
     pub v: POINT,
+}
+
+impl<POINT: Point> Display for PubShare<POINT> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "PubShare( index: {}, value: {} )", self.i, self.v)
+    }
 }
 
 impl<POINT: Point> PubShare<POINT> {
@@ -383,7 +395,7 @@ impl<POINT: Point> PubShare<POINT> {
 }
 
 /// [`PubPoly`] represents a public commitment polynomial to a secret sharing polynomial.
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct PubPoly<GROUP: Group> {
     /// Cryptographic [`Group`]
     g: GROUP,
@@ -393,13 +405,18 @@ pub struct PubPoly<GROUP: Group> {
     commits: Vec<GROUP::POINT>,
 }
 
-impl<GROUP: Group> Default for PubPoly<GROUP> {
-    fn default() -> Self {
-        Self {
-            g: Default::default(),
-            b: Default::default(),
-            commits: Default::default(),
-        }
+impl<GROUP: Group> Display for PubPoly<GROUP> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "PubPoly( group: {}, base_point: {:?}, commits: {:?} )",
+            self.g,
+            self.b.as_ref().map(|b| b.to_string()),
+            self.commits
+                .iter()
+                .map(|c| c.to_string())
+                .collect::<Vec<_>>()
+        )
     }
 }
 
@@ -461,7 +478,7 @@ impl<GROUP: Group> PubPoly<GROUP> {
     /// `p.b` as a default value which of course does not correspond to the correct
     /// base point and thus should not be used in further computations.
     pub fn add(&self, q: &Self) -> Result<Self, PolyError> {
-        if self.g.string() != q.g.string() {
+        if self.g.to_string() != q.g.to_string() {
             return Err(PolyError::NoGroupsMatch);
         }
 
@@ -486,7 +503,7 @@ impl<GROUP: Group> PubPoly<GROUP> {
     /// this routine returns in variable time. Otherwise it runs in constant time
     /// regardless of whether it eventually returns `true` or `false`.
     pub fn equal(&self, q: &PubPoly<GROUP>) -> Result<bool, PolyError> {
-        if self.g.string() != q.g.string() {
+        if self.g.to_string() != q.g.to_string() {
             return Ok(false);
         }
         let mut b = true;

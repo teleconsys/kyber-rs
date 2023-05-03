@@ -1,5 +1,7 @@
 /// module key creates asymmetric key pairs.
+use core::fmt::{Debug, Display, Formatter};
 use crate::{group::edwards25519::CurveError, Group, Point, Random, Scalar};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// [`Generator`] is a type that needs to implement a special case in order
@@ -16,10 +18,25 @@ pub trait Suite: Group + Random {}
 
 /// [`Pair`] represents a public/private keypair together with the
 /// [`ciphersuite`](Suite) the key was generated from.
-#[derive(Debug, Clone)]
+#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Pair<POINT: Point> {
-    pub public: POINT,          // Public key
+    #[serde(deserialize_with = "POINT::deserialize")]
+    pub public: POINT, // Public key
     pub private: POINT::SCALAR, // Private key
+}
+
+impl<POINT: Point> Debug for Pair<POINT> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Pair")
+            .field("public", &self.public)
+            .finish()
+    }
+}
+
+impl<POINT: Point> Display for Pair<POINT> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write! {f, "Pair( public_key: {} )", self.public}
+    }
 }
 
 /// [`new_key_pair()`] directly creates a secret/public key pair
@@ -48,15 +65,6 @@ impl<POINT: Point> Pair<POINT> {
         };
         self.public = suite.point().mul(&self.private, None);
         Ok(())
-    }
-}
-
-impl<POINT: Point> Default for Pair<POINT> {
-    fn default() -> Self {
-        Pair {
-            private: POINT::SCALAR::default(),
-            public: POINT::default(),
-        }
     }
 }
 

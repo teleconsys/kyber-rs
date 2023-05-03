@@ -1,6 +1,7 @@
+use core::cmp::Ordering::{self, Equal, Greater};
+use core::fmt::{Display, Formatter, LowerHex, UpperHex};
 use lazy_static::lazy_static;
 use num_bigint_dig as num_bigint;
-use std::cmp::Ordering::{self, Equal, Greater};
 use thiserror::Error;
 
 use num_bigint::algorithms::jacobi;
@@ -67,7 +68,7 @@ impl From<bool> for ByteOrder {
 /// target objects, and receive the modulus of the first operand.
 /// For efficiency the modulus field m is a pointer,
 /// whose target is assumed never to change.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Eq, Debug, Serialize, Deserialize)]
 pub struct Int {
     /// integer value from `0` through `m-1`
     pub(crate) v: BigInt,
@@ -201,9 +202,27 @@ impl Int {
     }
 }
 
+impl Display for Int {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{self:#x}")
+    }
+}
+
 impl PartialEq for Int {
     fn eq(&self, other: &Self) -> bool {
         self.equal(other)
+    }
+}
+
+impl Ord for Int {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.cmpr(other)
+    }
+}
+
+impl PartialOrd for Int {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmpr(other))
     }
 }
 
@@ -282,13 +301,23 @@ impl Marshaling for Int {
     }
 }
 
-impl ToString for Int {
-    fn to_string(&self) -> String {
-        hex::encode(self.v.to_bytes_be().1)
+impl LowerHex for Int {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let prefix = if f.alternate() { "0x" } else { "" };
+        let encoded = hex::encode(self.v.to_bytes_be().1);
+        write!(f, "{prefix}{encoded}")
     }
 }
 
-use std::ops::{self, Sub};
+impl UpperHex for Int {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let prefix = if f.alternate() { "0X" } else { "" };
+        let encoded = hex::encode_upper(self.v.to_bytes_be().1);
+        write!(f, "{prefix}{encoded}")
+    }
+}
+
+use core::ops::{self, Sub};
 impl_op_ex!(*|a: &Int, b: &Int| -> Int {
     let m = a.m.clone();
     let v = (a.v.clone() * b.v.clone()) % m.clone();

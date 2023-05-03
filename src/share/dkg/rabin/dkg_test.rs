@@ -61,7 +61,7 @@ fn dkg_gen<SUITE: Suite>(t: &TestData<SUITE>) -> Vec<DistKeyGenerator<SUITE>> {
 #[test]
 fn test_dkg_new_dist_key_generator() {
     let t = new_test_data();
-    let long = t.part_sec[0].clone();
+    let long = t.part_sec[0];
     let mut dkg =
         new_dist_key_generator(&t.suite, &long, &t.part_pubs, t.nb_participants / 2 + 1).unwrap();
     // quick testing here; easier.
@@ -158,13 +158,7 @@ fn test_dkg_process_response() {
     //let deal = dkgs[0].dealer.PlaintextDeal(idx_rec).unwrap();
 
     // give a wrong deal
-    let good_secret = dkgs[0]
-        .dealer
-        .plaintext_deal(idx_rec)
-        .unwrap()
-        .rnd_share
-        .v
-        .clone();
+    let good_secret = dkgs[0].dealer.plaintext_deal(idx_rec).unwrap().rnd_share.v;
     dkgs[0].dealer.plaintext_deal(idx_rec).unwrap().rnd_share.v = t.suite.scalar().zero();
     let dd = dkgs[0].deals().unwrap();
     let enc_d = dd.get(&idx_rec).unwrap();
@@ -198,13 +192,7 @@ fn test_dkg_process_response() {
     // fake a wrong deal
     //deal20, err := dkg2.dealer.PlaintextDeal(0)
     //require.Nil(t, err)
-    let good_rnd_2_1 = dkgs[2]
-        .dealer
-        .plaintext_deal(1)
-        .unwrap()
-        .rnd_share
-        .v
-        .clone();
+    let good_rnd_2_1 = dkgs[2].dealer.plaintext_deal(1).unwrap().rnd_share.v;
     dkgs[2].dealer.plaintext_deal(1).unwrap().rnd_share.v = t.suite.scalar().zero();
     let mut deals_2 = dkgs[2].deals().unwrap();
 
@@ -282,7 +270,7 @@ fn test_dkg_secret_commits() {
     sc.session_id = good_sid;
 
     // wrong commitments
-    let good_point = sc.commitments[0].clone();
+    let good_point = sc.commitments[0];
     sc.commitments[0] = t.suite.point().null();
     let msg = sc.hash(&t.suite).unwrap();
     let sig = schnorr::sign(&t.suite, &dkgs[0].long, &msg).unwrap();
@@ -357,8 +345,8 @@ fn test_dkg_complaint_commits() {
     let good_deal = cc.deal;
     cc.deal = vss::rabin::vss::Deal {
         session_id: good_deal.session_id.clone(),
-        sec_share: good_deal.sec_share.clone(),
-        rnd_share: good_deal.rnd_share.clone(),
+        sec_share: good_deal.sec_share,
+        rnd_share: good_deal.rnd_share,
         t: good_deal.t,
         commitments: good_deal.commitments.clone(),
     };
@@ -515,8 +503,8 @@ fn test_dkg_reconstruct_commits() {
     let com = dkgs[2].commitments.get(&0);
     assert!(com.is_some());
     assert_eq!(
-        dkgs[0].dealer.secret_commit().unwrap().to_string(),
-        com.unwrap().commit().to_string()
+        dkgs[0].dealer.secret_commit().unwrap(),
+        com.unwrap().commit()
     );
 
     assert!(dkgs[2].finished());
@@ -659,13 +647,13 @@ fn test_dist_key_share() {
             dks.share.i,
             0
         );
-        shares.push(Some(dks.share.clone()));
+        shares.push(Some(dks.share));
     }
 
     let secret = recover_secret(t.suite, &shares, NB_PARTICIPANTS, NB_PARTICIPANTS).unwrap();
 
     let commit_secret = t.suite.point().mul(&secret, None);
-    assert_eq!(dkss[0].public().to_string(), commit_secret.to_string())
+    assert_eq!(dkss[0].public(), commit_secret)
 }
 
 fn gen_pair() -> (EdScalar, EdPoint) {

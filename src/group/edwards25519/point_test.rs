@@ -8,9 +8,9 @@ use crate::{
 
 #[test]
 fn test_point_marshal() {
-    let p = Point::default();
+    let p = Point::new();
 
-    assert_eq!("ed.point", std::str::from_utf8(&p.marshal_id()).unwrap());
+    assert_eq!("ed.point", core::str::from_utf8(&p.marshal_id()).unwrap());
 }
 
 /// [`test_point_has_small_order()`] ensures [`WEAK_KEYS`] are considered to have
@@ -18,7 +18,7 @@ fn test_point_marshal() {
 #[test]
 fn test_point_has_small_order() {
     for key in WEAK_KEYS {
-        let mut p = Point::default();
+        let mut p = Point::new();
         p.unmarshal_binary(&key).unwrap();
         assert!(p.has_small_order(), "weak keys should have a small order")
     }
@@ -35,7 +35,7 @@ fn test_point_has_small_order() {
 //     let mut buffer = PRIME.to_bytes_le().1;
 
 //     // Iterate over the 19*2 finite field elements
-//     let mut p = Point::default();
+//     let mut p = Point::new();
 //     let mut actual_non_canonical_count = 0;
 //     let expected_non_canonical_count = 24;
 //     for i in 0..19 {

@@ -9,7 +9,7 @@ use crate::cipher::Stream;
 /// Implementors must ensure that calls to these methods do not modify
 /// the underlying object so that other users of the object can access
 /// it concurrently.
-pub trait Marshaling: BinaryMarshaler + BinaryUnmarshaler + ToString {
+pub trait Marshaling: BinaryMarshaler + BinaryUnmarshaler {
     /// Encoded length of this object in bytes.
     fn marshal_size(&self) -> usize;
 

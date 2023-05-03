@@ -1,6 +1,5 @@
-use crate::util::test;
-
 use super::SuiteEd25519;
+use crate::util::test;
 
 impl test::Suite for SuiteEd25519 {}
 

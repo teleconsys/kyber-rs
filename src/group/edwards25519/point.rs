@@ -1,3 +1,5 @@
+use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -18,22 +20,28 @@ use super::{
 
 const MARSHAL_POINT_ID: [u8; 8] = [b'e', b'd', b'.', b'p', b'o', b'i', b'n', b't'];
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Copy, Clone, Eq, Ord, PartialOrd, Debug, Default, Serialize, Deserialize)]
 pub struct Point {
     ge: ExtendedGroupElement,
     var_time: bool,
 }
 
+impl Point {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 impl BinaryMarshaler for Point {
     fn marshal_binary(&self) -> Result<Vec<u8>, MarshallingError> {
         let mut b = [0_u8; 32];
-        self.ge.to_bytes(&mut b);
+        self.ge.write_bytes(&mut b);
         Ok(b.to_vec())
     }
 }
 impl BinaryUnmarshaler for Point {
     fn unmarshal_binary(&mut self, data: &[u8]) -> Result<(), MarshallingError> {
-        if !self.ge.from_bytes(data) {
+        if !self.ge.set_bytes(data) {
             return Err(MarshallingError::InvalidInput(
                 "invalid Ed25519 curve point".to_owned(),
             ));
@@ -85,7 +93,7 @@ impl group::Point for Point {
 
     fn set(&mut self, p: &Self) -> Self {
         self.ge = p.ge;
-        self.clone()
+        *self
     }
 
     fn embed_len(&self) -> usize {
@@ -117,7 +125,7 @@ impl group::Point for Point {
                 b[1..1 + dl].copy_from_slice(&d[0..dl]);
             }
             // Try to decode
-            if !self.ge.from_bytes(&b) {
+            if !self.ge.set_bytes(&b) {
                 // invalid point, retry
                 continue;
             }
@@ -160,7 +168,7 @@ impl group::Point for Point {
 
     fn data(&self) -> Result<Vec<u8>, PointError> {
         let mut b = [0u8; 32];
-        self.ge.to_bytes(&mut b);
+        self.ge.write_bytes(&mut b);
         let dl = b[0] as usize; // extract length byte
         if dl > self.embed_len() {
             return Err(PointError::EmbedDataLength);
@@ -172,7 +180,7 @@ impl group::Point for Point {
         let mut t2 = CachedGroupElement::default();
         let mut r = CompletedGroupElement::default();
 
-        p2.ge.to_cached(&mut t2);
+        p2.ge.write_cached(&mut t2);
         r.add(&p1.ge, &t2);
         r.to_extended(&mut self.ge);
 
@@ -183,7 +191,7 @@ impl group::Point for Point {
         let mut t2 = CachedGroupElement::default();
         let mut r = CompletedGroupElement::default();
 
-        p2.ge.to_cached(&mut t2);
+        p2.ge.write_cached(&mut t2);
         r.sub(&p1.ge, &t2);
         r.to_extended(&mut self.ge);
 
@@ -192,7 +200,7 @@ impl group::Point for Point {
 
     fn neg(&mut self, a: &Self) -> Self {
         self.ge.neg(&a.ge);
-        self.clone()
+        *self
     }
 
     /// [`mul()`] multiplies [`Point`] `p` by [`Scalar`] `s` using the repeated doubling method.
@@ -205,9 +213,9 @@ impl group::Point for Point {
             }
             Some(a_p) => {
                 if self.var_time {
-                    ge_scalar_mult_vartime(&mut self.ge, &mut a, &mut a_p.clone().ge);
+                    ge_scalar_mult_vartime(&mut self.ge, &mut a, &mut a_p.ge.clone());
                 } else {
-                    ge_scalar_mult(&mut self.ge, &mut a, &mut a_p.clone().ge);
+                    ge_scalar_mult(&mut self.ge, &mut a, &mut a_p.ge.clone());
                 }
             }
         }
@@ -221,8 +229,8 @@ impl PartialEq for Point {
     fn eq(&self, p2: &Self) -> bool {
         let mut b1 = [0_u8; 32];
         let mut b2 = [0_u8; 32];
-        self.ge.to_bytes(&mut b1);
-        p2.ge.to_bytes(&mut b2);
+        self.ge.write_bytes(&mut b1);
+        p2.ge.write_bytes(&mut b2);
         for i in 0..b1.len() {
             if b1[i] != b2[i] {
                 return false;
@@ -232,11 +240,29 @@ impl PartialEq for Point {
     }
 }
 
-impl ToString for Point {
-    fn to_string(&self) -> String {
+impl Display for Point {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Ed25519Point( {self:#x} )")
+    }
+}
+
+impl LowerHex for Point {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let prefix = if f.alternate() { "0x" } else { "" };
         let mut b = [0u8; 32];
-        self.ge.to_bytes(&mut b);
-        hex::encode(b)
+        self.ge.write_bytes(&mut b);
+        let encoded = hex::encode(b);
+        write!(f, "{prefix}{encoded}")
+    }
+}
+
+impl UpperHex for Point {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let prefix = if f.alternate() { "0X" } else { "" };
+        let mut b = [0u8; 32];
+        self.ge.write_bytes(&mut b);
+        let encoded = hex::encode_upper(b);
+        write!(f, "{prefix}{encoded}")
     }
 }
 
@@ -245,10 +271,10 @@ impl PointCanCheckCanonicalAndSmallOrder for Point {
     ///
     /// Provides resilience against malicious key substitution attacks (M-S-UEO)
     /// and message bound security (MSB) even for malicious keys
-    /// See paper https://eprint.iacr.org/2020/823.pdf for definitions and theorems
+    /// See paper <https://eprint.iacr.org/2020/823.pdf> for definitions and theorems
     ///
     /// This is the same code as in
-    /// https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1170
+    /// <https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1170>
     fn has_small_order(&self) -> bool {
         let s = match self.marshal_binary() {
             Ok(v) => v,
@@ -278,10 +304,10 @@ impl PointCanCheckCanonicalAndSmallOrder for Point {
     /// [`is_canonical()`] determines whether the group element is canonical
     ///
     /// Checks whether group element s is less than p, according to RFC8032§5.1.3.1
-    /// https://tools.ietf.org/html/rfc8032#section-5.1.3
+    /// <https://tools.ietf.org/html/rfc8032#section-5.1.3>
     ///
     /// Taken from
-    /// https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1113
+    /// <https://github.com/jedisct1/libsodium/blob/4744636721d2e420f8bbe2d563f31b1f5e682229/src/libsodium/crypto_core/ed25519/ref10/ed25519_ref10.c#L1113>
     ///
     /// The method accepts a buffer instead of calling `marshal_binary()` on the receiver
     /// because that always returns a value modulo `prime`.
