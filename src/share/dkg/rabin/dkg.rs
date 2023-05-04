@@ -297,7 +297,7 @@ pub struct DistKeyGenerator<SUITE: Suite> {
     pub suite: SUITE,
 
     pub index: u32,
-    pub(crate) long: <SUITE::POINT as Point>::SCALAR,
+    pub long: <SUITE::POINT as Point>::SCALAR,
     pub pubb: SUITE::POINT,
 
     pub participants: Vec<SUITE::POINT>,
