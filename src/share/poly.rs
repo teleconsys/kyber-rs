@@ -37,7 +37,7 @@ pub struct PriShare<SCALAR> {
     /// Index of the private share
     pub i: usize,
     /// Value of the private share
-    pub(crate) v: SCALAR,
+    pub v: SCALAR,
 }
 
 impl<SCALAR: Scalar> Debug for PriShare<SCALAR> {
