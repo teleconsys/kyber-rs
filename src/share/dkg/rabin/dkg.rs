@@ -33,7 +33,6 @@
 ///    must be broadcasted to all the QUAL participant.
 ///   7. At this point, every QUAL participant can issue the distributed key by
 ///    calling [`dist_key_share()`].
-
 extern crate alloc;
 use core::fmt::{Debug, Display, Formatter};
 use std::collections::HashMap;
@@ -76,7 +75,16 @@ impl<SUITE: Suite> Debug for DistKeyShare<SUITE> {
 
 impl<SUITE: Suite> Display for DistKeyShare<SUITE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "DistKeyShare( commits: {:?} )", self.commits)
+        write!(f, "DistKeyShare(")?;
+
+        write!(f, " commits: [")?;
+        let commits = self
+            .commits
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        write!(f, "{}] )", commits)
     }
 }
 
@@ -176,16 +184,22 @@ pub struct SecretCommits<SUITE: Suite> {
 
 impl<SUITE: Suite> Display for SecretCommits<SUITE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "SecretCommits( index: {},", self.index,)?;
+
+        write!(f, " commitments: [")?;
+        let commitments = self
+            .commitments
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        write!(f, "{}],", commitments)?;
+
         write!(
             f,
-            "SecretCommits( index: {}, commitments: {:?}, session_id: {:?}, signature: {:?} )",
-            self.index,
-            self.commitments
-                .iter()
-                .map(|c| c.to_string())
-                .collect::<Vec<_>>(),
-            self.session_id,
-            self.signature
+            " session_id: 0x{}, signature: 0x{} )",
+            hex::encode(&self.session_id),
+            hex::encode(&self.signature)
         )
     }
 }
@@ -222,8 +236,11 @@ impl<SUITE: Suite> Display for ComplaintCommits<SUITE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
-            "ComplaintCommits( index: {}, commitments: {}, session_id: {}, signature: {:?} )",
-            self.index, self.dealer_index, self.deal, self.signature
+            "ComplaintCommits( index: {}, dealer_index: {}, deal: {}, signature: 0x{} )",
+            self.index,
+            self.dealer_index,
+            self.deal,
+            hex::encode(&self.signature)
         )
     }
 }
@@ -272,8 +289,11 @@ impl<SUITE: Suite> Display for ReconstructCommits<SUITE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
-            "ReconstructCommits( session_id: {:?}, index: {}, dealer_index: {}, signature: {:?} )",
-            self.session_id, self.index, self.dealer_index, self.signature
+            "ReconstructCommits( session_id: 0x{}, index: {}, dealer_index: {}, signature: 0x{} )",
+            hex::encode(&self.session_id),
+            self.index,
+            self.dealer_index,
+            hex::encode(&self.signature)
         )
     }
 }
@@ -339,23 +359,63 @@ impl<T: Suite> Display for DistKeyGenerator<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
-            "DistKeyGenerator( suite: {}, public: {}, index: {}, threshold: {}, dealer: {}, 
-                verifiers: {:?}, commitments: {:?}, pending_reconstruct: {:?}, 
-                reconstructed: {:?}, participants: {:?} )",
-            self.suite,
-            self.pubb,
-            self.index,
-            self.t,
-            self.dealer,
-            self.verifiers,
-            self.commitments,
-            self.pending_reconstruct,
-            self.reconstructed,
-            self.participants
-                .iter()
-                .map(|p| p.to_string())
-                .collect::<Vec<_>>(),
-        )
+            "DistKeyGenerator( suite: {}, index: {}, public: {},",
+            self.suite, self.index, self.pubb,
+        )?;
+
+        write!(f, " participants: [")?;
+        let participants = self
+            .participants
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        write!(f, "{}],", participants)?;
+
+        write!(f, " threshold: {}, dealer: {},", self.t, self.dealer,)?;
+
+        write!(f, " verifiers: [")?;
+        let verifiers = self
+            .verifiers
+            .iter()
+            .map(|c| "(".to_string() + &c.0.to_string() + ", " + &c.1.to_string() + ")")
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "{}],", verifiers)?;
+
+        write!(f, " commitments: [")?;
+        let commitments = self
+            .commitments
+            .iter()
+            .map(|c| "(".to_string() + &c.0.to_string() + ", " + &c.1.to_string() + ")")
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "{}],", commitments)?;
+
+        write!(f, " pending_reconstruct: [")?;
+        let pending_reconstruct = self
+            .pending_reconstruct
+            .iter()
+            .map(|c| {
+                let vec_str =
+                    c.1.iter()
+                        .map(|c| c.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                "(".to_string() + &c.0.to_string() + ", [" + &vec_str + "])"
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "{}],", pending_reconstruct)?;
+
+        write!(f, " reconstructed: [")?;
+        let reconstructed = self
+            .reconstructed
+            .iter()
+            .map(|c| "(".to_string() + &c.0.to_string() + ", " + &c.1.to_string() + ")")
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "{}] )", reconstructed)
     }
 }
 

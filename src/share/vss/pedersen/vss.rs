@@ -64,17 +64,35 @@ impl<SUITE: Suite> Debug for Dealer<SUITE> {
 
 impl<SUITE: Suite> Display for Dealer<SUITE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write! {f, "Dealer( public_key: {},
-            verifiers: {:?}, hkdf_context: {:?}, 
-            threshold: {}, session_id: {:?}, deals: {:?}, aggregator: {} )",
-            self.pubb,
-            self.verifiers.iter().map(|v| v.to_string()).collect::<Vec<_>>(),
-            self.hkdf_context,
+        write!(f, "Dealer( public_key: {},", self.pubb)?;
+
+        write!(f, " verifiers: [")?;
+        let verifiers = self
+            .verifiers
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        write!(f, "{}],", verifiers)?;
+
+        write!(
+            f,
+            " hkdf_context: 0x{}, threshold: {}, session_id: 0x{},",
+            hex::encode(&self.hkdf_context),
             self.t,
-            self.session_id,
-            self.deals,
-            self.aggregator
-        }
+            hex::encode(&self.session_id),
+        )?;
+
+        write!(f, " deals: [")?;
+        let deals = self
+            .deals
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        write!(f, "{}],", deals)?;
+
+        write!(f, " aggregator: {} )", self.aggregator)
     }
 }
 
@@ -117,11 +135,19 @@ impl<SUITE: Suite> Debug for Deal<SUITE> {
 
 impl<SUITE: Suite> Display for Deal<SUITE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write! {f, "Deal( session_id: {:?}, threshold: {}, commitments: {:?} )",
-            self.session_id,
+        write! {f, "Deal( session_id: 0x{}, threshold: {},)",
+            hex::encode(&self.session_id),
             self.t,
-            self.commitments.iter().map(|c| c.to_string()).collect::<Vec<_>>()
-        }
+        }?;
+
+        write!(f, " commitments: [")?;
+        let commitments = self
+            .commitments
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        write!(f, "{}] )", commitments)
     }
 }
 
@@ -158,11 +184,11 @@ pub struct EncryptedDeal<POINT: Point> {
 
 impl<POINT: Point> Display for EncryptedDeal<POINT> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write! {f, "EncyptedDeal( dh_key: {}, signature: {:?}, nonce: {:?}, cipher: {:?} )",
+        write! {f, "EncyptedDeal( dh_key: {}, signature: 0x{}, nonce: 0x{}, cipher: 0x{} )",
             self.dhkey,
-            self.signature,
-            self.nonce,
-            self.cipher,
+            hex::encode(&self.signature),
+            hex::encode(&self.nonce),
+            hex::encode(&self.cipher),
         }
     }
 }
@@ -183,11 +209,11 @@ pub struct Response {
 
 impl Display for Response {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write! {f, "Response( session_id: {:?}, index: {}, status: {}, signature: {:?} )",
-        self.session_id,
+        write! {f, "Response( session_id: 0x{}, index: {}, status: {}, signature: 0x{} )",
+        hex::encode(&self.session_id),
         self.index,
         self.status,
-        self.signature
+        hex::encode(&self.signature)
         }
     }
 }
@@ -228,11 +254,11 @@ pub struct Justification<SUITE: Suite> {
 
 impl<SUITE: Suite> Display for Justification<SUITE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write! {f, "Justification( session_id: {:?}, index: {}, deal: {}, signature: {:?} )",
-        self.session_id,
+        write! {f, "Justification( session_id: 0x{}, index: {}, deal: {}, signature: 0x{} )",
+        hex::encode(&self.session_id),
         self.index,
         self.deal,
-        self.signature
+        hex::encode(&self.signature)
         }
     }
 }
@@ -472,14 +498,28 @@ impl<SUITE: Suite> Debug for Verifier<SUITE> {
 
 impl<SUITE: Suite> Display for Verifier<SUITE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write! {f, "Verifier( suite: {:?}, pubb: {}, dealer: {}, index: {}, verifiers: {:?}, hkdf_context: {:?}, aggregator: {:?} )",
+        write! {f, "Verifier( suite: {}, pubb: {}, dealer: {}, index: {},",
             self.suite,
             self.pubb,
             self.dealer,
-            self.index,
-            self.verifiers.iter().map(|v| v.to_string()).collect::<Vec<_>>(),
-            self.hkdf_context,
-            self.aggregator.as_ref().map(|a| a.to_string())
+            self.index
+        }?;
+
+        write!(f, " verifiers: [")?;
+        let verifiers = self
+            .verifiers
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        write!(f, "{}],", verifiers)?;
+
+        write!(f, " hkdf_context: 0x{},", hex::encode(&self.hkdf_context))?;
+
+        write!(f, " aggregator: ")?;
+        match self.aggregator {
+            Some(ref a) => write!(f, "Some({}) )", a),
+            None => write!(f, "None )"),
         }
     }
 }
@@ -740,19 +780,52 @@ pub struct Aggregator<SUITE: Suite> {
 
 impl<SUITE: Suite> Display for Aggregator<SUITE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write! {f, "Aggregator ( suite: {:?},  dealer: {}, verifiers: {:?}, commits: {:?},
-            responses: {:?}, session_id: {:?}, deal: {:?}, threshold: {}, bad_dealer: {}, timeout: {} )",
-            self.suite,
-            self.dealer,
-            self.verifiers.iter().map(|v| v.to_string()).collect::<Vec<_>>(),
-            self.commits.iter().map(|c| c.to_string()).collect::<Vec<_>>(),
-            self.responses,
-            self.sid,
-            self.deal.as_ref().map(|d| d.to_string()),
-            self.t,
-            self.bad_dealer,
-            self.timeout
-        }
+        write!(
+            f,
+            "Aggregator ( suite: {},  dealer: {},",
+            self.suite, self.dealer,
+        )?;
+
+        write!(f, " verifiers: [")?;
+        let verifiers = self
+            .verifiers
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        write!(f, "{}],", verifiers)?;
+
+        write!(f, " commits: [")?;
+        let commits = self
+            .commits
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        write!(f, "{}],", commits)?;
+
+        write!(f, " responses: [")?;
+        let responses = self
+            .responses
+            .iter()
+            .map(|c| "(".to_string() + &c.0.to_string() + ", " + &c.1.to_string() + ")")
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "{}],", responses)?;
+
+        write!(f, " session_id: 0x{},", hex::encode(&self.sid))?;
+
+        write!(f, " deal: ")?;
+        match self.deal {
+            Some(ref d) => write!(f, "Some({}),", d),
+            None => write!(f, "None,"),
+        }?;
+
+        write!(
+            f,
+            " threshold: {}, bad_dealer: {}, timeout: {} )",
+            self.t, self.bad_dealer, self.timeout
+        )
     }
 }
 

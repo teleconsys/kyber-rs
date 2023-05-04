@@ -407,16 +407,22 @@ pub struct PubPoly<GROUP: Group> {
 
 impl<GROUP: Group> Display for PubPoly<GROUP> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(
-            f,
-            "PubPoly( group: {}, base_point: {:?}, commits: {:?} )",
-            self.g,
-            self.b.as_ref().map(|b| b.to_string()),
-            self.commits
-                .iter()
-                .map(|c| c.to_string())
-                .collect::<Vec<_>>()
-        )
+        write!(f, "PubPoly( group: {},", self.g,)?;
+
+        write!(f, " base_point:")?;
+        match self.b {
+            Some(ref base) => write!(f, " Some({}),", base),
+            None => write!(f, " None,"),
+        }?;
+
+        write!(f, " commits: [")?;
+        let commits = self
+            .commits
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "{}] )", commits)
     }
 }
 

@@ -37,7 +37,16 @@ impl<SUITE: Suite> Debug for DistKeyShare<SUITE> {
 
 impl<SUITE: Suite> Display for DistKeyShare<SUITE> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "DistKeyShare( commits: {:?} )", self.commits)
+        write!(f, "DistKeyShare(")?;
+
+        write!(f, " commits: [")?;
+        let commits = self
+            .commits
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        write!(f, "{}] )", commits)
     }
 }
 
@@ -79,8 +88,10 @@ impl<POINT: Point> Display for Deal<POINT> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
-            "Deal( index: {}, deal: {}, signature: {:?} )",
-            self.index, self.deal, self.signature
+            "Deal( index: {}, deal: {}, signature: 0x{} )",
+            self.index,
+            self.deal,
+            hex::encode(&self.signature)
         )
     }
 }
