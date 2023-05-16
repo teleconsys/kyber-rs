@@ -84,7 +84,7 @@ impl PartialEq for Scalar {
 
 impl Display for Scalar {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Ed25519Scalar( {self:#x} )")
+        write!(f, "Ed25519Scalar({self:#x})")
     }
 }
 

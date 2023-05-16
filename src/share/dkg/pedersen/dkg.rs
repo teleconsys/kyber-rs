@@ -115,18 +115,54 @@ impl<SUITE: Suite, READ: Read + Clone> Debug for Config<SUITE, READ> {
 
 impl<SUITE: Suite, READ: Read + Clone> Display for Config<SUITE, READ> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write! {f, "Config( suite: {}, old_nodes: {:?}, public_coefficients: {:?}, new_nodes: {:?},
-            share: {:?}, threshold: {}, old_threshold: {}, reader: {}, user_reader_only: {} )",
-            self.suite,
-            self.old_nodes.iter().map(|n| n.to_string()).collect::<Vec<_>>(),
-            self.public_coeffs.as_ref().map(|f| f.iter().map(|p| p.to_string()).collect::<Vec<_>>()),
-            self.new_nodes.iter().map(|n| n.to_string()).collect::<Vec<_>>(),
-            self.share.as_ref().map(|s| s.to_string()),
+        write!(f, "Config( suite: {},", self.suite,)?;
+
+        write!(f, " old_nodes: [")?;
+        let old_nodes = self
+            .old_nodes
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        write!(f, "{}],", old_nodes)?;
+
+        match self.public_coeffs {
+            Some(ref p) => {
+                write!(f, "Some([")?;
+                let coeffs = p
+                    .iter()
+                    .map(|c| c.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                write!(f, "{}]),", coeffs)?;
+            }
+            None => write!(f, "None,")?,
+        };
+
+        write!(f, " new_nodes: [")?;
+        let new_nodes = self
+            .new_nodes
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        write!(f, "{}],", new_nodes)?;
+
+        write!(f, " share: ")?;
+        match self.share {
+            Some(ref s) => write!(f, "Some({})", s),
+            None => write!(f, "None"),
+        }?;
+        write!(f, ",")?;
+
+        write!(
+            f,
+            "threshold: {}, old_threshold: {}, reader: {}, user_reader_only: {} )",
             self.threshold,
             self.old_threshold,
             self.reader.is_some(),
             self.user_reader_only
-        }
+        )
     }
 }
 
@@ -196,17 +232,34 @@ impl<SUITE: Suite, READ: Read + Clone> Debug for DistKeyGenerator<SUITE, READ> {
 
 impl<SUITE: Suite, READ: Read + Clone> Display for DistKeyGenerator<SUITE, READ> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write! {f, "DistKeyGenerator( config: {}, suite: {:?}, public_key: {:?}, distributed_public_key: {:?},
-            dealer: {:?}, verifiers: {:?}, old_aggregators: {:?}, old_index: {}, new_index: {}, old_threshold: {}, 
-            new_threshold: {}, is_resharing: {}, can_issue: {}, can_receive: {}, new_present: {}, old_present: {}, 
-            processed: {}, timeout: {} )",
+        write! {f, "DistKeyGenerator( config: {}, suite: {}, public_key: {}, distributed_public_key: {},
+            dealer: {},",
             self.c,
             self.suite,
             self.pubb,
             self.dpub,
             self.dealer,
-            self.verifiers,
-            self.old_aggregators,
+        }?;
+
+        write!(f, " verifiers: [")?;
+        let verifiers = self
+            .verifiers
+            .iter()
+            .map(|c| "(".to_string() + &c.0.to_string() + ", " + &c.1.to_string() + ")")
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "{}],", verifiers)?;
+
+        write!(f, " old_aggregators: [")?;
+        let old_aggregators = self
+            .old_aggregators
+            .iter()
+            .map(|c| "(".to_string() + &c.0.to_string() + ", " + &c.1.to_string() + ")")
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "{}],", old_aggregators)?;
+
+        write!(f, " old_index: {}, new_index: {}, old_threshold: {}, new_threshold: {}, is_resharing: {}, can_issue: {}, can_receive: {}, new_present: {}, old_present: {}, processed: {}, timeout: {} )",
             self.oidx,
             self.nidx,
             self.old_t,
@@ -218,7 +271,7 @@ impl<SUITE: Suite, READ: Read + Clone> Display for DistKeyGenerator<SUITE, READ>
             self.old_present,
             self.processed,
             self.timeout
-        }
+        )
     }
 }
 

@@ -242,7 +242,7 @@ impl PartialEq for Point {
 
 impl Display for Point {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Ed25519Point( {self:#x} )")
+        write!(f, "Ed25519Point({self:#x})")
     }
 }
 

@@ -81,21 +81,57 @@ impl<SUITE: Suite, DKS: DistKeyShare<SUITE> + Debug> Debug for DSS<SUITE, DKS> {
 
 impl<SUITE: Suite, DKS: DistKeyShare<SUITE> + Display> Display for DSS<SUITE, DKS> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write! (f, "DSS( suite: {}, public_key: {}, index: {}, participants: {:?}, threshold: {}, 
-            long_polynomial: {}, random_polynomial: {}, message: {:?}, partials: {:?}, partials_indexes: {:?}, 
-            signed: {}, session_id: {:?} )",
-            self.suite,
-            self.public,
-            self.index,
-            self.participants.iter().map(|p| p.to_string()).collect::<Vec<_>>(),
+        write!(
+            f,
+            "DSS( suite: {}, public_key: {}, index: {},",
+            self.suite, self.public, self.index
+        )?;
+
+        write!(f, " participants: [")?;
+        let participants = self
+            .participants
+            .iter()
+            .map(|c| c.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        write!(f, "{}],", participants)?;
+
+        write!(
+            f,
+            "threshold: {}, long_polynomial: {}, random_polynomial: {}, message: 0x{},",
             self.t,
             self.long_poly,
             self.random_poly,
-            self.msg,
-            self.partials.iter().map(|p| p.as_ref().map(|s| s.to_string())).collect::<Vec<_>>(),
-            self.partials_idx,
+            hex::encode(&self.msg)
+        )?;
+
+        write!(f, " partials: [")?;
+        let partials = self
+            .partials
+            .iter()
+            .map(|c| match c {
+                Some(p) => "Some(".to_string() + &p.to_string() + ")",
+                None => "None".to_string(),
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        write!(f, "{}],", partials)?;
+
+        write!(f, " partials_indexes: [")?;
+        let partials_indexes = self
+            .partials_idx
+            .iter()
+            .map(|c| "(".to_string() + &c.0.to_string() + ", " + &c.1.to_string() + ")")
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "{}],", partials_indexes)?;
+
+        write!(
+            f,
+            "signed: {}, session_id: 0x{} )",
             self.signed,
-            self.session_id)
+            hex::encode(&self.session_id)
+        )
     }
 }
 

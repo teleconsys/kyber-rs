@@ -1,6 +1,6 @@
+use crate::{group::edwards25519::CurveError, Group, Point, Random, Scalar};
 /// module key creates asymmetric key pairs.
 use core::fmt::{Debug, Display, Formatter};
-use crate::{group::edwards25519::CurveError, Group, Point, Random, Scalar};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -35,7 +35,7 @@ impl<POINT: Point> Debug for Pair<POINT> {
 
 impl<POINT: Point> Display for Pair<POINT> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write! {f, "Pair( public_key: {} )", self.public}
+        write!(f, "Pair( public_key: {} )", self.public)
     }
 }
 
