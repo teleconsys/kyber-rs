@@ -240,6 +240,12 @@ impl PartialEq for Point {
     }
 }
 
+impl core::hash::Hash for Point {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.ge.hash(state);
+    }
+}
+
 impl Display for Point {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "Ed25519Point({self:#x})")
