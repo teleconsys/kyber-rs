@@ -242,7 +242,9 @@ impl PartialEq for Point {
 
 impl core::hash::Hash for Point {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.ge.hash(state);
+        let mut b = [0_u8; 32];
+        self.ge.write_bytes(&mut b);
+        b.hash(state);
     }
 }
 
